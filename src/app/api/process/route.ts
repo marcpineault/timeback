@@ -27,8 +27,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    const processedDir = path.join(process.cwd(), 'processed');
+    // Use env vars if set (for Railway volume mount), otherwise use defaults
+    const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
+    const processedDir = process.env.PROCESSED_DIR || path.join(process.cwd(), 'processed');
     const inputPath = path.join(uploadsDir, filename);
 
     // Verify file exists

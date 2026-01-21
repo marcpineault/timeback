@@ -11,7 +11,8 @@ export async function GET(
 
     // Sanitize filename to prevent directory traversal
     const sanitizedFilename = path.basename(filename);
-    const filepath = path.join(process.cwd(), 'processed', sanitizedFilename);
+    const processedDir = process.env.PROCESSED_DIR || path.join(process.cwd(), 'processed');
+    const filepath = path.join(processedDir, sanitizedFilename);
 
     if (!fs.existsSync(filepath)) {
       return NextResponse.json(

@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
     const filename = `${fileId}${ext}`;
 
     // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), 'uploads');
+    // Use UPLOADS_DIR env var if set (for Railway volume mount), otherwise use default
+    const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
     await mkdir(uploadsDir, { recursive: true });
 
     // Save file
