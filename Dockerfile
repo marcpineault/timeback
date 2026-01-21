@@ -1,8 +1,8 @@
 # Use Node.js LTS with Alpine for smaller image
 FROM node:20-alpine AS base
 
-# Install FFmpeg and dependencies
-RUN apk add --no-cache ffmpeg
+# Install FFmpeg, fonts, and dependencies
+RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu
 
 # Install dependencies only when needed
 FROM base AS deps

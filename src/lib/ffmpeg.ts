@@ -197,12 +197,13 @@ export async function removeSilence(
       .outputOptions([
         '-map', '[outv]',
         '-map', '[outa]',
-        // Hardware acceleration on Mac (VideoToolbox)
-        '-c:v', 'h264_videotoolbox',
-        '-q:v', '50',  // Quality (lower = better, 50 is good balance)
-        // Fast audio encoding
+        // Use libx264 with memory-efficient settings for server environments
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',  // Fastest preset, uses less memory
+        '-crf', '28',  // Slightly lower quality but much faster
+        '-threads', '1',  // Limit threads to reduce memory usage
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', '96k',  // Lower audio bitrate
       ])
       .output(outputPath)
       .on('end', () => {
@@ -210,26 +211,8 @@ export async function removeSilence(
         resolve(outputPath);
       })
       .on('error', (err) => {
-        // Fallback to software encoding if hardware fails
-        console.log(`[Silence Removal] Hardware encoding failed, trying software...`);
-        ffmpeg(inputPath)
-          .complexFilter(filterComplex)
-          .outputOptions([
-            '-map', '[outv]',
-            '-map', '[outa]',
-            '-c:v', 'libx264',
-            '-preset', 'veryfast',
-            '-crf', '23',
-            '-c:a', 'aac',
-            '-b:a', '128k',
-          ])
-          .output(outputPath)
-          .on('end', () => {
-            console.log(`[Silence Removal] Complete (software encoding)!`);
-            resolve(outputPath);
-          })
-          .on('error', reject)
-          .run();
+        console.error(`[Silence Removal] Error:`, err);
+        reject(err);
       })
       .run();
   });
@@ -279,10 +262,11 @@ export async function burnCaptions(
     const cmd = ffmpeg(inputPath)
       .videoFilters(filterString)
       .outputOptions([
-        // Hardware acceleration on Mac (VideoToolbox)
-        '-c:v', 'h264_videotoolbox',
-        '-q:v', '50',
-        // Copy audio (no re-encoding needed)
+        // Memory-efficient encoding for server environments
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
         '-c:a', 'copy',
       ])
       .output(outputPath)
@@ -296,29 +280,10 @@ export async function burnCaptions(
         try { fs.unlinkSync(tempSrtPath); } catch {}
         resolve(outputPath);
       })
-      .on('error', () => {
-        // Fallback to software encoding
-        console.log(`[Captions] Hardware encoding failed, trying software...`);
-        ffmpeg(inputPath)
-          .videoFilters(filterString)
-          .outputOptions([
-            '-c:v', 'libx264',
-            '-preset', 'veryfast',
-            '-crf', '23',
-            '-c:a', 'copy',
-          ])
-          .output(outputPath)
-          .on('end', () => {
-            console.log(`[Captions] Complete (software)!`);
-            try { fs.unlinkSync(tempSrtPath); } catch {}
-            resolve(outputPath);
-          })
-          .on('error', (err) => {
-            console.error(`[Captions] Error:`, err);
-            try { fs.unlinkSync(tempSrtPath); } catch {}
-            reject(err);
-          })
-          .run();
+      .on('error', (err) => {
+        console.error(`[Captions] Error:`, err);
+        try { fs.unlinkSync(tempSrtPath); } catch {}
+        reject(err);
       });
 
     cmd.run();
@@ -359,9 +324,9 @@ export async function addHeadline(
   }
 
   // Use drawtext with box option for background
-  // Using Helvetica for a clean professional look, thin box padding for reels
+  // Using sans-serif font (works on Linux/Docker), thin box padding for reels
   // Only show for first 5 seconds with enable='between(t,0,5)'
-  const filterString = `drawtext=text='${escapedHeadline}':fontfile=/System/Library/Fonts/Helvetica.ttc:fontsize=40:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.75:boxborderw=12:enable='between(t,0,5)'`;
+  const filterString = `drawtext=text='${escapedHeadline}':fontsize=40:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.75:boxborderw=12:enable='between(t,0,5)'`;
 
   console.log(`[Headline] Adding headline: "${headline}" at ${position}`);
 
@@ -369,8 +334,11 @@ export async function addHeadline(
     ffmpeg(inputPath)
       .videoFilters(filterString)
       .outputOptions([
-        '-c:v', 'h264_videotoolbox',
-        '-q:v', '50',
+        // Memory-efficient encoding for server environments
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
         '-c:a', 'copy',
       ])
       .output(outputPath)
@@ -378,24 +346,9 @@ export async function addHeadline(
         console.log(`[Headline] Complete!`);
         resolve(outputPath);
       })
-      .on('error', () => {
-        // Fallback to software encoding
-        console.log(`[Headline] Hardware encoding failed, trying software...`);
-        ffmpeg(inputPath)
-          .videoFilters(filterString)
-          .outputOptions([
-            '-c:v', 'libx264',
-            '-preset', 'veryfast',
-            '-crf', '23',
-            '-c:a', 'copy',
-          ])
-          .output(outputPath)
-          .on('end', () => {
-            console.log(`[Headline] Complete (software)!`);
-            resolve(outputPath);
-          })
-          .on('error', reject)
-          .run();
+      .on('error', (err) => {
+        console.error(`[Headline] Error:`, err);
+        reject(err);
       })
       .run();
   });
