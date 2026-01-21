@@ -1,0 +1,621 @@
+import ffmpeg from 'fluent-ffmpeg';
+import path from 'path';
+import fs from 'fs';
+
+export interface SilenceInterval {
+  start: number;
+  end: number;
+}
+
+export interface ProcessingOptions {
+  silenceThreshold?: number; // in dB, default -30
+  silenceDuration?: number; // minimum silence duration in seconds, default 0.5
+  headline?: string;
+  headlinePosition?: 'top' | 'center' | 'bottom';
+  captionStyle?: 'default' | 'bold' | 'outline';
+}
+
+/**
+ * Detect silent intervals in a video
+ */
+export async function detectSilence(
+  inputPath: string,
+  threshold: number = -20,
+  minDuration: number = 0.5
+): Promise<SilenceInterval[]> {
+  return new Promise((resolve, reject) => {
+    const silences: SilenceInterval[] = [];
+    let currentSilenceStart: number | null = null;
+
+    console.log(`[Silence Detection] Starting with threshold=${threshold}dB, minDuration=${minDuration}s`);
+
+    ffmpeg(inputPath)
+      .audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`)
+      .format('null')
+      .output('/dev/null')
+      .on('stderr', (line: string) => {
+        // Parse silence_start
+        const startMatch = line.match(/silence_start: ([\d.]+)/);
+        if (startMatch) {
+          currentSilenceStart = parseFloat(startMatch[1]);
+          console.log(`[Silence Detection] Found silence start at ${currentSilenceStart}s`);
+        }
+
+        // Parse silence_end
+        const endMatch = line.match(/silence_end: ([\d.]+)/);
+        if (endMatch && currentSilenceStart !== null) {
+          const endTime = parseFloat(endMatch[1]);
+          silences.push({
+            start: currentSilenceStart,
+            end: endTime,
+          });
+          console.log(`[Silence Detection] Found silence end at ${endTime}s (duration: ${(endTime - currentSilenceStart).toFixed(2)}s)`);
+          currentSilenceStart = null;
+        }
+      })
+      .on('end', () => {
+        console.log(`[Silence Detection] Complete. Found ${silences.length} silent intervals`);
+        resolve(silences);
+      })
+      .on('error', (err) => {
+        console.error(`[Silence Detection] Error:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
+ * Get video duration
+ */
+export async function getVideoDuration(inputPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return reject(err);
+      resolve(metadata.format.duration || 0);
+    });
+  });
+}
+
+/**
+ * Calculate non-silent segments from silence intervals
+ * Includes padding and filtering for more accurate cuts
+ */
+export function getNonSilentSegments(
+  silences: SilenceInterval[],
+  totalDuration: number,
+  options: { padding?: number; minSegmentDuration?: number; mergeGap?: number } = {}
+): SilenceInterval[] {
+  const padding = options.padding ?? 0.05; // 50ms padding around speech
+  const minSegmentDuration = options.minSegmentDuration ?? 0.15; // Ignore segments shorter than 150ms
+  const mergeGap = options.mergeGap ?? 0.1; // Merge segments less than 100ms apart
+
+  let segments: SilenceInterval[] = [];
+  let lastEnd = 0;
+
+  for (const silence of silences) {
+    if (silence.start > lastEnd) {
+      // Add padding: start slightly earlier, end slightly later
+      const paddedStart = Math.max(0, lastEnd - padding);
+      const paddedEnd = Math.min(totalDuration, silence.start + padding);
+      segments.push({ start: paddedStart, end: paddedEnd });
+    }
+    lastEnd = silence.end;
+  }
+
+  // Add final segment if there's content after last silence
+  if (lastEnd < totalDuration) {
+    const paddedStart = Math.max(0, lastEnd - padding);
+    segments.push({ start: paddedStart, end: totalDuration });
+  }
+
+  // Filter out segments that are too short
+  segments = segments.filter(seg => (seg.end - seg.start) >= minSegmentDuration);
+
+  // Merge segments that are very close together
+  if (segments.length > 1) {
+    const mergedSegments: SilenceInterval[] = [segments[0]];
+    for (let i = 1; i < segments.length; i++) {
+      const prev = mergedSegments[mergedSegments.length - 1];
+      const curr = segments[i];
+
+      // If gap between segments is small, merge them
+      if (curr.start - prev.end <= mergeGap) {
+        prev.end = curr.end;
+      } else {
+        mergedSegments.push(curr);
+      }
+    }
+    segments = mergedSegments;
+  }
+
+  console.log(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s)`);
+
+  return segments;
+}
+
+/**
+ * Remove silent parts from video by concatenating non-silent segments
+ */
+export async function removeSilence(
+  inputPath: string,
+  outputPath: string,
+  options: ProcessingOptions = {}
+): Promise<string> {
+  const threshold = options.silenceThreshold ?? -20;
+  const minDuration = options.silenceDuration ?? 0.5;
+
+  // Detect silences
+  const silences = await detectSilence(inputPath, threshold, minDuration);
+  const duration = await getVideoDuration(inputPath);
+
+  console.log(`[Silence Removal] Video duration: ${duration.toFixed(2)}s`);
+  console.log(`[Silence Removal] Found ${silences.length} silent intervals`);
+
+  const segments = getNonSilentSegments(silences, duration);
+
+  console.log(`[Silence Removal] Non-silent segments to keep:`);
+  segments.forEach((seg, i) => {
+    console.log(`  Segment ${i + 1}: ${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s (${(seg.end - seg.start).toFixed(2)}s)`);
+  });
+
+  if (segments.length === 0) {
+    throw new Error('No non-silent segments found in video');
+  }
+
+  // If no silences found, just copy the file
+  if (silences.length === 0) {
+    console.log(`[Silence Removal] No silences found, copying original file`);
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
+  // Create filter complex for concatenating segments
+  const filterParts: string[] = [];
+  const concatInputs: string[] = [];
+
+  segments.forEach((segment, index) => {
+    filterParts.push(
+      `[0:v]trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS[v${index}]`
+    );
+    filterParts.push(
+      `[0:a]atrim=start=${segment.start}:end=${segment.end},asetpts=PTS-STARTPTS[a${index}]`
+    );
+    concatInputs.push(`[v${index}][a${index}]`);
+  });
+
+  const filterComplex = [
+    ...filterParts,
+    `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`,
+  ].join(';');
+
+  console.log(`[Silence Removal] Processing ${segments.length} segments...`);
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .complexFilter(filterComplex)
+      .outputOptions([
+        '-map', '[outv]',
+        '-map', '[outa]',
+        // Hardware acceleration on Mac (VideoToolbox)
+        '-c:v', 'h264_videotoolbox',
+        '-q:v', '50',  // Quality (lower = better, 50 is good balance)
+        // Fast audio encoding
+        '-c:a', 'aac',
+        '-b:a', '128k',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Silence Removal] Complete!`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        // Fallback to software encoding if hardware fails
+        console.log(`[Silence Removal] Hardware encoding failed, trying software...`);
+        ffmpeg(inputPath)
+          .complexFilter(filterComplex)
+          .outputOptions([
+            '-map', '[outv]',
+            '-map', '[outa]',
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+          ])
+          .output(outputPath)
+          .on('end', () => {
+            console.log(`[Silence Removal] Complete (software encoding)!`);
+            resolve(outputPath);
+          })
+          .on('error', reject)
+          .run();
+      })
+      .run();
+  });
+}
+
+/**
+ * Burn captions (subtitles) into video
+ */
+export async function burnCaptions(
+  inputPath: string,
+  outputPath: string,
+  srtPath: string,
+  style: string = 'default'
+): Promise<string> {
+  // Clean centered captions - minimal style
+  // Alignment=2 is bottom-center, MarginV positions vertically
+  const styleMap: Record<string, string> = {
+    // Default: clean, small white text with subtle shadow for readability
+    default: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100',
+    // Bold style
+    bold: 'Fontname=Arial,FontSize=11,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100',
+    // Outline style
+    outline: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=1,Shadow=0,Alignment=2,MarginV=100',
+  };
+
+  const subtitleStyle = styleMap[style] || styleMap.default;
+
+  console.log(`[Captions] Burning captions from: ${srtPath}`);
+  console.log(`[Captions] Style: ${style}`);
+
+  // Read and log SRT content for debugging
+  const srtContent = fs.readFileSync(srtPath, 'utf-8');
+  const lineCount = srtContent.split('\n').length;
+  console.log(`[Captions] SRT file has ${lineCount} lines`);
+
+  // Copy SRT to a temp file with simple name to avoid FFmpeg path escaping issues
+  const tempSrtName = 'temp_subs.srt';
+  const srtDir = path.dirname(srtPath);
+  const tempSrtPath = path.join(srtDir, tempSrtName);
+  fs.copyFileSync(srtPath, tempSrtPath);
+
+  const escapedPath = tempSrtPath.replace(/:/g, '\\:').replace(/'/g, "'\\''");
+  const filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
+  console.log(`[Captions] Filter: ${filterString}`);
+
+  return new Promise((resolve, reject) => {
+    const cmd = ffmpeg(inputPath)
+      .videoFilters(filterString)
+      .outputOptions([
+        // Hardware acceleration on Mac (VideoToolbox)
+        '-c:v', 'h264_videotoolbox',
+        '-q:v', '50',
+        // Copy audio (no re-encoding needed)
+        '-c:a', 'copy',
+      ])
+      .output(outputPath)
+      .on('stderr', (line: string) => {
+        if (line.includes('subtitle') || line.includes('Error') || line.includes('error')) {
+          console.log(`[Captions FFmpeg] ${line}`);
+        }
+      })
+      .on('end', () => {
+        console.log(`[Captions] Complete!`);
+        try { fs.unlinkSync(tempSrtPath); } catch {}
+        resolve(outputPath);
+      })
+      .on('error', () => {
+        // Fallback to software encoding
+        console.log(`[Captions] Hardware encoding failed, trying software...`);
+        ffmpeg(inputPath)
+          .videoFilters(filterString)
+          .outputOptions([
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-crf', '23',
+            '-c:a', 'copy',
+          ])
+          .output(outputPath)
+          .on('end', () => {
+            console.log(`[Captions] Complete (software)!`);
+            try { fs.unlinkSync(tempSrtPath); } catch {}
+            resolve(outputPath);
+          })
+          .on('error', (err) => {
+            console.error(`[Captions] Error:`, err);
+            try { fs.unlinkSync(tempSrtPath); } catch {}
+            reject(err);
+          })
+          .run();
+      });
+
+    cmd.run();
+  });
+}
+
+/**
+ * Add headline text overlay to video with background box
+ */
+export async function addHeadline(
+  inputPath: string,
+  outputPath: string,
+  headline: string,
+  position: 'top' | 'center' | 'bottom' = 'top'
+): Promise<string> {
+  // Y positions for the text
+  const yPositions: Record<string, string> = {
+    top: 'y=240',
+    center: 'y=(h-text_h)/2',
+    bottom: 'y=h-text_h-240',
+  };
+
+  // Escape special characters for FFmpeg drawtext filter
+  // Replace apostrophes and quotes, escape colons and backslashes
+  let escapedHeadline = headline
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, '\u2019')  // Replace apostrophe with unicode right single quote
+    .replace(/"/g, '\u201d')  // Replace double quote with unicode right double quote
+    .replace(/:/g, '\\:');
+
+  // Split into two lines if longer than ~30 chars
+  if (escapedHeadline.length > 30) {
+    const words = escapedHeadline.split(' ');
+    const midpoint = Math.ceil(words.length / 2);
+    const line1 = words.slice(0, midpoint).join(' ');
+    const line2 = words.slice(midpoint).join(' ');
+    escapedHeadline = `${line1}\n${line2}`;
+  }
+
+  // Use drawtext with box option for background
+  // Using Helvetica for a clean professional look, thin box padding for reels
+  // Only show for first 5 seconds with enable='between(t,0,5)'
+  const filterString = `drawtext=text='${escapedHeadline}':fontfile=/System/Library/Fonts/Helvetica.ttc:fontsize=40:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.75:boxborderw=12:enable='between(t,0,5)'`;
+
+  console.log(`[Headline] Adding headline: "${headline}" at ${position}`);
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .videoFilters(filterString)
+      .outputOptions([
+        '-c:v', 'h264_videotoolbox',
+        '-q:v', '50',
+        '-c:a', 'copy',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Headline] Complete!`);
+        resolve(outputPath);
+      })
+      .on('error', () => {
+        // Fallback to software encoding
+        console.log(`[Headline] Hardware encoding failed, trying software...`);
+        ffmpeg(inputPath)
+          .videoFilters(filterString)
+          .outputOptions([
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-crf', '23',
+            '-c:a', 'copy',
+          ])
+          .output(outputPath)
+          .on('end', () => {
+            console.log(`[Headline] Complete (software)!`);
+            resolve(outputPath);
+          })
+          .on('error', reject)
+          .run();
+      })
+      .run();
+  });
+}
+
+export interface BRollCutaway {
+  timestamp: number;
+  duration: number;
+  context: string;  // Context text used to generate contextual animation
+}
+
+/**
+ * Convert an image to a video clip with subtle ken burns effect
+ */
+export async function imageToVideoClip(
+  imagePath: string,
+  outputPath: string,
+  duration: number,
+  videoWidth: number = 1080,
+  videoHeight: number = 1920
+): Promise<string> {
+  console.log(`[B-Roll] Converting image to ${duration}s video clip`);
+
+  return new Promise((resolve, reject) => {
+    // Ken burns effect: slow zoom in
+    const filterComplex = [
+      `scale=${videoWidth * 1.1}:${videoHeight * 1.1}`,
+      `zoompan=z='min(zoom+0.001,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${duration * 30}:s=${videoWidth}x${videoHeight}:fps=30`
+    ].join(',');
+
+    ffmpeg(imagePath)
+      .loop(1)
+      .inputOptions(['-t', String(duration)])
+      .videoFilters(filterComplex)
+      .outputOptions([
+        '-c:v', 'libx264',
+        '-t', String(duration),
+        '-pix_fmt', 'yuv420p',
+        '-r', '30',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[B-Roll] Video clip created: ${outputPath}`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[B-Roll] Error creating clip:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
+ * Insert animated B-roll overlays on top of the video
+ */
+export async function insertBRollCutaways(
+  inputPath: string,
+  outputPath: string,
+  cutaways: BRollCutaway[],
+  outputDir: string
+): Promise<string> {
+  if (cutaways.length === 0) {
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
+  console.log(`[B-Roll] Overlaying ${cutaways.length} animated B-roll clips`);
+
+  // Get video dimensions
+  const videoInfo = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return reject(err);
+      const video = metadata.streams.find(s => s.codec_type === 'video');
+      resolve({
+        width: video?.width || 1080,
+        height: video?.height || 1920,
+      });
+    });
+  });
+
+  // Import animation generator
+  const { generateContextualAnimation } = await import('./animations');
+
+  // Sort cutaways by timestamp
+  const sortedCutaways = [...cutaways].sort((a, b) => a.timestamp - b.timestamp);
+
+  // Generate animation videos for each cutaway
+  const animationPaths: string[] = [];
+  for (let i = 0; i < sortedCutaways.length; i++) {
+    const cutaway = sortedCutaways[i];
+    const animPath = path.join(outputDir, `anim_${i}.mp4`);
+
+    // Generate contextual animation based on the context
+    await generateContextualAnimation(
+      animPath,
+      cutaway.duration,
+      videoInfo.width,
+      videoInfo.height,
+      cutaway.context
+    );
+    animationPaths.push(animPath);
+  }
+
+  // Build filter complex for overlaying animations
+  const filterParts: string[] = [];
+  const inputLabels: string[] = ['0:v'];
+
+  // Add each animation as an input
+  for (let i = 0; i < animationPaths.length; i++) {
+    inputLabels.push(`${i + 1}:v`);
+  }
+
+  let lastOutput = '0:v';
+
+  for (let i = 0; i < sortedCutaways.length; i++) {
+    const cutaway = sortedCutaways[i];
+    const startTime = cutaway.timestamp;
+    const duration = cutaway.duration;
+    const fadeTime = 0.3;
+
+    // Scale animation to overlay size (centered, 80% of video)
+    const overlayWidth = Math.floor(videoInfo.width * 0.8);
+    const overlayHeight = Math.floor(videoInfo.height * 0.4);
+    const xPos = Math.floor((videoInfo.width - overlayWidth) / 2);
+    const yPos = Math.floor((videoInfo.height - overlayHeight) / 2);
+
+    // Scale and fade the animation
+    filterParts.push(
+      `[${i + 1}:v]scale=${overlayWidth}:${overlayHeight},format=rgba,fade=t=in:st=0:d=${fadeTime}:alpha=1,fade=t=out:st=${duration - fadeTime}:d=${fadeTime}:alpha=1[anim${i}]`
+    );
+
+    // Overlay on video with time enable
+    const inputLabel = lastOutput;
+    const outputLabel = i < sortedCutaways.length - 1 ? `tmp${i}` : 'outv';
+    filterParts.push(
+      `[${inputLabel}][anim${i}]overlay=x=${xPos}:y=${yPos}:enable='between(t,${startTime},${startTime + duration})'[${outputLabel}]`
+    );
+    lastOutput = outputLabel;
+  }
+
+  const filterComplex = filterParts.join(';');
+  console.log(`[B-Roll] Filter complex: ${filterComplex.substring(0, 200)}...`);
+
+  return new Promise((resolve, reject) => {
+    let cmd = ffmpeg(inputPath);
+
+    // Add animation videos as inputs
+    for (const animPath of animationPaths) {
+      cmd = cmd.input(animPath);
+    }
+
+    cmd
+      .complexFilter(filterComplex)
+      .outputOptions([
+        '-map', '[outv]',
+        '-map', '0:a',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '23',
+        '-c:a', 'copy',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[B-Roll] Animated overlays added successfully`);
+        // Clean up animation files
+        for (const animPath of animationPaths) {
+          try { fs.unlinkSync(animPath); } catch {}
+        }
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[B-Roll] Error adding overlays:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
+ * Full processing pipeline: remove silence, add captions, add headline
+ */
+export async function processVideo(
+  inputPath: string,
+  outputDir: string,
+  srtPath?: string,
+  options: ProcessingOptions = {}
+): Promise<string> {
+  const baseName = path.basename(inputPath, path.extname(inputPath));
+  let currentInput = inputPath;
+  let stepOutput: string;
+
+  // Step 1: Remove silence
+  stepOutput = path.join(outputDir, `${baseName}_nosilence.mp4`);
+  await removeSilence(currentInput, stepOutput, options);
+  currentInput = stepOutput;
+
+  // Step 2: Burn captions if SRT provided
+  if (srtPath && fs.existsSync(srtPath)) {
+    stepOutput = path.join(outputDir, `${baseName}_captioned.mp4`);
+    await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
+    // Clean up intermediate file
+    if (currentInput !== inputPath) fs.unlinkSync(currentInput);
+    currentInput = stepOutput;
+  }
+
+  // Step 3: Add headline if provided
+  if (options.headline) {
+    stepOutput = path.join(outputDir, `${baseName}_final.mp4`);
+    await addHeadline(currentInput, stepOutput, options.headline, options.headlinePosition);
+    // Clean up intermediate file
+    if (currentInput !== inputPath) fs.unlinkSync(currentInput);
+    currentInput = stepOutput;
+  }
+
+  // Rename to final output if needed
+  const finalOutput = path.join(outputDir, `${baseName}_processed.mp4`);
+  if (currentInput !== finalOutput) {
+    fs.renameSync(currentInput, finalOutput);
+  }
+
+  return finalOutput;
+}

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: timeback
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+    disk:
+      name: video-storage
+      mountPath: /app/uploads
+      sizeGB: 10
+    healthCheckPath: /
+    plan: starter

@@ -36,6 +36,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# video files
+/uploads/*
+/processed/*
+!uploads/.gitkeep
+!processed/.gitkeep
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
