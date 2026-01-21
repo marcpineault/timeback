@@ -3,6 +3,11 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
+// Route segment config for large file uploads (App Router)
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // 60 seconds timeout for Vercel/Railway
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -45,8 +50,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Upload error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to upload file' },
+      { error: `Failed to upload file: ${errorMessage}` },
       { status: 500 }
     );
   }
