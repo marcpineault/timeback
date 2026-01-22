@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+// Railway build - ensure env vars are loaded
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
