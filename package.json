@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.36.9",
+    "@prisma/client": "^6.19.2",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/formidable": "^3.4.6",
     "@types/uuid": "^10.0.0",
@@ -16,8 +18,11 @@
     "formidable": "^3.5.4",
     "next": "16.1.4",
     "openai": "^6.16.0",
+    "prisma": "^6.19.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "stripe": "^20.2.0",
+    "svix": "^1.84.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
@@ -25,6 +30,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.4",
     "tailwindcss": "^4",

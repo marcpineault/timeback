@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  clerkId         String    @unique
+  email           String    @unique
+  name            String?
+  plan            Plan      @default(FREE)
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  videosThisMonth Int       @default(0)
+  resetDate       DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  videos          Video[]
+}
+
+model Video {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalName    String
+  originalUrl     String?
+  processedUrl    String?
+  status          VideoStatus @default(PENDING)
+  duration        Int?        // in seconds
+  silenceRemoved  Int?        // seconds removed
+  errorMessage    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum VideoStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

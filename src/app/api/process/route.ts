@@ -3,6 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway } from '@/lib/ffmpeg';
 import { transcribeVideo, extractHook, identifyBRollMoments } from '@/lib/whisper';
+import { auth } from '@clerk/nextjs/server';
+import { prisma } from '@/lib/db';
+import { canProcessVideo, incrementVideoCount } from '@/lib/user';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +21,7 @@ export async function POST(request: NextRequest) {
       generateCaptions,
       useHookAsHeadline,
       generateBRoll,
+      userId: bodyUserId,
     } = body;
 
     if (!fileId || !filename) {
@@ -25,6 +29,28 @@ export async function POST(request: NextRequest) {
         { error: 'Missing fileId or filename' },
         { status: 400 }
       );
+    }
+
+    // Check authentication and usage limits
+    const { userId: clerkUserId } = await auth();
+    let dbUserId = bodyUserId;
+
+    if (clerkUserId) {
+      const user = await prisma.user.findUnique({
+        where: { clerkId: clerkUserId },
+      });
+
+      if (user) {
+        dbUserId = user.id;
+        const canProcess = await canProcessVideo(user.id);
+
+        if (!canProcess.allowed) {
+          return NextResponse.json(
+            { error: canProcess.reason },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     // Use env vars if set (for Railway volume mount), otherwise use defaults
@@ -145,6 +171,21 @@ export async function POST(request: NextRequest) {
     }
 
     const outputFilename = path.basename(finalOutput);
+
+    // Track usage if user is authenticated
+    if (dbUserId) {
+      await incrementVideoCount(dbUserId);
+
+      // Create video record
+      await prisma.video.create({
+        data: {
+          userId: dbUserId,
+          originalName: filename,
+          processedUrl: `/api/download/${outputFilename}`,
+          status: 'COMPLETED',
+        },
+      });
+    }
 
     console.log('[Process] Complete!');
     return NextResponse.json({

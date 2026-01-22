@@ -197,13 +197,15 @@ export async function removeSilence(
       .outputOptions([
         '-map', '[outv]',
         '-map', '[outa]',
-        // Use libx264 with memory-efficient settings for server environments
+        // Memory-efficient settings for constrained server environments
         '-c:v', 'libx264',
-        '-preset', 'ultrafast',  // Fastest preset, uses less memory
-        '-crf', '28',  // Slightly lower quality but much faster
-        '-threads', '1',  // Limit threads to reduce memory usage
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
+        '-max_muxing_queue_size', '512',  // Limit muxing buffer
+        '-bufsize', '1M',  // Limit rate control buffer
         '-c:a', 'aac',
-        '-b:a', '96k',  // Lower audio bitrate
+        '-b:a', '96k',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -262,11 +264,13 @@ export async function burnCaptions(
     const cmd = ffmpeg(inputPath)
       .videoFilters(filterString)
       .outputOptions([
-        // Memory-efficient encoding for server environments
+        // Memory-efficient encoding for constrained server environments
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
         '-threads', '1',
+        '-max_muxing_queue_size', '512',
+        '-bufsize', '1M',
         '-c:a', 'copy',
       ])
       .output(outputPath)
@@ -334,11 +338,13 @@ export async function addHeadline(
     ffmpeg(inputPath)
       .videoFilters(filterString)
       .outputOptions([
-        // Memory-efficient encoding for server environments
+        // Memory-efficient encoding for constrained server environments
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
         '-threads', '1',
+        '-max_muxing_queue_size', '512',
+        '-bufsize', '1M',
         '-c:a', 'copy',
       ])
       .output(outputPath)
@@ -385,9 +391,13 @@ export async function imageToVideoClip(
       .videoFilters(filterComplex)
       .outputOptions([
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
         '-t', String(duration),
         '-pix_fmt', 'yuv420p',
         '-r', '30',
+        '-max_muxing_queue_size', '512',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -437,17 +447,23 @@ export async function insertBRollCutaways(
   const sortedCutaways = [...cutaways].sort((a, b) => a.timestamp - b.timestamp);
 
   // Generate animation videos for each cutaway
+  // Use smaller resolution for animations (will be scaled up during overlay)
+  // This significantly reduces memory usage
+  const animWidth = Math.floor(videoInfo.width * 0.5);
+  const animHeight = Math.floor(videoInfo.height * 0.25);
+
   const animationPaths: string[] = [];
   for (let i = 0; i < sortedCutaways.length; i++) {
     const cutaway = sortedCutaways[i];
     const animPath = path.join(outputDir, `anim_${i}.mp4`);
 
     // Generate contextual animation based on the context
+    // Using reduced resolution to save memory
     await generateContextualAnimation(
       animPath,
       cutaway.duration,
-      videoInfo.width,
-      videoInfo.height,
+      animWidth,
+      animHeight,
       cutaway.context
     );
     animationPaths.push(animPath);
@@ -470,15 +486,16 @@ export async function insertBRollCutaways(
     const duration = cutaway.duration;
     const fadeTime = 0.3;
 
-    // Scale animation to overlay size (centered, 80% of video)
+    // Target overlay size (centered, 80% of video width, 40% of height)
     const overlayWidth = Math.floor(videoInfo.width * 0.8);
     const overlayHeight = Math.floor(videoInfo.height * 0.4);
     const xPos = Math.floor((videoInfo.width - overlayWidth) / 2);
     const yPos = Math.floor((videoInfo.height - overlayHeight) / 2);
 
-    // Scale and fade the animation
+    // Scale from smaller animation to overlay size, then fade
+    // Using fast_bilinear for faster scaling with less memory
     filterParts.push(
-      `[${i + 1}:v]scale=${overlayWidth}:${overlayHeight},format=rgba,fade=t=in:st=0:d=${fadeTime}:alpha=1,fade=t=out:st=${duration - fadeTime}:d=${fadeTime}:alpha=1[anim${i}]`
+      `[${i + 1}:v]scale=${overlayWidth}:${overlayHeight}:flags=fast_bilinear,format=rgba,fade=t=in:st=0:d=${fadeTime}:alpha=1,fade=t=out:st=${duration - fadeTime}:d=${fadeTime}:alpha=1[anim${i}]`
     );
 
     // Overlay on video with time enable
@@ -507,8 +524,11 @@ export async function insertBRollCutaways(
         '-map', '[outv]',
         '-map', '0:a',
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-crf', '23',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
+        '-max_muxing_queue_size', '512',
+        '-bufsize', '1M',
         '-c:a', 'copy',
       ])
       .output(outputPath)

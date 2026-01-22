@@ -1,0 +1,135 @@
+import { redirect } from 'next/navigation'
+import { UserButton } from '@clerk/nextjs'
+import { getOrCreateUser, getUserUsage } from '@/lib/user'
+import { PLANS } from '@/lib/plans'
+import VideoProcessor from './VideoProcessor'
+import Link from 'next/link'
+
+export default async function DashboardPage() {
+  const user = await getOrCreateUser()
+
+  if (!user) {
+    redirect('/sign-in')
+  }
+
+  const usage = await getUserUsage(user.id)
+
+  if (!usage) {
+    redirect('/sign-in')
+  }
+
+  const usagePercentage = (usage.videosUsed / usage.planDetails.videosPerMonth) * 100
+
+  return (
+    <div className="min-h-screen bg-gray-900">
+      {/* Header */}
+      <header className="border-b border-gray-800">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/" className="text-xl font-bold text-white">TimeBack</Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/pricing"
+              className="text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              Upgrade
+            </Link>
+            <UserButton afterSignOutUrl="/" />
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Usage Card */}
+        <div className="bg-gray-800 rounded-xl p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                {PLANS[usage.plan as keyof typeof PLANS].name} Plan
+              </h2>
+              <p className="text-gray-400 text-sm">
+                {usage.videosUsed} of {usage.planDetails.videosPerMonth} videos used this month
+              </p>
+            </div>
+            {usage.plan === 'FREE' && (
+              <Link
+                href="/pricing"
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Upgrade to Pro
+              </Link>
+            )}
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div
+              className="bg-blue-500 h-2 rounded-full transition-all"
+              style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+            />
+          </div>
+          {usage.videosRemaining <= 0 && (
+            <p className="text-amber-400 text-sm mt-2">
+              You&apos;ve reached your monthly limit. Upgrade to process more videos.
+            </p>
+          )}
+        </div>
+
+        {/* Video Processor */}
+        <VideoProcessor
+          userId={user.id}
+          canProcess={usage.videosRemaining > 0}
+          videosRemaining={usage.videosRemaining}
+          hasWatermark={usage.planDetails.watermark}
+        />
+
+        {/* Recent Videos */}
+        {usage.recentVideos.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold text-white mb-4">Recent Videos</h3>
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-700/50">
+                  <tr>
+                    <th className="text-left text-gray-400 text-sm font-medium px-4 py-3">Name</th>
+                    <th className="text-left text-gray-400 text-sm font-medium px-4 py-3">Status</th>
+                    <th className="text-left text-gray-400 text-sm font-medium px-4 py-3">Date</th>
+                    <th className="text-left text-gray-400 text-sm font-medium px-4 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {usage.recentVideos.map((video) => (
+                    <tr key={video.id}>
+                      <td className="px-4 py-3 text-white">{video.originalName}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          video.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                          video.status === 'PROCESSING' ? 'bg-blue-500/20 text-blue-400' :
+                          video.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
+                          'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {video.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 text-sm">
+                        {new Date(video.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        {video.status === 'COMPLETED' && video.processedUrl && (
+                          <a
+                            href={video.processedUrl}
+                            className="text-blue-400 hover:text-blue-300 text-sm"
+                            download
+                          >
+                            Download
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

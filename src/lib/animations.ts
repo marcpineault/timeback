@@ -63,14 +63,18 @@ export async function generateGraphAnimation(
         // Create animated line
         `color=c=black:s=${width}x${height}:d=${duration},geq=r='if(between(Y,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})-5,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})+5),${direction === 'up' ? 100 : 255},15)':g='if(between(Y,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})-5,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})+5),${direction === 'up' ? 255 : 50},20)':b='if(between(Y,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})-5,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})+5),100,30)'[line]`,
         // Composite
-        `[bg][line]overlay=0:0:format=auto,gblur=sigma=1[out]`
+        `[bg][line]overlay=0:0:format=auto[out]`
       ])
       .outputOptions([
         '-map', '[out]',
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '30',
+        '-threads', '1',
         '-t', String(duration),
         '-pix_fmt', 'yuv420p',
         '-r', String(fps),
+        '-max_muxing_queue_size', '512',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -114,9 +118,13 @@ export async function generateCounterAnimation(
       .videoFilters(filterComplex)
       .outputOptions([
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '30',
+        '-threads', '1',
         '-t', String(duration),
         '-pix_fmt', 'yuv420p',
         '-r', String(fps),
+        '-max_muxing_queue_size', '512',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -154,14 +162,18 @@ export async function generatePulseAnimation(
       .inputFormat('lavfi')
       .complexFilter([
         // Create pulsing circle using geq
-        `geq=r='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(0, 2)},15)':g='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(2, 4)},15)':b='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(4, 6)},25)',gblur=sigma=20[out]`
+        `geq=r='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(0, 2)},15)':g='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(2, 4)},15)':b='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(4, 6)},25)'[out]`
       ])
       .outputOptions([
         '-map', '[out]',
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '30',
+        '-threads', '1',
         '-t', String(duration),
         '-pix_fmt', 'yuv420p',
         '-r', String(fps),
+        '-max_muxing_queue_size', '512',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -200,9 +212,13 @@ export async function generateParticleAnimation(
       .outputOptions([
         '-map', '[out]',
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '30',
+        '-threads', '1',
         '-t', String(duration),
         '-pix_fmt', 'yuva420p',
         '-r', String(fps),
+        '-max_muxing_queue_size', '512',
       ])
       .output(outputPath)
       .on('end', () => {
