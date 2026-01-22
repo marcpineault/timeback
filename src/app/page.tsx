@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 
+// Build v2 - force fresh deployment
 export default async function LandingPage() {
   const { userId } = await auth()
 
