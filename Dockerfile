@@ -31,6 +31,10 @@ ENV NODE_ENV=production
 # Dummy DATABASE_URL for prisma generate (not used for actual DB connection)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
+# Build args for Next.js public env vars (required at build time)
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
 # Build the application
 RUN npm run build
 
