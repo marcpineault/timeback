@@ -193,7 +193,7 @@ export default async function LandingPage() {
           <span className="text-gray-500">TimeBack</span>
           <div className="flex items-center gap-6 text-sm text-gray-500">
             <Link href="/pricing" className="hover:text-gray-400">Pricing</Link>
-            <span>support@timeback.io</span>
+            <span>support@timebackvideo.com</span>
           </div>
         </div>
       </footer>
