@@ -6,8 +6,12 @@ import { transcribeVideo, extractHook, identifyBRollMoments } from '@/lib/whispe
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { canProcessVideo, incrementVideoCount } from '@/lib/user';
+import { cleanupOldFiles } from '@/lib/cleanup';
 
 export async function POST(request: NextRequest) {
+  // Run cleanup of old files on each request
+  cleanupOldFiles();
+
   try {
     const body = await request.json();
     const {
@@ -185,6 +189,16 @@ export async function POST(request: NextRequest) {
           status: 'COMPLETED',
         },
       });
+    }
+
+    // Clean up the original uploaded file
+    try {
+      if (fs.existsSync(inputPath)) {
+        fs.unlinkSync(inputPath);
+        console.log('[Process] Cleaned up original upload');
+      }
+    } catch (cleanupErr) {
+      console.error('[Process] Failed to clean up original file:', cleanupErr);
     }
 
     console.log('[Process] Complete!');
