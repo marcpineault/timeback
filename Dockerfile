@@ -62,4 +62,8 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+# Copy and use startup script that runs migrations before starting
+COPY --from=builder /app/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
+CMD ["./start.sh"]
