@@ -8,7 +8,10 @@ import {
   finalizeUpload,
   checkS3Available,
   getS3UploadUrl,
-  confirmS3Upload
+  confirmS3Upload,
+  getBatchS3UploadUrls,
+  confirmBatchS3Uploads,
+  type FileInfo
 } from '@/app/actions/upload';
 
 export interface UploadedFile {
@@ -27,6 +30,8 @@ interface UploadingFile {
   error?: string;
   result?: UploadedFile;
   previewUrl: string;
+  s3Key?: string;
+  presignedUrl?: string;
 }
 
 interface VideoUploaderProps {
@@ -272,6 +277,110 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
   };
 
+  // Optimized batch S3 upload - gets all URLs upfront, uploads in parallel, confirms all at once
+  const uploadFilesToS3Batch = async (files: File[], initialState: UploadingFile[]): Promise<UploadedFile[]> => {
+    // Step 1: Get all presigned URLs in a single request
+    const fileInfos: FileInfo[] = files.map(f => ({
+      filename: f.name,
+      contentType: f.type,
+      fileSize: f.size,
+    }));
+
+    const batchUrlResult = await getBatchS3UploadUrls(fileInfos);
+    if (!batchUrlResult.success || !batchUrlResult.urls) {
+      throw new Error(batchUrlResult.error || 'Failed to get upload URLs');
+    }
+
+    // Step 2: Upload all files in parallel with their presigned URLs
+    const uploadPromises = files.map((file, index) => {
+      const urlInfo = batchUrlResult.urls!.find(u => u.index === index);
+      if (!urlInfo) {
+        return Promise.resolve(null);
+      }
+
+      return new Promise<{ index: number; s3Key: string } | null>((resolve) => {
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
+        ));
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setUploadingFiles(prev => prev.map((f, i) =>
+              i === index ? { ...f, progress } : f
+            ));
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ index, s3Key: urlInfo.key });
+          } else {
+            setUploadingFiles(prev => prev.map((f, i) =>
+              i === index ? { ...f, status: 'error' as const, error: `Upload failed: ${xhr.status}` } : f
+            ));
+            resolve(null);
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          setUploadingFiles(prev => prev.map((f, i) =>
+            i === index ? { ...f, status: 'error' as const, error: 'Network error' } : f
+          ));
+          resolve(null);
+        });
+
+        xhr.open('PUT', urlInfo.url);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+    });
+
+    const uploadResults = await Promise.all(uploadPromises);
+    const successfulUploads = uploadResults.filter((r): r is { index: number; s3Key: string } => r !== null);
+
+    if (successfulUploads.length === 0) {
+      return [];
+    }
+
+    // Step 3: Confirm all uploads in a single request
+    const confirmData = successfulUploads.map(u => ({
+      s3Key: u.s3Key,
+      originalName: files[u.index].name,
+      size: files[u.index].size,
+    }));
+
+    const confirmResult = await confirmBatchS3Uploads(confirmData);
+    if (!confirmResult.success || !confirmResult.files) {
+      throw new Error('Failed to confirm uploads');
+    }
+
+    // Update state and return results
+    const results: UploadedFile[] = [];
+    for (const confirmed of confirmResult.files) {
+      const uploadInfo = successfulUploads.find(u => u.s3Key === confirmed.s3Key);
+      if (uploadInfo && confirmed.success) {
+        const uploadedFile: UploadedFile = {
+          fileId: confirmed.fileId!,
+          filename: confirmed.filename!,
+          originalName: confirmed.originalName!,
+          size: confirmed.size!,
+          s3Key: confirmed.s3Key,
+          previewUrl: initialState[uploadInfo.index].previewUrl,
+        };
+        results.push(uploadedFile);
+
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === uploadInfo.index ? { ...f, status: 'complete' as const, progress: 100, result: uploadedFile } : f
+        ));
+      }
+    }
+
+    return results;
+  };
+
   const uploadFiles = async (files: File[]) => {
     setError(null);
 
@@ -297,13 +406,33 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }));
     setUploadingFiles(initialState);
 
-    // Upload files sequentially to avoid overwhelming the server
-    const results: UploadedFile[] = [];
-    for (let i = 0; i < validFiles.length; i++) {
-      const result = await uploadSingleFile(validFiles[i], i, initialState[i].previewUrl);
-      if (result) {
-        results.push(result);
+    // Check S3 availability
+    let useS3 = s3Available;
+    if (useS3 === null) {
+      useS3 = await checkS3Available();
+      setS3Available(useS3);
+    }
+
+    let results: UploadedFile[] = [];
+
+    // Use optimized batch upload for S3
+    if (useS3) {
+      console.log('[Upload] Using optimized batch S3 upload');
+      try {
+        results = await uploadFilesToS3Batch(validFiles, initialState);
+      } catch (err) {
+        console.error('[Upload] Batch upload failed:', err);
+        setError(err instanceof Error ? err.message : 'Upload failed');
       }
+    } else {
+      // Fallback: Upload files in parallel using individual methods
+      console.log('[Upload] Using fallback upload methods');
+      const uploadPromises = validFiles.map((file, i) =>
+        uploadSingleFile(file, i, initialState[i].previewUrl)
+      );
+
+      const uploadResults = await Promise.all(uploadPromises);
+      results = uploadResults.filter((r): r is UploadedFile => r !== null);
     }
 
     // Notify parent of completed uploads
