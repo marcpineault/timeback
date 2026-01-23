@@ -14,9 +14,10 @@ interface VideoQueueProps {
   videos: QueuedVideo[];
   onRemove: (fileId: string) => void;
   onClear: () => void;
+  onPreview?: (video: QueuedVideo) => void;
 }
 
-export default function VideoQueue({ videos, onRemove, onClear }: VideoQueueProps) {
+export default function VideoQueue({ videos, onRemove, onClear, onPreview }: VideoQueueProps) {
   if (videos.length === 0) return null;
 
   const completedCount = videos.filter(v => v.status === 'complete').length;
@@ -78,12 +79,26 @@ export default function VideoQueue({ videos, onRemove, onClear }: VideoQueueProp
               video.status === 'processing' ? 'bg-blue-500/5' : ''
             }`}
           >
-            {/* Thumbnail placeholder */}
-            <div className="w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+            {/* Thumbnail with preview button */}
+            <button
+              onClick={() => video.file.previewUrl && onPreview?.(video)}
+              disabled={!video.file.previewUrl}
+              className={`w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0 relative group transition-all ${
+                video.file.previewUrl ? 'hover:bg-gray-600 cursor-pointer' : 'cursor-default'
+              }`}
+              title={video.file.previewUrl ? 'Click to preview' : 'Preview not available'}
+            >
               <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-            </div>
+              {video.file.previewUrl && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              )}
+            </button>
 
             {/* File Info */}
             <div className="flex-1 min-w-0">

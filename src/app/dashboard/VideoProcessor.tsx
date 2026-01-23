@@ -4,6 +4,7 @@ import { useState } from 'react'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
+import VideoPreview from '@/components/VideoPreview'
 
 interface VideoProcessorProps {
   userId: string
@@ -20,6 +21,7 @@ export default function VideoProcessor({
 }: VideoProcessorProps) {
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [previewVideo, setPreviewVideo] = useState<QueuedVideo | null>(null)
 
   const handleUploadComplete = (files: UploadedFile[]) => {
     const maxFiles = Math.min(files.length, videosRemaining)
@@ -36,6 +38,14 @@ export default function VideoProcessor({
 
   const handleClearQueue = () => {
     setVideoQueue([])
+  }
+
+  const handlePreviewVideo = (video: QueuedVideo) => {
+    setPreviewVideo(video)
+  }
+
+  const handleClosePreview = () => {
+    setPreviewVideo(null)
   }
 
   const processVideo = async (video: QueuedVideo, config: ProcessingConfig): Promise<QueuedVideo> => {
@@ -148,6 +158,7 @@ export default function VideoProcessor({
         videos={videoQueue}
         onRemove={handleRemoveVideo}
         onClear={handleClearQueue}
+        onPreview={handlePreviewVideo}
       />
 
       {hasVideosToProcess && !isProcessing && (
@@ -204,6 +215,15 @@ export default function VideoProcessor({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Video Preview Modal */}
+      {previewVideo && previewVideo.file.previewUrl && (
+        <VideoPreview
+          videoUrl={previewVideo.file.previewUrl}
+          videoName={previewVideo.file.originalName}
+          onClose={handleClosePreview}
+        />
       )}
     </div>
   )
