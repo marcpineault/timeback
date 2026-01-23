@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { stripe, STRIPE_PRICES } from '@/lib/stripe'
 import { getOrCreateUser } from '@/lib/user'
 import { prisma } from '@/lib/db'
+import { PLANS } from '@/lib/plans'
 
 export async function POST(req: Request) {
   try {
@@ -44,6 +45,10 @@ export async function POST(req: Request) {
       })
     }
 
+    // Get plan details for description
+    const planDetails = PLANS[plan]
+    const planDescription = planDetails.features.join(' • ')
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -60,6 +65,20 @@ export async function POST(req: Request) {
       metadata: {
         userId: user.id,
         plan,
+      },
+      subscription_data: {
+        description: `TimeBack ${planDetails.name} Plan: ${planDescription}`,
+        metadata: {
+          plan,
+          videosPerMonth: planDetails.videosPerMonth.toString(),
+          maxDuration: planDetails.maxDuration.toString(),
+          maxResolution: planDetails.maxResolution.toString(),
+        },
+      },
+      custom_text: {
+        submit: {
+          message: `You're subscribing to the ${planDetails.name} plan which includes: ${planDescription}`,
+        },
       },
     })
 
