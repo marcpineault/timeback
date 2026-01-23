@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { auth } from '@clerk/nextjs/server';
+import { createUploadUrl, isS3Configured } from '@/lib/s3';
 
 export interface UploadResult {
   success: boolean;
@@ -12,6 +13,7 @@ export interface UploadResult {
   filename?: string;
   originalName?: string;
   size?: number;
+  s3Key?: string;
   error?: string;
 }
 
@@ -25,6 +27,114 @@ export interface InitUploadResult {
   success: boolean;
   uploadId?: string;
   error?: string;
+}
+
+export interface S3PresignedUrlResult {
+  success: boolean;
+  url?: string;
+  key?: string;
+  error?: string;
+}
+
+export interface S3UploadCompleteResult {
+  success: boolean;
+  fileId?: string;
+  filename?: string;
+  originalName?: string;
+  size?: number;
+  s3Key?: string;
+  error?: string;
+}
+
+/**
+ * Check if S3 uploads are available
+ */
+export async function checkS3Available(): Promise<boolean> {
+  const configured = isS3Configured();
+  console.log(`[Upload] S3 configured: ${configured}`);
+  return configured;
+}
+
+/**
+ * Get a presigned URL for direct browser-to-S3 upload
+ */
+export async function getS3UploadUrl(
+  filename: string,
+  contentType: string,
+  fileSize: number
+): Promise<S3PresignedUrlResult> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    if (!isS3Configured()) {
+      return { success: false, error: 'S3 is not configured' };
+    }
+
+    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
+    if (!validTypes.includes(contentType)) {
+      return {
+        success: false,
+        error: 'Invalid file type. Please upload MP4, MOV, WebM, or AVI.'
+      };
+    }
+
+    const maxSize = 500 * 1024 * 1024;
+    if (fileSize > maxSize) {
+      return {
+        success: false,
+        error: 'File too large. Maximum size is 500MB.'
+      };
+    }
+
+    const { url, key } = await createUploadUrl(filename, contentType);
+
+    console.log(`[Upload] Generated S3 presigned PUT URL for: ${filename}`);
+    console.log(`[Upload] S3 key: ${key}`);
+
+    return { success: true, url, key };
+  } catch (error) {
+    console.error('S3 presigned URL error:', error);
+    return { success: false, error: 'Failed to generate upload URL' };
+  }
+}
+
+/**
+ * Confirm S3 upload completion
+ */
+export async function confirmS3Upload(
+  s3Key: string,
+  originalName: string,
+  size: number
+): Promise<S3UploadCompleteResult> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const filename = s3Key.split('/').pop() || s3Key;
+    const fileId = filename.replace(/\.[^/.]+$/, '');
+
+    console.log(`[Upload] S3 upload confirmed!`);
+    console.log(`[Upload] File: ${originalName} (${(size / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`[Upload] S3 Key: ${s3Key}`);
+    console.log(`[Upload] Storage: CLOUDFLARE R2`);
+
+    return {
+      success: true,
+      fileId,
+      filename,
+      originalName,
+      size,
+      s3Key,
+    };
+  } catch (error) {
+    console.error('S3 confirm upload error:', error);
+    return { success: false, error: 'Failed to confirm upload' };
+  }
 }
 
 // Initialize a chunked upload - creates the temp file

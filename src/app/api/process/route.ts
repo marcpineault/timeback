@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
 import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset } from '@/lib/ffmpeg';
 import { transcribeVideo, extractHook, identifyBRollMoments } from '@/lib/whisper';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { canProcessVideo, incrementVideoCount } from '@/lib/user';
 import { cleanupOldFiles } from '@/lib/cleanup';
+import { isS3Configured, getS3ObjectStream, deleteS3Object } from '@/lib/s3';
 
 export async function POST(request: NextRequest) {
   // Run cleanup of old files on each request
@@ -17,6 +20,7 @@ export async function POST(request: NextRequest) {
     const {
       fileId,
       filename,
+      s3Key,  // S3 key if file was uploaded to S3
       headline,
       headlinePosition,
       captionStyle,
@@ -64,18 +68,58 @@ export async function POST(request: NextRequest) {
     // Use env vars if set (for Railway volume mount), otherwise use defaults
     const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
     const processedDir = process.env.PROCESSED_DIR || path.join(process.cwd(), 'processed');
-    const inputPath = path.join(uploadsDir, filename);
 
-    // Verify file exists
+    // Ensure directories exist
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    fs.mkdirSync(processedDir, { recursive: true });
+
+    let inputPath = path.join(uploadsDir, filename);
+    let downloadedFromS3 = false;
+
+    // Debug logging
+    console.log('[Process] Received request:');
+    console.log('[Process] - fileId:', fileId);
+    console.log('[Process] - filename:', filename);
+    console.log('[Process] - s3Key:', s3Key || 'NOT PROVIDED');
+
+    // If file is in S3, download it first
+    if (s3Key && isS3Configured()) {
+      console.log('[Process] ========================================');
+      console.log('[Process] STORAGE: CLOUDFLARE R2');
+      console.log('[Process] S3 Key:', s3Key);
+      console.log('[Process] Downloading file from R2...');
+      try {
+        const s3Stream = await getS3ObjectStream(s3Key);
+        const localPath = path.join(uploadsDir, filename);
+
+        await pipeline(s3Stream, createWriteStream(localPath));
+
+        inputPath = localPath;
+        downloadedFromS3 = true;
+        console.log('[Process] File downloaded from S3 successfully');
+      } catch (s3Error) {
+        console.error('[Process] Failed to download from S3:', s3Error);
+        return NextResponse.json(
+          { error: 'Failed to download file from storage' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Log storage method if NOT using S3
+    if (!downloadedFromS3) {
+      console.log('[Process] ========================================');
+      console.log('[Process] STORAGE: LOCAL (Railway filesystem)');
+      console.log('[Process] File path:', inputPath);
+    }
+
+    // Verify file exists (either local or downloaded from S3)
     if (!fs.existsSync(inputPath)) {
       return NextResponse.json(
         { error: 'Video file not found' },
         { status: 404 }
       );
     }
-
-    // Ensure processed directory exists
-    fs.mkdirSync(processedDir, { recursive: true });
 
     const baseName = path.basename(inputPath, path.extname(inputPath));
     let currentInput = inputPath;
@@ -242,10 +286,20 @@ export async function POST(request: NextRequest) {
     try {
       if (fs.existsSync(inputPath)) {
         fs.unlinkSync(inputPath);
-        console.log('[Process] Cleaned up original upload');
+        console.log('[Process] Cleaned up local upload file');
       }
     } catch (cleanupErr) {
-      console.error('[Process] Failed to clean up original file:', cleanupErr);
+      console.error('[Process] Failed to clean up local file:', cleanupErr);
+    }
+
+    // Clean up S3 file if it was downloaded from there
+    if (s3Key && downloadedFromS3 && isS3Configured()) {
+      try {
+        await deleteS3Object(s3Key);
+        console.log('[Process] Cleaned up S3 file');
+      } catch (s3CleanupErr) {
+        console.error('[Process] Failed to clean up S3 file:', s3CleanupErr);
+      }
     }
 
     console.log('[Process] Complete!');

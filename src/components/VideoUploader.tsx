@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   uploadVideo,
   initChunkedUpload,
   uploadChunk,
-  finalizeUpload
+  finalizeUpload,
+  checkS3Available,
+  getS3UploadUrl,
+  confirmS3Upload
 } from '@/app/actions/upload';
 
 export interface UploadedFile {
@@ -14,6 +17,7 @@ export interface UploadedFile {
   originalName: string;
   size: number;
   previewUrl?: string;
+  s3Key?: string;
 }
 
 interface UploadingFile {
@@ -38,8 +42,14 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [s3Available, setS3Available] = useState<boolean | null>(null);
 
   const isUploading = uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending');
+
+  // Check if S3 is available on mount
+  useEffect(() => {
+    checkS3Available().then(setS3Available);
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -164,8 +174,97 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
   };
 
+  // S3 direct upload - bypasses all server size limits
+  const uploadFileToS3 = async (file: File, index: number, previewUrl: string): Promise<UploadedFile | null> => {
+    setUploadingFiles(prev => prev.map((f, i) =>
+      i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
+    ));
+
+    try {
+      // Step 1: Get presigned URL from server
+      const urlResult = await getS3UploadUrl(file.name, file.type, file.size);
+      if (!urlResult.success || !urlResult.url || !urlResult.key) {
+        throw new Error(urlResult.error || 'Failed to get upload URL');
+      }
+
+      // Step 2: Upload directly to R2/S3 using presigned PUT URL
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setUploadingFiles(prev => prev.map((f, i) =>
+              i === index ? { ...f, progress } : f
+            ));
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+
+        xhr.open('PUT', urlResult.url!);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+
+      // Step 3: Confirm upload with server
+      const confirmResult = await confirmS3Upload(urlResult.key, file.name, file.size);
+      if (!confirmResult.success) {
+        throw new Error(confirmResult.error || 'Failed to confirm upload');
+      }
+
+      const uploadedFile: UploadedFile = {
+        fileId: confirmResult.fileId!,
+        filename: confirmResult.filename!,
+        originalName: confirmResult.originalName!,
+        size: confirmResult.size!,
+        s3Key: confirmResult.s3Key,
+        previewUrl,
+      };
+
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'complete' as const, progress: 100, result: uploadedFile } : f
+      ));
+
+      return uploadedFile;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'error' as const, error: errorMsg } : f
+      ));
+      return null;
+    }
+  };
+
   const uploadSingleFile = async (file: File, index: number, previewUrl: string): Promise<UploadedFile | null> => {
-    // Use chunked upload for files over 5MB
+    // Check S3 availability at upload time if not yet determined
+    let useS3 = s3Available;
+    if (useS3 === null) {
+      console.log('[Upload] S3 availability not yet determined, checking now...');
+      useS3 = await checkS3Available();
+      setS3Available(useS3);
+    }
+
+    console.log('[Upload] S3 available:', useS3);
+
+    // Use S3 direct upload if available (best option - no size limits)
+    if (useS3) {
+      console.log('[Upload] Using S3 direct upload');
+      return uploadFileToS3(file, index, previewUrl);
+    }
+
+    console.log('[Upload] S3 not available, using fallback');
+    // Fallback: Use chunked upload for files over 5MB
     if (file.size > CHUNK_SIZE) {
       return uploadFileChunked(file, index, previewUrl);
     } else {
