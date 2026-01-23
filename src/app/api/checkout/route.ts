@@ -13,8 +13,10 @@ export async function POST(req: Request) {
       return NextResponse.redirect(new URL('/sign-in', req.url))
     }
 
-    const formData = await req.formData()
-    const plan = formData.get('plan') as 'PRO' | 'BUSINESS'
+    // Parse form data from URL-encoded body
+    const text = await req.text()
+    const params = new URLSearchParams(text)
+    const plan = params.get('plan') as 'PRO' | 'BUSINESS'
 
     if (!plan || !['PRO', 'BUSINESS'].includes(plan)) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
