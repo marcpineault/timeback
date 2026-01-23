@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
-import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway } from '@/lib/ffmpeg';
+import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset } from '@/lib/ffmpeg';
 import { transcribeVideo, extractHook, identifyBRollMoments } from '@/lib/whisper';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
@@ -25,6 +25,10 @@ export async function POST(request: NextRequest) {
       generateCaptions,
       useHookAsHeadline,
       generateBRoll,
+      normalizeAudio: shouldNormalizeAudio,
+      colorGrade,
+      autoZoom,
+      autoZoomIntensity,
       userId: bodyUserId,
     } = body;
 
@@ -89,7 +93,23 @@ export async function POST(request: NextRequest) {
     console.log('[Process] Step 1: Removing silence...');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     await removeSilence(currentInput, stepOutput, options);
+    // Clean up intermediate file
+    if (currentInput !== inputPath) {
+      try { fs.unlinkSync(currentInput); } catch {}
+    }
     currentInput = stepOutput;
+
+    // Step 1.5: Normalize audio levels if enabled
+    if (shouldNormalizeAudio) {
+      console.log('[Process] Step 1.5: Normalizing audio levels...');
+      stepOutput = path.join(processedDir, `${baseName}_normalized.mp4`);
+      await normalizeAudio(currentInput, stepOutput);
+      // Clean up intermediate file
+      if (currentInput !== inputPath) {
+        try { fs.unlinkSync(currentInput); } catch {}
+      }
+      currentInput = stepOutput;
+    }
 
     // Step 2: Transcribe the SILENCE-REMOVED video (so timestamps match!)
     let srtPath: string | undefined;
@@ -128,6 +148,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Step 3.2: Apply color grading if selected
+    if (colorGrade && colorGrade !== 'none') {
+      console.log(`[Process] Step 3.2: Applying ${colorGrade} color grade...`);
+      stepOutput = path.join(processedDir, `${baseName}_graded.mp4`);
+      await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
+      // Clean up intermediate file
+      if (currentInput !== inputPath) {
+        try { fs.unlinkSync(currentInput); } catch {}
+      }
+      currentInput = stepOutput;
+    }
+
     // Step 3.5: Generate and insert AI B-Roll if enabled
     console.log(`[Process] B-Roll enabled: ${generateBRoll}, segments: ${transcriptionSegments.length}`);
     if (generateBRoll && transcriptionSegments.length > 0) {
@@ -155,6 +187,19 @@ export async function POST(request: NextRequest) {
         }
         currentInput = stepOutput;
       }
+    }
+
+    // Step 3.8: Apply auto-zoom on speech if enabled
+    if (autoZoom && transcriptionSegments.length > 0) {
+      console.log(`[Process] Step 3.8: Applying auto-zoom on speech...`);
+      const zoomIntensity = 1 + (autoZoomIntensity || 5) / 100; // Convert percentage to multiplier (e.g., 5% -> 1.05)
+      stepOutput = path.join(processedDir, `${baseName}_zoomed.mp4`);
+      await applyAutoZoom(currentInput, stepOutput, transcriptionSegments, zoomIntensity);
+      // Clean up intermediate file
+      if (currentInput !== inputPath) {
+        try { fs.unlinkSync(currentInput); } catch {}
+      }
+      currentInput = stepOutput;
     }
 
     // Step 4: Add headline if provided or using hook

@@ -561,6 +561,162 @@ export async function insertBRollCutaways(
 }
 
 /**
+ * Normalize audio levels using EBU R128 loudness standard
+ * Target: -14 LUFS (optimal for social media platforms)
+ */
+export async function normalizeAudio(
+  inputPath: string,
+  outputPath: string
+): Promise<string> {
+  console.log(`[Audio] Normalizing audio levels...`);
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioFilters('loudnorm=I=-14:TP=-1:LRA=11')
+      .outputOptions([
+        '-c:v', 'copy',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Audio] Normalization complete!`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[Audio] Normalization error:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
+ * Color grading presets for video enhancement
+ */
+export type ColorGradePreset = 'none' | 'warm' | 'cool' | 'cinematic' | 'vibrant' | 'vintage';
+
+const colorGradeFilters: Record<ColorGradePreset, string> = {
+  none: '',
+  warm: 'colorbalance=rs=0.15:gs=0.05:bs=-0.1:rm=0.1:gm=0.05:bm=-0.05',
+  cool: 'colorbalance=rs=-0.1:gs=0:bs=0.15:rm=-0.05:gm=0.05:bm=0.1',
+  cinematic: 'colorbalance=rs=0.1:gs=-0.05:bs=-0.1,eq=contrast=1.1:brightness=-0.05:saturation=0.9',
+  vibrant: 'eq=saturation=1.4:contrast=1.1:brightness=0.02',
+  vintage: 'colorbalance=rs=0.2:gs=0.1:bs=-0.15,eq=saturation=0.85:contrast=1.05',
+};
+
+/**
+ * Apply color grading preset to video
+ */
+export async function applyColorGrade(
+  inputPath: string,
+  outputPath: string,
+  preset: ColorGradePreset
+): Promise<string> {
+  if (preset === 'none') {
+    console.log(`[Color] No color grading applied`);
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
+  console.log(`[Color] Applying ${preset} color grade...`);
+  const filterString = colorGradeFilters[preset];
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .videoFilters(filterString)
+      .outputOptions([
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
+        '-c:a', 'copy',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Color] Color grading complete!`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[Color] Color grading error:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
+ * Apply auto-zoom effect during speech segments
+ * Creates a subtle "punch in" effect during speaking to increase engagement
+ */
+export async function applyAutoZoom(
+  inputPath: string,
+  outputPath: string,
+  segments: { start: number; end: number }[],
+  zoomIntensity: number = 1.05
+): Promise<string> {
+  if (segments.length === 0) {
+    console.log(`[Zoom] No segments provided, skipping auto-zoom`);
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
+  console.log(`[Zoom] Applying auto-zoom to ${segments.length} speech segments (intensity: ${zoomIntensity}x)...`);
+
+  // Get video info for dimensions
+  const videoInfo = await new Promise<{ width: number; height: number; duration: number }>((resolve, reject) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return reject(err);
+      const video = metadata.streams.find(s => s.codec_type === 'video');
+      resolve({
+        width: video?.width || 1080,
+        height: video?.height || 1920,
+        duration: metadata.format.duration || 0,
+      });
+    });
+  });
+
+  // Build zoom expression that activates during speech segments
+  // Format: if(between(t,start,end),zoom,1)
+  const zoomConditions = segments
+    .map(seg => `between(t,${seg.start.toFixed(2)},${seg.end.toFixed(2)})`)
+    .join('+');
+
+  // Smooth zoom using expression: lerp towards target when speaking, lerp back when not
+  // This creates a gradual zoom in/out effect
+  const zoomExpr = `if(${zoomConditions},min(zoom+0.002,${zoomIntensity}),max(zoom-0.002,1))`;
+
+  // Center the zoom on the frame
+  const xExpr = `iw/2-(iw/zoom/2)`;
+  const yExpr = `ih/2-(ih/zoom/2)`;
+
+  // Use zoompan filter for smooth animated zoom
+  const filterString = `zoompan=z='${zoomExpr}':x='${xExpr}':y='${yExpr}':d=1:s=${videoInfo.width}x${videoInfo.height}:fps=30`;
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .videoFilters(filterString)
+      .outputOptions([
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
+        '-c:a', 'copy',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Zoom] Auto-zoom complete!`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[Zoom] Auto-zoom error:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
  * Full processing pipeline: remove silence, add captions, add headline
  */
 export async function processVideo(
