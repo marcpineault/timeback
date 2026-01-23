@@ -231,13 +231,15 @@ export async function burnCaptions(
 ): Promise<string> {
   // Clean centered captions - minimal style
   // Alignment=2 is bottom-center, MarginV positions vertically
+  // MarginL/MarginR add horizontal padding for Instagram Reels safe zone (~100px each side)
+  // This keeps captions within ~880px center width on 1080px video
   const styleMap: Record<string, string> = {
     // Default: clean, small white text with subtle shadow for readability
-    default: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100',
+    default: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100,MarginL=100,MarginR=100',
     // Bold style
-    bold: 'Fontname=Arial,FontSize=11,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100',
+    bold: 'Fontname=Arial,FontSize=11,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100,MarginL=100,MarginR=100',
     // Outline style
-    outline: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=1,Shadow=0,Alignment=2,MarginV=100',
+    outline: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=1,Shadow=0,Alignment=2,MarginV=100,MarginL=100,MarginR=100',
   };
 
   const subtitleStyle = styleMap[style] || styleMap.default;
