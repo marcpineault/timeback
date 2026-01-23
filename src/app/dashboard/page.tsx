@@ -6,16 +6,40 @@ import VideoProcessor from './VideoProcessor'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
-  const user = await getOrCreateUser()
+  let user
+  let usage
 
-  if (!user) {
-    redirect('/sign-in')
-  }
+  try {
+    user = await getOrCreateUser()
 
-  const usage = await getUserUsage(user.id)
+    if (!user) {
+      redirect('/sign-in')
+    }
 
-  if (!usage) {
-    redirect('/sign-in')
+    usage = await getUserUsage(user.id)
+
+    if (!usage) {
+      redirect('/sign-in')
+    }
+  } catch (error) {
+    console.error('Dashboard error:', error)
+    // Show a helpful error page instead of crashing
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="bg-gray-800 rounded-xl p-8 max-w-md text-center">
+          <h1 className="text-xl font-semibold text-white mb-2">Something went wrong</h1>
+          <p className="text-gray-400 mb-4">
+            There was an issue loading your dashboard. Please try signing out and back in.
+          </p>
+          <a
+            href="/sign-in"
+            className="inline-block px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+          >
+            Sign In Again
+          </a>
+        </div>
+      </div>
+    )
   }
 
   const usagePercentage = (usage.videosUsed / usage.planDetails.videosPerMonth) * 100

@@ -15,13 +15,28 @@ export async function getOrCreateUser() {
   })
 
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        clerkId: clerkUser.id,
-        email: clerkUser.emailAddresses[0]?.emailAddress || '',
-        name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null,
-      },
-    })
+    const email = clerkUser.emailAddresses[0]?.emailAddress || ''
+
+    // Check if user exists by email (in case created with different clerkId from dev/prod switch)
+    const existingByEmail = email ? await prisma.user.findUnique({
+      where: { email },
+    }) : null
+
+    if (existingByEmail) {
+      // Update the existing user with the new clerkId
+      user = await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: { clerkId: clerkUser.id },
+      })
+    } else {
+      user = await prisma.user.create({
+        data: {
+          clerkId: clerkUser.id,
+          email,
+          name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null,
+        },
+      })
+    }
   }
 
   // Reset monthly usage if needed
