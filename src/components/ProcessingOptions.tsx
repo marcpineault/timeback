@@ -39,7 +39,7 @@ export default function ProcessingOptions({
     headline: '',
     headlinePosition: 'top',
     captionStyle: 'default',
-    silenceThreshold: -20,
+    silenceThreshold: -30,
     silenceDuration: 0.5,
     useHookAsHeadline: false,
     generateBRoll: false,
@@ -76,36 +76,49 @@ export default function ProcessingOptions({
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-white">Silence Removal</h3>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Silence Threshold (dB)
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm text-gray-400">
+                Silence Threshold
+              </label>
+              <span className="text-sm text-white font-medium">{config.silenceThreshold} dB</span>
+            </div>
             <input
-              type="number"
+              type="range"
               value={config.silenceThreshold}
               onChange={(e) => setConfig({ ...config, silenceThreshold: Number(e.target.value) })}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-              min="-60"
-              max="0"
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              min="-50"
+              max="-20"
+              step="1"
             />
-            <p className="text-xs text-gray-500 mt-1">Lower = more sensitive</p>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Less aggressive (-50dB)</span>
+              <span>More aggressive (-20dB)</span>
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Min Silence Duration (s)
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-sm text-gray-400">
+                Min Silence Duration
+              </label>
+              <span className="text-sm text-white font-medium">{config.silenceDuration}s</span>
+            </div>
             <input
-              type="number"
+              type="range"
               value={config.silenceDuration}
               onChange={(e) => setConfig({ ...config, silenceDuration: Number(e.target.value) })}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-              min="0.1"
-              max="5"
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              min="0.2"
+              max="2"
               step="0.1"
             />
-            <p className="text-xs text-gray-500 mt-1">Minimum length to cut</p>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Cut short pauses (0.2s)</span>
+              <span>Only long pauses (2s)</span>
+            </div>
           </div>
         </div>
       </div>

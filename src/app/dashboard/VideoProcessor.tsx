@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import JSZip from 'jszip'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
@@ -22,6 +23,9 @@ export default function VideoProcessor({
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewVideo, setPreviewVideo] = useState<QueuedVideo | null>(null)
+  const [lastConfig, setLastConfig] = useState<ProcessingConfig | null>(null)
+  const [processingStatus, setProcessingStatus] = useState<string>('')
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const handleUploadComplete = (files: UploadedFile[]) => {
     const maxFiles = Math.min(files.length, videosRemaining)
@@ -46,6 +50,35 @@ export default function VideoProcessor({
 
   const handleClosePreview = () => {
     setPreviewVideo(null)
+  }
+
+  const handleRetry = async (fileId: string) => {
+    if (!lastConfig) return
+
+    const video = videoQueue.find(v => v.file.fileId === fileId)
+    if (!video) return
+
+    // Reset video to pending, then process it
+    setVideoQueue(prev =>
+      prev.map(v => v.file.fileId === fileId ? { ...v, status: 'pending', error: undefined } : v)
+    )
+
+    // Process the single video
+    setIsProcessing(true)
+    setProcessingStatus(`Retrying ${video.file.originalName}...`)
+
+    setVideoQueue(prev =>
+      prev.map(v => v.file.fileId === fileId ? { ...v, status: 'processing' } : v)
+    )
+
+    const result = await processVideo(video, lastConfig)
+
+    setVideoQueue(prev =>
+      prev.map(v => v.file.fileId === fileId ? result : v)
+    )
+
+    setIsProcessing(false)
+    setProcessingStatus('')
   }
 
   const processVideo = async (video: QueuedVideo, config: ProcessingConfig): Promise<QueuedVideo> => {
@@ -86,10 +119,14 @@ export default function VideoProcessor({
 
   const handleProcess = async (config: ProcessingConfig) => {
     setIsProcessing(true)
+    setLastConfig(config)
 
     const pendingVideos = videoQueue.filter(v => v.status === 'pending')
 
-    for (const video of pendingVideos) {
+    for (let i = 0; i < pendingVideos.length; i++) {
+      const video = pendingVideos[i]
+      setProcessingStatus(`Processing ${i + 1}/${pendingVideos.length}: ${video.file.originalName}`)
+
       setVideoQueue(prev =>
         prev.map(v => v.file.fileId === video.file.fileId ? { ...v, status: 'processing' } : v)
       )
@@ -102,6 +139,7 @@ export default function VideoProcessor({
     }
 
     setIsProcessing(false)
+    setProcessingStatus('')
     // Refresh the page to update usage
     window.location.reload()
   }
@@ -118,6 +156,40 @@ export default function VideoProcessor({
         document.body.removeChild(link)
       }, index * 500)
     })
+  }
+
+  const handleDownloadAsZip = async () => {
+    const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
+    if (completedVideos.length === 0) return
+
+    setIsDownloading(true)
+
+    try {
+      const zip = new JSZip()
+
+      // Fetch all videos and add to zip
+      for (const video of completedVideos) {
+        const response = await fetch(video.downloadUrl!)
+        const blob = await response.blob()
+        const filename = video.outputFilename || `video_${video.file.fileId}.mp4`
+        zip.file(filename, blob)
+      }
+
+      // Generate and download ZIP
+      const content = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `timeback_videos_${Date.now()}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Failed to create ZIP:', err)
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   const pendingVideos = videoQueue.filter(v => v.status === 'pending')
@@ -160,6 +232,7 @@ export default function VideoProcessor({
         onRemove={handleRemoveVideo}
         onClear={handleClearQueue}
         onPreview={handlePreviewVideo}
+        onRetry={lastConfig ? handleRetry : undefined}
       />
 
       {hasVideosToProcess && !isProcessing && (
@@ -177,8 +250,11 @@ export default function VideoProcessor({
             <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
             <div>
               <p className="text-white font-medium">Processing videos...</p>
-              <p className="text-gray-400 text-sm">This may take a few minutes</p>
+              <p className="text-gray-400 text-sm">{processingStatus || 'This may take a few minutes'}</p>
             </div>
+          </div>
+          <div className="mt-4 text-xs text-gray-500">
+            <p>Steps: Silence removal → Audio normalization → Transcription → Captions → Color grading → Final output</p>
           </div>
         </div>
       )}
@@ -199,13 +275,32 @@ export default function VideoProcessor({
             </div>
             <div className="flex gap-3">
               <button
+                onClick={handleDownloadAsZip}
+                disabled={isDownloading}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                {isDownloading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Creating ZIP...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download as ZIP
+                  </>
+                )}
+              </button>
+              <button
                 onClick={handleDownloadAll}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Download All
+                Individual
               </button>
               <button
                 onClick={handleClearQueue}

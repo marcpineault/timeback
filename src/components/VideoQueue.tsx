@@ -15,9 +15,10 @@ interface VideoQueueProps {
   onRemove: (fileId: string) => void;
   onClear: () => void;
   onPreview?: (video: QueuedVideo) => void;
+  onRetry?: (fileId: string) => void;
 }
 
-export default function VideoQueue({ videos, onRemove, onClear, onPreview }: VideoQueueProps) {
+export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRetry }: VideoQueueProps) {
   if (videos.length === 0) return null;
 
   const completedCount = videos.filter(v => v.status === 'complete').length;
@@ -124,6 +125,19 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview }: Vid
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                 </a>
+              )}
+
+              {/* Retry button for failed */}
+              {video.status === 'error' && onRetry && (
+                <button
+                  onClick={() => onRetry(video.file.fileId)}
+                  className="p-2 text-amber-400 hover:text-amber-300 transition-colors"
+                  title="Retry"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
               )}
 
               {/* Remove button */}
