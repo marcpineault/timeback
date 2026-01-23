@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     let stepOutput: string;
 
     const options: ProcessingOptions = {
-      silenceThreshold: silenceThreshold ?? -35,
+      silenceThreshold: silenceThreshold ?? -30,
       silenceDuration: silenceDuration ?? 0.4,
       headline: headline || undefined,
       headlinePosition: headlinePosition || 'top',
