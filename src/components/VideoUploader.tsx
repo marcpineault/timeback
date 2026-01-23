@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { uploadVideo } from '@/app/actions/upload';
 
 export interface UploadedFile {
   fileId: string;
@@ -48,23 +49,25 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     formData.append('video', file);
 
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      // Use Server Action instead of API route to bypass Railway's 10MB limit
+      const result = await uploadVideo(formData);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Upload failed');
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
       }
 
-      const data = await response.json();
+      const uploadedFile: UploadedFile = {
+        fileId: result.fileId!,
+        filename: result.filename!,
+        originalName: result.originalName!,
+        size: result.size!,
+      };
 
       setUploadingFiles(prev => prev.map((f, i) =>
-        i === index ? { ...f, status: 'complete' as const, progress: 100, result: data } : f
+        i === index ? { ...f, status: 'complete' as const, progress: 100, result: uploadedFile } : f
       ));
 
-      return data;
+      return uploadedFile;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Upload failed';
       setUploadingFiles(prev => prev.map((f, i) =>
