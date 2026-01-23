@@ -677,31 +677,38 @@ export async function applyAutoZoom(
   });
 
   // Build zoom expression that activates during speech segments
-  // Format: if(between(t,start,end),zoom,1)
-  const zoomConditions = segments
-    .map(seg => `between(t,${seg.start.toFixed(2)},${seg.end.toFixed(2)})`)
+  // Use simpler approach: scale + crop with conditional zoom based on time
+  // Limit to first 20 segments to avoid overly complex expressions
+  const limitedSegments = segments.slice(0, 20);
+
+  const zoomConditions = limitedSegments
+    .map(seg => `between(t\\,${seg.start.toFixed(2)}\\,${seg.end.toFixed(2)})`)
     .join('+');
 
-  // Smooth zoom using expression: lerp towards target when speaking, lerp back when not
-  // This creates a gradual zoom in/out effect
-  const zoomExpr = `if(${zoomConditions},min(zoom+0.002,${zoomIntensity}),max(zoom-0.002,1))`;
+  // Calculate zoom factor (e.g., 1.05 = 5% zoom)
+  const zoomFactor = zoomIntensity;
+  const scaledWidth = Math.round(videoInfo.width * zoomFactor);
+  const scaledHeight = Math.round(videoInfo.height * zoomFactor);
 
-  // Center the zoom on the frame
-  const xExpr = `iw/2-(iw/zoom/2)`;
-  const yExpr = `ih/2-(ih/zoom/2)`;
-
-  // Use zoompan filter for smooth animated zoom
-  const filterString = `zoompan=z='${zoomExpr}':x='${xExpr}':y='${yExpr}':d=1:s=${videoInfo.width}x${videoInfo.height}:fps=30`;
+  // Use scale and crop for zoom effect - simpler and more reliable than zoompan
+  // When speaking: scale up and crop to center
+  // When not speaking: use original
+  const filterComplex = [
+    `[0:v]split=2[orig][zoom]`,
+    `[zoom]scale=${scaledWidth}:${scaledHeight},crop=${videoInfo.width}:${videoInfo.height}[zoomed]`,
+    `[orig][zoomed]overlay=x='if(${zoomConditions},0,W)':y=0:shortest=1[out]`
+  ].join(';');
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
-      .videoFilters(filterString)
+      .complexFilter(filterComplex, 'out')
       .outputOptions([
         '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '1',
-        '-c:a', 'copy',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -710,7 +717,14 @@ export async function applyAutoZoom(
       })
       .on('error', (err) => {
         console.error(`[Zoom] Auto-zoom error:`, err);
-        reject(err);
+        // Graceful fallback: just copy the file if zoom fails
+        console.log(`[Zoom] Falling back to original video without zoom`);
+        try {
+          fs.copyFileSync(inputPath, outputPath);
+          resolve(outputPath);
+        } catch (copyErr) {
+          reject(err);
+        }
       })
       .run();
   });
