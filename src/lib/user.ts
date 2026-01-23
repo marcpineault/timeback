@@ -56,23 +56,7 @@ export async function getOrCreateUser() {
 }
 
 export async function canProcessVideo(userId: string): Promise<{ allowed: boolean; reason?: string }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  })
-
-  if (!user) {
-    return { allowed: false, reason: 'User not found' }
-  }
-
-  const plan = PLANS[user.plan as PlanType]
-
-  if (user.videosThisMonth >= plan.videosPerMonth) {
-    return {
-      allowed: false,
-      reason: `You've reached your limit of ${plan.videosPerMonth} videos this month. Upgrade to process more.`
-    }
-  }
-
+  // TODO: Re-enable paywall after testing
   return { allowed: true }
 }
 
@@ -100,11 +84,12 @@ export async function getUserUsage(userId: string) {
 
   const plan = PLANS[user.plan as PlanType]
 
+  // TODO: Re-enable after testing
   return {
     plan: user.plan,
     planDetails: plan,
-    videosUsed: user.videosThisMonth,
-    videosRemaining: plan.videosPerMonth - user.videosThisMonth,
+    videosUsed: 0,
+    videosRemaining: 999999,
     recentVideos: user.videos as Video[],
   }
 }

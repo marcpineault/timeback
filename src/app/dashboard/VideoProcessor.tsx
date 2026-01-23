@@ -56,6 +56,7 @@ export default function VideoProcessor({
         body: JSON.stringify({
           fileId: video.file.fileId,
           filename: video.file.filename,
+          s3Key: video.file.s3Key, // Pass S3 key for files uploaded to S3
           userId,
           addWatermark: hasWatermark,
           ...config,
