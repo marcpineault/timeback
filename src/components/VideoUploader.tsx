@@ -13,6 +13,7 @@ export interface UploadedFile {
   filename: string;
   originalName: string;
   size: number;
+  previewUrl?: string;
 }
 
 interface UploadingFile {
@@ -21,6 +22,7 @@ interface UploadingFile {
   status: 'pending' | 'uploading' | 'complete' | 'error';
   error?: string;
   result?: UploadedFile;
+  previewUrl: string;
 }
 
 interface VideoUploaderProps {
@@ -60,7 +62,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   };
 
   // Chunked upload for large files
-  const uploadFileChunked = async (file: File, index: number): Promise<UploadedFile | null> => {
+  const uploadFileChunked = async (file: File, index: number, previewUrl: string): Promise<UploadedFile | null> => {
     setUploadingFiles(prev => prev.map((f, i) =>
       i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
     ));
@@ -107,6 +109,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         filename: finalResult.filename!,
         originalName: finalResult.originalName!,
         size: finalResult.size!,
+        previewUrl,
       };
 
       setUploadingFiles(prev => prev.map((f, i) =>
@@ -124,7 +127,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   };
 
   // Direct upload for small files (under 5MB)
-  const uploadFileDirectly = async (file: File, index: number): Promise<UploadedFile | null> => {
+  const uploadFileDirectly = async (file: File, index: number, previewUrl: string): Promise<UploadedFile | null> => {
     setUploadingFiles(prev => prev.map((f, i) =>
       i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
     ));
@@ -144,6 +147,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         filename: result.filename!,
         originalName: result.originalName!,
         size: result.size!,
+        previewUrl,
       };
 
       setUploadingFiles(prev => prev.map((f, i) =>
@@ -160,12 +164,12 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
   };
 
-  const uploadSingleFile = async (file: File, index: number): Promise<UploadedFile | null> => {
+  const uploadSingleFile = async (file: File, index: number, previewUrl: string): Promise<UploadedFile | null> => {
     // Use chunked upload for files over 5MB
     if (file.size > CHUNK_SIZE) {
-      return uploadFileChunked(file, index);
+      return uploadFileChunked(file, index, previewUrl);
     } else {
-      return uploadFileDirectly(file, index);
+      return uploadFileDirectly(file, index, previewUrl);
     }
   };
 
@@ -185,18 +189,19 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       setError(`${files.length - validFiles.length} file(s) skipped - invalid format.`);
     }
 
-    // Initialize upload state
+    // Initialize upload state with preview URLs
     const initialState: UploadingFile[] = validFiles.map(file => ({
       file,
       progress: 0,
       status: 'pending',
+      previewUrl: URL.createObjectURL(file),
     }));
     setUploadingFiles(initialState);
 
     // Upload files sequentially to avoid overwhelming the server
     const results: UploadedFile[] = [];
     for (let i = 0; i < validFiles.length; i++) {
-      const result = await uploadSingleFile(validFiles[i], i);
+      const result = await uploadSingleFile(validFiles[i], i, initialState[i].previewUrl);
       if (result) {
         results.push(result);
       }
