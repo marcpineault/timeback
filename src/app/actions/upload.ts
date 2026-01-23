@@ -46,6 +46,24 @@ export interface S3UploadCompleteResult {
   error?: string;
 }
 
+export interface FileInfo {
+  filename: string;
+  contentType: string;
+  fileSize: number;
+}
+
+export interface BatchPresignedUrlResult {
+  success: boolean;
+  urls?: Array<{ url: string; key: string; index: number }>;
+  error?: string;
+}
+
+export interface BatchConfirmResult {
+  success: boolean;
+  files?: Array<S3UploadCompleteResult>;
+  error?: string;
+}
+
 /**
  * Check if S3 uploads are available
  */
@@ -134,6 +152,88 @@ export async function confirmS3Upload(
   } catch (error) {
     console.error('S3 confirm upload error:', error);
     return { success: false, error: 'Failed to confirm upload' };
+  }
+}
+
+/**
+ * Get presigned URLs for multiple files in a single request (reduces round trips)
+ */
+export async function getBatchS3UploadUrls(
+  files: FileInfo[]
+): Promise<BatchPresignedUrlResult> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    if (!isS3Configured()) {
+      return { success: false, error: 'S3 is not configured' };
+    }
+
+    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
+    const maxSize = 500 * 1024 * 1024;
+
+    const urls: Array<{ url: string; key: string; index: number }> = [];
+
+    // Generate all presigned URLs in parallel
+    const urlPromises = files.map(async (file, index) => {
+      if (!validTypes.includes(file.contentType)) {
+        throw new Error(`Invalid file type for ${file.filename}`);
+      }
+      if (file.fileSize > maxSize) {
+        throw new Error(`File ${file.filename} too large. Maximum size is 500MB.`);
+      }
+
+      const { url, key } = await createUploadUrl(file.filename, file.contentType);
+      return { url, key, index };
+    });
+
+    const results = await Promise.all(urlPromises);
+    urls.push(...results);
+
+    console.log(`[Upload] Generated ${urls.length} presigned URLs in batch`);
+
+    return { success: true, urls };
+  } catch (error) {
+    console.error('Batch presigned URL error:', error);
+    const msg = error instanceof Error ? error.message : 'Failed to generate upload URLs';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Confirm multiple S3 uploads in a single request
+ */
+export async function confirmBatchS3Uploads(
+  uploads: Array<{ s3Key: string; originalName: string; size: number }>
+): Promise<BatchConfirmResult> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const files: S3UploadCompleteResult[] = uploads.map(upload => {
+      const filename = upload.s3Key.split('/').pop() || upload.s3Key;
+      const fileId = filename.replace(/\.[^/.]+$/, '');
+
+      return {
+        success: true,
+        fileId,
+        filename,
+        originalName: upload.originalName,
+        size: upload.size,
+        s3Key: upload.s3Key,
+      };
+    });
+
+    console.log(`[Upload] Batch confirmed ${files.length} uploads to CLOUDFLARE R2`);
+
+    return { success: true, files };
+  } catch (error) {
+    console.error('Batch confirm upload error:', error);
+    return { success: false, error: 'Failed to confirm uploads' };
   }
 }
 
