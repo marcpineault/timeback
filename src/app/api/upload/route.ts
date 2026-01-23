@@ -1,15 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { mkdir } from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 // Route segment config for large file uploads (App Router)
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // 60 seconds timeout for Vercel/Railway
+export const maxDuration = 300; // 5 minutes timeout for large uploads
 
 export async function POST(request: NextRequest) {
   try {
+    // Get content type to determine how to parse
+    const contentType = request.headers.get('content-type') || '';
+
+    if (!contentType.includes('multipart/form-data')) {
+      return NextResponse.json(
+        { error: 'Content type must be multipart/form-data' },
+        { status: 400 }
+      );
+    }
+
+    // Parse the multipart form data
     const formData = await request.formData();
     const file = formData.get('video') as File | null;
 
@@ -32,15 +46,21 @@ export async function POST(request: NextRequest) {
     const filename = `${fileId}${ext}`;
 
     // Ensure uploads directory exists
-    // Use UPLOADS_DIR env var if set (for Railway volume mount), otherwise use default
     const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
     await mkdir(uploadsDir, { recursive: true });
 
-    // Save file
+    // Save file using streaming to handle large files
     const filepath = path.join(uploadsDir, filename);
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
+
+    // Convert File to stream and pipe to file system
+    const fileStream = file.stream();
+    const writeStream = createWriteStream(filepath);
+
+    // Use pipeline for proper stream handling
+    await pipeline(
+      Readable.fromWeb(fileStream as import('stream/web').ReadableStream),
+      writeStream
+    );
 
     return NextResponse.json({
       success: true,
