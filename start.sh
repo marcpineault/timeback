@@ -2,7 +2,8 @@
 set -e
 
 echo "Running database migrations..."
-prisma db push --schema=./prisma/schema.prisma --skip-generate
+cd /app
+prisma db push --skip-generate
 
 echo "Starting server..."
 exec node server.js
