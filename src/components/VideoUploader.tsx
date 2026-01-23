@@ -297,14 +297,13 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }));
     setUploadingFiles(initialState);
 
-    // Upload files sequentially to avoid overwhelming the server
-    const results: UploadedFile[] = [];
-    for (let i = 0; i < validFiles.length; i++) {
-      const result = await uploadSingleFile(validFiles[i], i, initialState[i].previewUrl);
-      if (result) {
-        results.push(result);
-      }
-    }
+    // Upload files in parallel for faster uploads
+    const uploadPromises = validFiles.map((file, i) =>
+      uploadSingleFile(file, i, initialState[i].previewUrl)
+    );
+
+    const uploadResults = await Promise.all(uploadPromises);
+    const results = uploadResults.filter((r): r is UploadedFile => r !== null);
 
     // Notify parent of completed uploads
     if (results.length > 0) {
