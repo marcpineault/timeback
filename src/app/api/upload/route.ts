@@ -14,7 +14,7 @@ export const maxDuration = 300; // 5 minutes timeout for large uploads
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check - middleware is bypassed for this route to allow large uploads
+    // Auth check first (route is public in middleware, but we require auth)
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
