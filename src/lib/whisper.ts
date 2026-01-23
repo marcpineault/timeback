@@ -16,9 +16,16 @@ export interface TranscriptionSegment {
   text: string;
 }
 
+export interface TranscriptionWord {
+  word: string;
+  start: number;
+  end: number;
+}
+
 export interface TranscriptionResult {
   text: string;
   segments: TranscriptionSegment[];
+  words?: TranscriptionWord[];
   srtPath: string;
 }
 
@@ -54,16 +61,22 @@ export async function extractAudio(
  * Transcribe audio using OpenAI Whisper API
  */
 export async function transcribeAudio(
-  audioPath: string
-): Promise<{ text: string; segments: TranscriptionSegment[] }> {
+  audioPath: string,
+  includeWords: boolean = false
+): Promise<{ text: string; segments: TranscriptionSegment[]; words?: TranscriptionWord[] }> {
   const openai = getOpenAIClient();
   const audioFile = fs.createReadStream(audioPath);
+
+  // Request word-level timestamps if needed for animated captions
+  const granularities: ('segment' | 'word')[] = includeWords
+    ? ['segment', 'word']
+    : ['segment'];
 
   const response = await openai.audio.transcriptions.create({
     file: audioFile,
     model: 'whisper-1',
     response_format: 'verbose_json',
-    timestamp_granularities: ['segment'],
+    timestamp_granularities: granularities,
   });
 
   const segments: TranscriptionSegment[] = (response.segments || []).map((seg) => ({
@@ -72,9 +85,19 @@ export async function transcribeAudio(
     text: seg.text.trim(),
   }));
 
+  // Extract word-level timestamps if requested
+  const words: TranscriptionWord[] | undefined = includeWords
+    ? ((response as { words?: Array<{ word: string; start: number; end: number }> }).words || []).map((w) => ({
+        word: w.word,
+        start: w.start,
+        end: w.end,
+      }))
+    : undefined;
+
   return {
     text: response.text,
     segments,
+    words,
   };
 }
 
@@ -95,6 +118,20 @@ function formatSrtTime(seconds: number): string {
 }
 
 /**
+ * Format seconds to ASS timestamp format (H:MM:SS.cc)
+ */
+function formatAssTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const centiseconds = Math.round((seconds % 1) * 100);
+
+  return `${hours}:${minutes.toString().padStart(2, '0')}:${secs
+    .toString()
+    .padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+}
+
+/**
  * Generate SRT file from transcription segments
  */
 export function generateSrt(
@@ -110,6 +147,106 @@ export function generateSrt(
     .join('\n');
 
   fs.writeFileSync(outputPath, srtContent, 'utf-8');
+  return outputPath;
+}
+
+/**
+ * Group words into lines for display (max ~5 words per line for readability)
+ */
+function groupWordsIntoLines(
+  words: TranscriptionWord[],
+  maxWordsPerLine: number = 5
+): Array<{ words: TranscriptionWord[]; start: number; end: number }> {
+  const lines: Array<{ words: TranscriptionWord[]; start: number; end: number }> = [];
+  let currentLine: TranscriptionWord[] = [];
+  let lineStart = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+
+    if (currentLine.length === 0) {
+      lineStart = word.start;
+    }
+
+    currentLine.push(word);
+
+    // Check if we should break the line
+    const shouldBreak =
+      currentLine.length >= maxWordsPerLine ||
+      // Break on natural pauses (gaps > 0.5s between words)
+      (i < words.length - 1 && words[i + 1].start - word.end > 0.5) ||
+      // Break on sentence-ending punctuation
+      /[.!?]$/.test(word.word);
+
+    if (shouldBreak || i === words.length - 1) {
+      lines.push({
+        words: currentLine,
+        start: lineStart,
+        end: word.end,
+      });
+      currentLine = [];
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * Generate ASS subtitle file with word-by-word animation (karaoke style)
+ */
+export function generateAnimatedAss(
+  words: TranscriptionWord[],
+  outputPath: string
+): string {
+  // ASS header with styles
+  // Default style: words start gray, then highlight to yellow when spoken
+  const header = `[Script Info]
+Title: Animated Captions
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,48,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,2,2,100,100,150,1
+Style: Highlight,Arial,48,&H0000FFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,2,2,100,100,150,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  // Group words into displayable lines
+  const lines = groupWordsIntoLines(words);
+
+  // Generate dialogue events for each line
+  const events: string[] = [];
+
+  for (const line of lines) {
+    const startTime = formatAssTime(line.start);
+    const endTime = formatAssTime(line.end);
+
+    // Build the text with karaoke timing tags
+    // Each word gets a \kf tag with duration in centiseconds
+    let text = '';
+    for (let i = 0; i < line.words.length; i++) {
+      const word = line.words[i];
+      const wordDuration = Math.round((word.end - word.start) * 100); // Convert to centiseconds
+
+      // Add karaoke fill tag (\kf) - fills the word progressively
+      // Color override: start with white, fill with yellow
+      text += `{\\kf${wordDuration}}${word.word} `;
+    }
+
+    text = text.trim();
+
+    // Create dialogue event
+    events.push(`Dialogue: 0,${startTime},${endTime},Default,,0,0,0,,${text}`);
+  }
+
+  const assContent = header + events.join('\n') + '\n';
+  fs.writeFileSync(outputPath, assContent, 'utf-8');
+
   return outputPath;
 }
 
@@ -216,24 +353,33 @@ export function extractHook(text: string, maxLength: number = 60): string {
 }
 
 /**
- * Full transcription pipeline: extract audio, transcribe, generate SRT
+ * Full transcription pipeline: extract audio, transcribe, generate SRT/ASS
  */
 export async function transcribeVideo(
   videoPath: string,
-  outputDir: string
+  outputDir: string,
+  options: { animated?: boolean } = {}
 ): Promise<TranscriptionResult> {
   const baseName = path.basename(videoPath, path.extname(videoPath));
   const audioPath = path.join(outputDir, `${baseName}_audio.mp3`);
-  const srtPath = path.join(outputDir, `${baseName}.srt`);
+  const srtPath = options.animated
+    ? path.join(outputDir, `${baseName}.ass`)
+    : path.join(outputDir, `${baseName}.srt`);
 
   // Extract audio
   await extractAudio(videoPath, audioPath);
 
-  // Transcribe
-  const { text, segments } = await transcribeAudio(audioPath);
+  // Transcribe (include word-level timestamps for animated captions)
+  const { text, segments, words } = await transcribeAudio(audioPath, options.animated);
 
-  // Generate SRT
-  generateSrt(segments, srtPath);
+  // Generate subtitle file
+  if (options.animated && words && words.length > 0) {
+    generateAnimatedAss(words, srtPath);
+    console.log(`[Transcription] Generated animated ASS with ${words.length} words`);
+  } else {
+    generateSrt(segments, srtPath);
+    console.log(`[Transcription] Generated SRT with ${segments.length} segments`);
+  }
 
   // Clean up audio file
   fs.unlinkSync(audioPath);
@@ -241,6 +387,7 @@ export async function transcribeVideo(
   return {
     text,
     segments,
+    words,
     srtPath,
   };
 }
