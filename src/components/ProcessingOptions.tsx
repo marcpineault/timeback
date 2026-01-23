@@ -17,7 +17,7 @@ export interface ProcessingConfig {
   generateCaptions: boolean;
   headline: string;
   headlinePosition: 'top' | 'center' | 'bottom';
-  captionStyle: 'default' | 'bold' | 'outline';
+  captionStyle: 'default' | 'bold' | 'outline' | 'animated';
   silenceThreshold: number;
   silenceDuration: number;
   useHookAsHeadline: boolean;
@@ -127,8 +127,14 @@ export default function ProcessingOptions({
             >
               <option value="default">Default (White with outline)</option>
               <option value="bold">Bold (Larger, thicker)</option>
-              <option value="outline">Outline (Yellow with shadow)</option>
+              <option value="outline">Outline (Black outline)</option>
+              <option value="animated">Animated (Word-by-word highlight)</option>
             </select>
+            {config.captionStyle === 'animated' && (
+              <p className="text-sm text-yellow-400 mt-2">
+                Words highlight one-by-one as they are spoken - great for engagement!
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -98,7 +98,9 @@ export async function POST(request: NextRequest) {
 
     if (generateCaptions || useHookAsHeadline || generateBRoll) {
       console.log('[Process] Step 2: Transcribing silence-removed video...');
-      const transcription = await transcribeVideo(currentInput, processedDir);
+      // Use animated transcription (word-level timestamps) for animated caption style
+      const isAnimated = captionStyle === 'animated';
+      const transcription = await transcribeVideo(currentInput, processedDir, { animated: isAnimated });
       srtPath = transcription.srtPath;
       transcriptionSegments = transcription.segments;
 

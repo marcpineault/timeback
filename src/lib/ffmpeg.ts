@@ -229,6 +229,9 @@ export async function burnCaptions(
   srtPath: string,
   style: string = 'default'
 ): Promise<string> {
+  // Check if this is an animated ASS file
+  const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
+
   // Clean centered captions - minimal style
   // Alignment=2 is bottom-center, MarginV positions vertically
   // MarginL/MarginR add horizontal padding for Instagram Reels safe zone (~100px each side)
@@ -242,24 +245,31 @@ export async function burnCaptions(
     outline: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=1,Shadow=0,Alignment=2,MarginV=100,MarginL=100,MarginR=100',
   };
 
-  const subtitleStyle = styleMap[style] || styleMap.default;
-
   console.log(`[Captions] Burning captions from: ${srtPath}`);
-  console.log(`[Captions] Style: ${style}`);
+  console.log(`[Captions] Style: ${style}, Animated: ${isAnimated}`);
 
-  // Read and log SRT content for debugging
-  const srtContent = fs.readFileSync(srtPath, 'utf-8');
-  const lineCount = srtContent.split('\n').length;
-  console.log(`[Captions] SRT file has ${lineCount} lines`);
+  // Read and log subtitle content for debugging
+  const subContent = fs.readFileSync(srtPath, 'utf-8');
+  const lineCount = subContent.split('\n').length;
+  console.log(`[Captions] Subtitle file has ${lineCount} lines`);
 
-  // Copy SRT to a temp file with simple name to avoid FFmpeg path escaping issues
-  const tempSrtName = 'temp_subs.srt';
-  const srtDir = path.dirname(srtPath);
-  const tempSrtPath = path.join(srtDir, tempSrtName);
-  fs.copyFileSync(srtPath, tempSrtPath);
+  // Copy subtitle to a temp file with simple name to avoid FFmpeg path escaping issues
+  const tempSubName = isAnimated ? 'temp_subs.ass' : 'temp_subs.srt';
+  const subDir = path.dirname(srtPath);
+  const tempSubPath = path.join(subDir, tempSubName);
+  fs.copyFileSync(srtPath, tempSubPath);
 
-  const escapedPath = tempSrtPath.replace(/:/g, '\\:').replace(/'/g, "'\\''");
-  const filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
+  const escapedPath = tempSubPath.replace(/:/g, '\\:').replace(/'/g, "'\\''");
+
+  // For animated ASS files, use the ass filter directly (styles are embedded in the file)
+  // For SRT files, use subtitles filter with force_style
+  let filterString: string;
+  if (isAnimated) {
+    filterString = `ass='${escapedPath}'`;
+  } else {
+    const subtitleStyle = styleMap[style] || styleMap.default;
+    filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
+  }
   console.log(`[Captions] Filter: ${filterString}`);
 
   return new Promise((resolve, reject) => {
@@ -283,12 +293,12 @@ export async function burnCaptions(
       })
       .on('end', () => {
         console.log(`[Captions] Complete!`);
-        try { fs.unlinkSync(tempSrtPath); } catch {}
+        try { fs.unlinkSync(tempSubPath); } catch {}
         resolve(outputPath);
       })
       .on('error', (err) => {
         console.error(`[Captions] Error:`, err);
-        try { fs.unlinkSync(tempSrtPath); } catch {}
+        try { fs.unlinkSync(tempSubPath); } catch {}
         reject(err);
       });
 
