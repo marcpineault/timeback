@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { uploadVideo } from '@/app/actions/upload';
+import {
+  uploadVideo,
+  initChunkedUpload,
+  uploadChunk,
+  finalizeUpload
+} from '@/app/actions/upload';
 
 export interface UploadedFile {
   fileId: string;
@@ -23,6 +28,10 @@ interface VideoUploaderProps {
   disabled?: boolean;
 }
 
+// 5MB chunks to stay well under Railway's 10MB limit
+// Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
+const CHUNK_SIZE = 5 * 1024 * 1024;
+
 export default function VideoUploader({ onUploadComplete, disabled }: VideoUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
@@ -40,7 +49,82 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     setIsDragging(false);
   }, []);
 
-  const uploadSingleFile = async (file: File, index: number): Promise<UploadedFile | null> => {
+  // Helper to convert ArrayBuffer to base64
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  };
+
+  // Chunked upload for large files
+  const uploadFileChunked = async (file: File, index: number): Promise<UploadedFile | null> => {
+    setUploadingFiles(prev => prev.map((f, i) =>
+      i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
+    ));
+
+    try {
+      // Step 1: Initialize upload
+      const initResult = await initChunkedUpload(file.name, file.size, file.type);
+      if (!initResult.success || !initResult.uploadId) {
+        throw new Error(initResult.error || 'Failed to initialize upload');
+      }
+
+      const uploadId = initResult.uploadId;
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+      // Step 2: Upload chunks
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunkBlob = file.slice(start, end);
+        const chunkBuffer = await chunkBlob.arrayBuffer();
+        const chunkBase64 = arrayBufferToBase64(chunkBuffer);
+
+        const chunkResult = await uploadChunk(uploadId, chunkIndex, totalChunks, chunkBase64);
+
+        if (!chunkResult.success) {
+          throw new Error(chunkResult.error || 'Failed to upload chunk');
+        }
+
+        // Update progress
+        const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, progress } : f
+        ));
+      }
+
+      // Step 3: Finalize upload
+      const finalResult = await finalizeUpload(uploadId);
+      if (!finalResult.success) {
+        throw new Error(finalResult.error || 'Failed to finalize upload');
+      }
+
+      const uploadedFile: UploadedFile = {
+        fileId: finalResult.fileId!,
+        filename: finalResult.filename!,
+        originalName: finalResult.originalName!,
+        size: finalResult.size!,
+      };
+
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'complete' as const, progress: 100, result: uploadedFile } : f
+      ));
+
+      return uploadedFile;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'error' as const, error: errorMsg } : f
+      ));
+      return null;
+    }
+  };
+
+  // Direct upload for small files (under 5MB)
+  const uploadFileDirectly = async (file: File, index: number): Promise<UploadedFile | null> => {
     setUploadingFiles(prev => prev.map((f, i) =>
       i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
     ));
@@ -49,7 +133,6 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     formData.append('video', file);
 
     try {
-      // Use Server Action instead of API route to bypass Railway's 10MB limit
       const result = await uploadVideo(formData);
 
       if (!result.success) {
@@ -74,6 +157,15 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         i === index ? { ...f, status: 'error' as const, error: errorMsg } : f
       ));
       return null;
+    }
+  };
+
+  const uploadSingleFile = async (file: File, index: number): Promise<UploadedFile | null> => {
+    // Use chunked upload for files over 5MB
+    if (file.size > CHUNK_SIZE) {
+      return uploadFileChunked(file, index);
+    } else {
+      return uploadFileDirectly(file, index);
     }
   };
 
@@ -233,11 +325,14 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
                 {/* Progress Bar */}
                 {item.status === 'uploading' && (
-                  <div className="w-20 bg-gray-600 rounded-full h-1.5">
-                    <div
-                      className="bg-blue-500 h-1.5 rounded-full transition-all"
-                      style={{ width: `${item.progress}%` }}
-                    />
+                  <div className="flex items-center gap-2">
+                    <div className="w-20 bg-gray-600 rounded-full h-1.5">
+                      <div
+                        className="bg-blue-500 h-1.5 rounded-full transition-all"
+                        style={{ width: `${item.progress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-400 w-8">{item.progress}%</span>
                   </div>
                 )}
               </div>
