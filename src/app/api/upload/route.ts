@@ -5,6 +5,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
+import { auth } from '@clerk/nextjs/server';
 
 // Route segment config for large file uploads (App Router)
 export const runtime = 'nodejs';
@@ -13,6 +14,12 @@ export const maxDuration = 300; // 5 minutes timeout for large uploads
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check - middleware is bypassed for this route to allow large uploads
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Get content type to determine how to parse
     const contentType = request.headers.get('content-type') || '';
 
