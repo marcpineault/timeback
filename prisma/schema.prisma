@@ -20,6 +20,12 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   videos          Video[]
+
+  // Google Drive integration
+  googleAccessToken  String?
+  googleRefreshToken String?
+  googleTokenExpiry  DateTime?
+  googleDriveConnected Boolean @default(false)
 }
 
 model Video {

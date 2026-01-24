@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import JSZip from 'jszip'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
@@ -26,6 +26,58 @@ export default function VideoProcessor({
   const [lastConfig, setLastConfig] = useState<ProcessingConfig | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isDriveConnected, setIsDriveConnected] = useState(false)
+  const [isUploadingToDrive, setIsUploadingToDrive] = useState(false)
+  const [driveUploadStatus, setDriveUploadStatus] = useState<string>('')
+
+  // Check Google Drive connection status
+  useEffect(() => {
+    const checkDriveStatus = async () => {
+      try {
+        const response = await fetch('/api/drive/status')
+        if (response.ok) {
+          const data = await response.json()
+          setIsDriveConnected(data.connected)
+        }
+      } catch (error) {
+        console.error('Failed to check Drive status:', error)
+      }
+    }
+    checkDriveStatus()
+  }, [])
+
+  // Handle uploading all videos to Google Drive
+  const handleUploadToDrive = async () => {
+    const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
+    if (completedVideos.length === 0) return
+
+    setIsUploadingToDrive(true)
+    setDriveUploadStatus(`Uploading 0/${completedVideos.length}...`)
+
+    try {
+      for (let i = 0; i < completedVideos.length; i++) {
+        const video = completedVideos[i]
+        setDriveUploadStatus(`Uploading ${i + 1}/${completedVideos.length}...`)
+
+        await fetch('/api/drive/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoUrl: video.downloadUrl,
+            fileName: video.outputFilename || `${video.file.originalName.replace(/\.[^/.]+$/, '')}_processed.mp4`,
+          }),
+        })
+      }
+      setDriveUploadStatus('Uploaded to Drive!')
+      setTimeout(() => setDriveUploadStatus(''), 3000)
+    } catch (error) {
+      console.error('Failed to upload to Drive:', error)
+      setDriveUploadStatus('Upload failed')
+      setTimeout(() => setDriveUploadStatus(''), 3000)
+    } finally {
+      setIsUploadingToDrive(false)
+    }
+  }
 
   const handleUploadComplete = (files: UploadedFile[]) => {
     const maxFiles = Math.min(files.length, videosRemaining)
@@ -270,7 +322,10 @@ export default function VideoProcessor({
               </div>
               <div>
                 <p className="text-white font-medium text-sm sm:text-base">All videos processed!</p>
-                <p className="text-gray-400 text-xs sm:text-sm">{completedVideos.length} video(s) ready</p>
+                <p className="text-gray-400 text-xs sm:text-sm">
+                  {completedVideos.length} video(s) ready
+                  {driveUploadStatus && <span className="ml-2 text-green-400">{driveUploadStatus}</span>}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -295,6 +350,41 @@ export default function VideoProcessor({
                   </>
                 )}
               </button>
+              {/* Google Drive Upload Button */}
+              {isDriveConnected ? (
+                <button
+                  onClick={handleUploadToDrive}
+                  disabled={isUploadingToDrive}
+                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {isUploadingToDrive ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="hidden sm:inline">{driveUploadStatus}</span>
+                      <span className="sm:hidden">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2L2 19.5h20L12 2zm0 4l6.5 11.5h-13L12 6z"/>
+                      </svg>
+                      <span className="hidden sm:inline">Save to Drive</span>
+                      <span className="sm:hidden">Drive</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <a
+                  href="/api/auth/google"
+                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L2 19.5h20L12 2zm0 4l6.5 11.5h-13L12 6z"/>
+                  </svg>
+                  <span className="hidden sm:inline">Connect Drive</span>
+                  <span className="sm:hidden">Drive</span>
+                </a>
+              )}
               <button
                 onClick={handleDownloadAll}
                 className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
