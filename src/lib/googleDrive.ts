@@ -296,11 +296,17 @@ export async function createDriveFolder(
 
 /**
  * List folders in Google Drive (for folder picker)
+ * Supports pagination to retrieve all folders, not just the first 100
  */
 export async function listDriveFolders(
   accessToken: string,
-  parentId?: string
-): Promise<{ id: string; name: string }[]> {
+  parentId?: string,
+  options?: { pageToken?: string; maxResults?: number }
+): Promise<{
+  folders: { id: string; name: string }[];
+  nextPageToken?: string;
+  hasMore: boolean;
+}> {
   const drive = getDriveClient(accessToken);
 
   const query = parentId
@@ -309,13 +315,40 @@ export async function listDriveFolders(
 
   const response = await drive.files.list({
     q: query,
-    fields: 'files(id, name)',
+    fields: 'files(id, name), nextPageToken',
     orderBy: 'name',
-    pageSize: 100,
+    pageSize: Math.min(options?.maxResults || 100, 1000),
+    pageToken: options?.pageToken,
   });
 
-  return (response.data.files || []).map((file) => ({
+  const folders = (response.data.files || []).map((file) => ({
     id: file.id!,
     name: file.name!,
   }));
+
+  return {
+    folders,
+    nextPageToken: response.data.nextPageToken || undefined,
+    hasMore: !!response.data.nextPageToken,
+  };
+}
+
+/**
+ * List ALL folders in Google Drive (fetches all pages)
+ * Use with caution for users with many folders - prefer paginated version
+ */
+export async function listAllDriveFolders(
+  accessToken: string,
+  parentId?: string
+): Promise<{ id: string; name: string }[]> {
+  const allFolders: { id: string; name: string }[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const result = await listDriveFolders(accessToken, parentId, { pageToken });
+    allFolders.push(...result.folders);
+    pageToken = result.nextPageToken;
+  } while (pageToken);
+
+  return allFolders;
 }

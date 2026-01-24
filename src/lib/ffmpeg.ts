@@ -713,6 +713,99 @@ const colorGradeFilters: Record<ColorGradePreset, string> = {
 };
 
 /**
+ * Combined video processing options for single-pass encoding
+ * This reduces multiple FFmpeg passes to a single pass when possible
+ */
+export interface CombinedProcessingOptions {
+  colorGrade?: ColorGradePreset;
+  headline?: string;
+  headlinePosition?: 'top' | 'center' | 'bottom';
+}
+
+/**
+ * Apply multiple video filters in a single FFmpeg pass
+ * This is more efficient than running separate passes for each filter
+ * Combines color grading and headline into one re-encode
+ */
+export async function applyCombinedFilters(
+  inputPath: string,
+  outputPath: string,
+  options: CombinedProcessingOptions
+): Promise<string> {
+  const filters: string[] = [];
+
+  // Add color grading filter if specified
+  if (options.colorGrade && options.colorGrade !== 'none') {
+    const colorFilter = colorGradeFilters[options.colorGrade];
+    if (colorFilter) {
+      filters.push(colorFilter);
+    }
+  }
+
+  // Add headline filter if specified
+  if (options.headline) {
+    const yPositions: Record<string, string> = {
+      top: 'y=240',
+      center: 'y=(h-text_h)/2',
+      bottom: 'y=h-text_h-240',
+    };
+
+    let escapedHeadline = options.headline
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, '\u2019')
+      .replace(/"/g, '\u201d')
+      .replace(/:/g, '\\:');
+
+    if (escapedHeadline.length > 30) {
+      const words = escapedHeadline.split(' ');
+      const midpoint = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, midpoint).join(' ');
+      const line2 = words.slice(midpoint).join(' ');
+      escapedHeadline = `${line1}\n${line2}`;
+    }
+
+    const position = options.headlinePosition || 'top';
+    filters.push(
+      `drawtext=text='${escapedHeadline}':fontsize=40:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.75:boxborderw=12:enable='between(t,0,5)'`
+    );
+  }
+
+  // If no filters to apply, just copy the file
+  if (filters.length === 0) {
+    console.log('[Combined] No filters to apply, copying file');
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
+  const filterString = filters.join(',');
+  console.log(`[Combined] Applying ${filters.length} filters in single pass: ${filterString.substring(0, 100)}...`);
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .videoFilters(filterString)
+      .outputOptions([
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '2',
+        '-max_muxing_queue_size', '512',
+        '-bufsize', '1M',
+        '-c:a', 'copy',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Combined] Processing complete!`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[Combined] Error:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
  * Apply color grading preset to video
  */
 export async function applyColorGrade(

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   uploadVideo,
   initChunkedUpload,
-  uploadChunk,
+  uploadChunkBinary,
   finalizeUpload,
   checkS3Available,
   getS3UploadUrl,
@@ -66,17 +66,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     setIsDragging(false);
   }, []);
 
-  // Helper to convert ArrayBuffer to base64
-  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  };
-
-  // Chunked upload for large files
+  // Chunked upload for large files using binary FormData (no base64 overhead)
   const uploadFileChunked = async (file: File, index: number, previewUrl: string): Promise<UploadedFile | null> => {
     setUploadingFiles(prev => prev.map((f, i) =>
       i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
@@ -92,15 +82,20 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       const uploadId = initResult.uploadId;
       const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-      // Step 2: Upload chunks
+      // Step 2: Upload chunks using binary FormData (no base64 conversion)
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
         const start = chunkIndex * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
         const chunkBlob = file.slice(start, end);
-        const chunkBuffer = await chunkBlob.arrayBuffer();
-        const chunkBase64 = arrayBufferToBase64(chunkBuffer);
 
-        const chunkResult = await uploadChunk(uploadId, chunkIndex, totalChunks, chunkBase64);
+        // Use FormData with binary blob - no base64 overhead
+        const formData = new FormData();
+        formData.append('uploadId', uploadId);
+        formData.append('chunkIndex', String(chunkIndex));
+        formData.append('totalChunks', String(totalChunks));
+        formData.append('chunk', chunkBlob, `chunk_${chunkIndex}`);
+
+        const chunkResult = await uploadChunkBinary(formData);
 
         if (!chunkResult.success) {
           throw new Error(chunkResult.error || 'Failed to upload chunk');
