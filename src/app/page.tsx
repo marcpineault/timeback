@@ -13,16 +13,16 @@ export default async function LandingPage() {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="pt-4 px-4">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between bg-white rounded-2xl">
-          <span className="text-xl font-bold text-gray-900">TimeBack</span>
+      <header className="border-b border-gray-800">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <span className="text-xl font-bold text-white">TimeBack</span>
           <div className="flex items-center gap-4">
-            <Link href="/pricing" className="text-gray-600 hover:text-gray-900 transition-colors">
+            <Link href="/pricing" className="text-gray-400 hover:text-white transition-colors">
               Pricing
             </Link>
             <Link
               href="/sign-in"
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-gray-400 hover:text-white transition-colors"
             >
               Sign In
             </Link>

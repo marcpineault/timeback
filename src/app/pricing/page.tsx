@@ -17,9 +17,9 @@ export default async function PricingPage() {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="pt-4 px-4">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between bg-white rounded-2xl">
-          <Link href="/" className="text-xl font-bold text-gray-900">TimeBack</Link>
+      <header className="border-b border-gray-800">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/" className="text-xl font-bold text-white">TimeBack</Link>
           <div className="flex items-center gap-4">
             {userId ? (
               <Link
@@ -30,7 +30,7 @@ export default async function PricingPage() {
               </Link>
             ) : (
               <>
-                <Link href="/sign-in" className="text-gray-600 hover:text-gray-900 transition-colors">
+                <Link href="/sign-in" className="text-gray-400 hover:text-white transition-colors">
                   Sign In
                 </Link>
                 <Link
