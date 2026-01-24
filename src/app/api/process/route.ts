@@ -4,7 +4,8 @@ import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
-import { transcribeVideo, extractHook, identifyBRollMoments } from '@/lib/whisper';
+import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord } from '@/lib/whisper';
+import { correctSpeechMistakes, SpeechCorrectionConfig, DEFAULT_SPEECH_CORRECTION_CONFIG } from '@/lib/speechCorrection';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { canProcessVideo, incrementVideoCount } from '@/lib/user';
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
       autoZoom,
       autoZoomIntensity,
       aspectRatio,
+      speechCorrection,
+      speechCorrectionConfig,
       userId: bodyUserId,
     } = body;
 
@@ -160,19 +163,61 @@ export async function POST(request: NextRequest) {
     let srtPath: string | undefined;
     let hookText: string | undefined;
     let transcriptionSegments: { start: number; end: number; text: string }[] = [];
+    let transcriptionWords: TranscriptionWord[] = [];
 
-    if (generateCaptions || useHookAsHeadline || generateBRoll) {
+    // Need word-level timestamps for speech correction or animated captions
+    const needsWordTimestamps = speechCorrection || captionStyle === 'animated';
+
+    if (generateCaptions || useHookAsHeadline || generateBRoll || speechCorrection) {
       console.log('[Process] Step 2: Transcribing silence-removed video...');
-      // Use animated transcription (word-level timestamps) for animated caption style
-      const isAnimated = captionStyle === 'animated';
-      const transcription = await transcribeVideo(currentInput, processedDir, { animated: isAnimated });
+      // Use animated transcription (word-level timestamps) for animated caption style or speech correction
+      const transcription = await transcribeVideo(currentInput, processedDir, { animated: needsWordTimestamps });
       srtPath = transcription.srtPath;
       transcriptionSegments = transcription.segments;
+      transcriptionWords = transcription.words || [];
 
       // Extract hook if needed
       if (useHookAsHeadline) {
         hookText = extractHook(transcription.text);
         console.log(`[Process] Extracted hook: "${hookText}"`);
+      }
+
+      // Step 2.5: Apply AI Speech Correction if enabled
+      if (speechCorrection && transcriptionWords.length > 0) {
+        console.log('[Process] Step 2.5: Applying AI speech correction...');
+
+        // Parse speech correction config
+        const correctionConfig: SpeechCorrectionConfig = speechCorrectionConfig ? {
+          removeFillerWords: speechCorrectionConfig.removeFillerWords ?? true,
+          removeRepeatedWords: speechCorrectionConfig.removeRepeatedWords ?? true,
+          removeFalseStarts: speechCorrectionConfig.removeFalseStarts ?? true,
+          removeSelfCorrections: speechCorrectionConfig.removeSelfCorrections ?? true,
+          aggressiveness: speechCorrectionConfig.aggressiveness || 'moderate',
+        } : DEFAULT_SPEECH_CORRECTION_CONFIG;
+
+        stepOutput = path.join(processedDir, `${baseName}_corrected.mp4`);
+        const correctionResult = await correctSpeechMistakes(
+          currentInput,
+          stepOutput,
+          transcriptionWords,
+          correctionConfig
+        );
+
+        console.log(`[Process] Speech correction removed ${correctionResult.segmentsRemoved} mistakes (${correctionResult.timeRemoved.toFixed(2)}s)`);
+
+        // Clean up intermediate file
+        if (currentInput !== inputPath) {
+          await fs.unlink(currentInput).catch(() => {})
+        }
+        currentInput = stepOutput;
+
+        // Re-transcribe the corrected video if we need captions (since timestamps changed)
+        if (generateCaptions && correctionResult.segmentsRemoved > 0) {
+          console.log('[Process] Re-transcribing after speech correction for accurate captions...');
+          const newTranscription = await transcribeVideo(currentInput, processedDir, { animated: captionStyle === 'animated' });
+          srtPath = newTranscription.srtPath;
+          transcriptionSegments = newTranscription.segments;
+        }
       }
 
       // Step 3: Burn captions if enabled
