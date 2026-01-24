@@ -298,7 +298,7 @@ export default function ProcessingOptions({
               value={config.headline}
               onChange={(e) => setConfig({ ...config, headline: e.target.value })}
               placeholder="Enter headline (optional)"
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500"
+              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400"
             />
           </div>
         )}
