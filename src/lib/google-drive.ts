@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { prisma } from './prisma';
+import { prisma } from './db';
 
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
