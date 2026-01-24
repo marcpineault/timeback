@@ -201,11 +201,11 @@ export async function removeSilence(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',  // Limit muxing buffer
         '-bufsize', '1M',  // Limit rate control buffer
         '-c:a', 'aac',
-        '-b:a', '96k',
+        '-b:a', '128k',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -280,7 +280,7 @@ export async function burnCaptions(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -366,7 +366,7 @@ export async function addHeadline(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -417,7 +417,7 @@ export async function imageToVideoClip(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-t', String(duration),
         '-pix_fmt', 'yuv420p',
         '-r', '30',
@@ -476,22 +476,20 @@ export async function insertBRollCutaways(
   const animWidth = Math.floor(videoInfo.width * 0.5);
   const animHeight = Math.floor(videoInfo.height * 0.25);
 
-  const animationPaths: string[] = [];
-  for (let i = 0; i < sortedCutaways.length; i++) {
-    const cutaway = sortedCutaways[i];
-    const animPath = path.join(outputDir, `anim_${i}.mp4`);
-
-    // Generate contextual animation based on the context
-    // Using reduced resolution to save memory
-    await generateContextualAnimation(
-      animPath,
-      cutaway.duration,
-      animWidth,
-      animHeight,
-      cutaway.context
-    );
-    animationPaths.push(animPath);
-  }
+  // Generate all animations in parallel for better performance
+  const animationPaths = await Promise.all(
+    sortedCutaways.map(async (cutaway, i) => {
+      const animPath = path.join(outputDir, `anim_${i}.mp4`);
+      await generateContextualAnimation(
+        animPath,
+        cutaway.duration,
+        animWidth,
+        animHeight,
+        cutaway.context
+      );
+      return animPath;
+    })
+  );
 
   // Build filter complex for overlaying animations
   const filterParts: string[] = [];
@@ -550,7 +548,7 @@ export async function insertBRollCutaways(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -698,7 +696,7 @@ export async function convertAspectRatio(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-c:a', 'copy',
       ])
@@ -811,7 +809,7 @@ export async function applyCombinedFilters(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -853,7 +851,7 @@ export async function applyColorGrade(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-c:a', 'copy',
       ])
       .output(outputPath)
@@ -975,7 +973,7 @@ export async function trimVideo(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '2',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'aac',
@@ -1040,7 +1038,7 @@ export async function splitVideo(
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '28',
-          '-threads', '2',
+          '-threads', '0',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
           '-c:a', 'aac',
