@@ -168,58 +168,6 @@ export default function ProcessingOptions({
         </div>
       </div>
 
-      {/* Quick Presets */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-medium text-white">Quick Presets</h3>
-        <div className="grid grid-cols-3 gap-2">
-          {(Object.entries(PRESETS) as [PresetKey, Preset][]).map(([key, preset]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => applyPreset(key)}
-              className={`p-3 rounded-lg text-center transition-all ${
-                activePreset === key
-                  ? 'bg-blue-500 text-white ring-2 ring-blue-400'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              <span className="text-xl block mb-1">{preset.icon}</span>
-              <span className="text-xs font-medium">{preset.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Aspect Ratio */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-medium text-white">Aspect Ratio</h3>
-        <div className="grid grid-cols-5 gap-2">
-          {ASPECT_RATIO_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                setConfig({ ...config, aspectRatio: option.value });
-                setActivePreset('custom');
-              }}
-              className={`p-2 rounded-lg text-center transition-all ${
-                config.aspectRatio === option.value
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              <div className="text-xs font-medium">{option.label.split(' ')[0]}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5 truncate">{option.platforms.split(',')[0]}</div>
-            </button>
-          ))}
-        </div>
-        {config.aspectRatio !== 'original' && (
-          <p className="text-xs text-gray-500">
-            Video will be converted with blurred background padding (no cropping)
-          </p>
-        )}
-      </div>
-
       {/* Silence Removal Settings */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-white">Silence Removal</h3>
