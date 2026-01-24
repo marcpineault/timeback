@@ -28,18 +28,25 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Verify state contains the correct userId
-  if (state) {
-    try {
-      const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
-      if (stateData.userId !== clerkId) {
-        return NextResponse.redirect(
-          new URL('/dashboard?gdrive_error=invalid_state', request.url)
-        );
-      }
-    } catch {
-      // State parsing failed, but continue since we verified auth
+  // Verify state contains the correct userId (fail closed for CSRF protection)
+  if (!state) {
+    return NextResponse.redirect(
+      new URL('/dashboard?gdrive_error=missing_state', request.url)
+    );
+  }
+
+  try {
+    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    if (!stateData.userId || stateData.userId !== clerkId) {
+      return NextResponse.redirect(
+        new URL('/dashboard?gdrive_error=invalid_state', request.url)
+      );
     }
+  } catch {
+    // State parsing failed - reject for security
+    return NextResponse.redirect(
+      new URL('/dashboard?gdrive_error=invalid_state', request.url)
+    );
   }
 
   try {

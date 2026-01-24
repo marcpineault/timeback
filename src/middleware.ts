@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -13,6 +14,31 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect()
   }
+
+  // Add security headers to all responses
+  const response = NextResponse.next()
+
+  // Prevent MIME type sniffing
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+
+  // Prevent clickjacking
+  response.headers.set('X-Frame-Options', 'DENY')
+
+  // Enable XSS protection
+  response.headers.set('X-XSS-Protection', '1; mode=block')
+
+  // Control referrer information
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+
+  // Enforce HTTPS (only in production)
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
+
+  // Permissions policy to disable unnecessary browser features
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+
+  return response
 })
 
 export const config = {

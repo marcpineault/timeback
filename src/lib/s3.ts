@@ -1,5 +1,6 @@
 import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { randomBytes } from 'crypto';
 
 // S3-compatible client singleton (works with AWS S3, Cloudflare R2, Backblaze B2, etc.)
 let s3Client: S3Client | null = null;
@@ -62,9 +63,9 @@ export async function createUploadUrl(
   const client = getS3Client();
   const bucket = getS3Bucket();
 
-  // Generate a unique key for the file
+  // Generate a unique key for the file using cryptographic randomness
   const timestamp = Date.now();
-  const randomId = Math.random().toString(36).substring(2, 15);
+  const randomId = randomBytes(16).toString('hex');
   const ext = filename.split('.').pop() || 'mp4';
   const key = `uploads/${timestamp}-${randomId}.${ext}`;
 

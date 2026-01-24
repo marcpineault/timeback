@@ -324,7 +324,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Processing error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to process video' },
+      { error: 'Failed to process video. Please try again.' },
       { status: 500 }
     );
   }

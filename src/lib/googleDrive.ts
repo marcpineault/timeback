@@ -127,6 +127,89 @@ export interface BulkUploadResult {
 }
 
 /**
+ * Validate URL to prevent SSRF attacks
+ * Blocks access to internal networks, localhost, and cloud metadata endpoints
+ */
+function isUrlSafeForFetch(url: string): { safe: boolean; reason?: string } {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    const protocol = urlObj.protocol;
+
+    // Only allow HTTP and HTTPS
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      return { safe: false, reason: 'Only HTTP and HTTPS protocols are allowed' };
+    }
+
+    // Block localhost variations
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '[::1]' ||
+      hostname === '::1' ||
+      hostname === '0.0.0.0'
+    ) {
+      return { safe: false, reason: 'Localhost URLs are not allowed' };
+    }
+
+    // Block private IP ranges (IPv4)
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const ipv4Match = hostname.match(ipv4Regex);
+    if (ipv4Match) {
+      const [, a, b, c] = ipv4Match.map(Number);
+      // 10.0.0.0/8
+      if (a === 10) {
+        return { safe: false, reason: 'Private IP addresses are not allowed' };
+      }
+      // 172.16.0.0/12
+      if (a === 172 && b >= 16 && b <= 31) {
+        return { safe: false, reason: 'Private IP addresses are not allowed' };
+      }
+      // 192.168.0.0/16
+      if (a === 192 && b === 168) {
+        return { safe: false, reason: 'Private IP addresses are not allowed' };
+      }
+      // 169.254.0.0/16 (link-local, AWS metadata)
+      if (a === 169 && b === 254) {
+        return { safe: false, reason: 'Link-local and metadata endpoints are not allowed' };
+      }
+      // 127.0.0.0/8 (loopback)
+      if (a === 127) {
+        return { safe: false, reason: 'Loopback addresses are not allowed' };
+      }
+      // 0.0.0.0/8
+      if (a === 0) {
+        return { safe: false, reason: 'Invalid IP address' };
+      }
+    }
+
+    // Block cloud metadata endpoints (common hostnames)
+    const blockedHostnames = [
+      'metadata.google.internal',
+      'metadata.goog',
+      'metadata',
+      'instance-data',
+    ];
+    if (blockedHostnames.includes(hostname)) {
+      return { safe: false, reason: 'Cloud metadata endpoints are not allowed' };
+    }
+
+    // Block internal DNS patterns
+    if (
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.localdomain')
+    ) {
+      return { safe: false, reason: 'Internal hostnames are not allowed' };
+    }
+
+    return { safe: true };
+  } catch {
+    return { safe: false, reason: 'Invalid URL format' };
+  }
+}
+
+/**
  * Bulk upload multiple files to Google Drive
  * Fetches files from URLs and uploads them in parallel (with concurrency limit)
  */
@@ -145,10 +228,16 @@ export async function bulkUploadToDrive(
 
     const batchResults = await Promise.allSettled(
       batch.map(async (file) => {
+        // SSRF protection: validate URL before fetching
+        const urlCheck = isUrlSafeForFetch(file.url);
+        if (!urlCheck.safe) {
+          throw new Error(`URL validation failed: ${urlCheck.reason}`);
+        }
+
         // Fetch the file from the URL
         const response = await fetch(file.url);
         if (!response.ok) {
-          throw new Error(`Failed to fetch file: ${response.statusText}`);
+          throw new Error('Failed to fetch file');
         }
 
         const arrayBuffer = await response.arrayBuffer();
