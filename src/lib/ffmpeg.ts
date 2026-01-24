@@ -232,17 +232,17 @@ export async function burnCaptions(
   // Check if this is an animated ASS file
   const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
 
-  // Clean centered captions - minimal style
+  // TikTok-style captions - bold, large text with strong outline
   // Alignment=2 is bottom-center, MarginV positions vertically
   // MarginL/MarginR add horizontal padding for Instagram Reels safe zone (~100px each side)
-  // This keeps captions within ~880px center width on 1080px video
+  // Using Impact/Arial Black style fonts which are similar to TikTok's Proxima Nova Bold
   const styleMap: Record<string, string> = {
-    // Default: clean, small white text with subtle shadow for readability
-    default: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100,MarginL=100,MarginR=100',
-    // Bold style
-    bold: 'Fontname=Arial,FontSize=11,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=100,MarginL=100,MarginR=100',
-    // Outline style
-    outline: 'Fontname=Arial,FontSize=10,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=1,Shadow=0,Alignment=2,MarginV=100,MarginL=100,MarginR=100',
+    // Default: TikTok style - bold white text with black outline
+    default: 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
+    // Bold style - even larger and bolder
+    bold: 'Fontname=Impact,FontSize=20,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=1,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
+    // Outline style - clean outline look
+    outline: 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
   };
 
   console.log(`[Captions] Burning captions from: ${srtPath}`);
