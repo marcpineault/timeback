@@ -12,7 +12,7 @@ export interface ProcessingOptions {
   silenceDuration?: number; // minimum silence duration in seconds, default 0.5
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
-  captionStyle?: 'tiktok' | 'tiktok-bold' | 'tiktok-outline' | 'instagram' | 'instagram-clean' | 'instagram-bold' | 'youtube';
+  captionStyle?: 'tiktok' | 'instagram';
 }
 
 /**
@@ -237,20 +237,12 @@ export async function burnCaptions(
   // Alignment=2 is bottom-center, MarginV is from bottom edge
   // MarginV=440 places captions in lower third but ABOVE like/comment/share buttons
   const styleMap: Record<string, string> = {
-    // TikTok style - clean white text with black outline, positioned in safe zone
-    tiktok: 'Fontname=Arial,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
-    // TikTok Bold - slightly larger for emphasis
-    'tiktok-bold': 'Fontname=Arial Black,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
-    // TikTok Outline - clean outline look
-    'tiktok-outline': 'Fontname=Arial,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=0,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
-    // Instagram style - white text on subtle dark background box
-    instagram: 'Fontname=Helvetica,FontSize=12,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
-    // Instagram Clean - minimal white text with subtle shadow
-    'instagram-clean': 'Fontname=Helvetica,FontSize=12,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H40000000,Outline=1,Shadow=1,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
-    // Instagram Bold - slightly bolder
-    'instagram-bold': 'Fontname=Arial,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
-    // YouTube style - clean readable text with background
-    youtube: 'Fontname=Roboto,FontSize=12,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&HCC000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=400,MarginL=60,MarginR=60',
+    // TikTok style - bold white text with black outline (classic TikTok look)
+    // Clean, punchy, high contrast - works on any background
+    tiktok: 'Fontname=Arial,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
+    // Instagram style - white text on semi-transparent dark background box
+    // Clean, modern, refined look with better readability on busy backgrounds
+    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
   };
 
   console.log(`[Captions] Burning captions from: ${srtPath}`);
@@ -355,14 +347,11 @@ export async function addHeadline(
   // x position slightly left of center to avoid right-side engagement buttons
   let filterString: string;
 
-  if (captionStyle.startsWith('instagram')) {
-    // Instagram style - clean white on subtle dark pill/box
+  if (captionStyle === 'instagram') {
+    // Instagram style - clean white on subtle dark background box
     filterString = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
-  } else if (captionStyle === 'youtube') {
-    // YouTube style - clean white text on dark background
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.7:boxborderw=10:enable='between(t,0,5)'`;
   } else {
-    // TikTok style - simple white text with clean black outline
+    // TikTok style - bold white text with clean black outline
     filterString = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:borderw=2:bordercolor=black:enable='between(t,0,5)'`;
   }
 
@@ -795,11 +784,11 @@ export async function applyCombinedFilters(
 
     // Platform-native headline styles - clean and simple, slightly left of center
     let headlineFilter: string;
-    if (captionStyle.startsWith('instagram')) {
+    if (captionStyle === 'instagram') {
+      // Instagram style - clean white on subtle dark background box
       headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
-    } else if (captionStyle === 'youtube') {
-      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.7:boxborderw=10:enable='between(t,0,5)'`;
     } else {
+      // TikTok style - bold white text with clean black outline
       headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:borderw=2:bordercolor=black:enable='between(t,0,5)'`;
     }
     filters.push(headlineFilter);
