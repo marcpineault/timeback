@@ -12,7 +12,7 @@ export interface ProcessingOptions {
   silenceDuration?: number; // minimum silence duration in seconds, default 0.5
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
-  captionStyle?: 'default' | 'bold' | 'outline';
+  captionStyle?: 'tiktok' | 'tiktok-bold' | 'tiktok-outline' | 'instagram' | 'instagram-clean' | 'instagram-bold' | 'youtube';
 }
 
 /**
@@ -232,17 +232,25 @@ export async function burnCaptions(
   // Check if this is an animated ASS file
   const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
 
-  // TikTok-style captions - bold, large text with strong outline
+  // Platform-specific caption styles
   // Alignment=2 is bottom-center, MarginV positions vertically
-  // MarginL/MarginR add horizontal padding for Instagram Reels safe zone (~100px each side)
-  // Using Impact/Arial Black style fonts which are similar to TikTok's Proxima Nova Bold
+  // MarginL/MarginR add horizontal padding for safe zone (~80-100px each side)
   const styleMap: Record<string, string> = {
-    // Default: TikTok style - bold white text with black outline
-    default: 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
-    // Bold style - even larger and bolder
-    bold: 'Fontname=Impact,FontSize=20,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=1,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
-    // Outline style - clean outline look
-    outline: 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
+    // TikTok style - bold white text with strong black outline (like native TikTok captions)
+    tiktok: 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
+    // TikTok Bold - larger and bolder for more impact
+    'tiktok-bold': 'Fontname=Impact,FontSize=20,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=1,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
+    // TikTok Outline - clean outline look
+    'tiktok-outline': 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
+    // Instagram style - cleaner, softer look with semi-transparent background box effect
+    // Uses BorderStyle=4 for opaque box background instead of outline
+    instagram: 'Fontname=Helvetica,FontSize=16,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=140,MarginL=100,MarginR=100',
+    // Instagram Clean - minimal white text with subtle shadow
+    'instagram-clean': 'Fontname=Helvetica,FontSize=16,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H40000000,Outline=2,Shadow=1,Alignment=2,MarginV=140,MarginL=100,MarginR=100',
+    // Instagram Bold - bolder Instagram style
+    'instagram-bold': 'Fontname=Arial,FontSize=17,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H99000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=140,MarginL=100,MarginR=100',
+    // YouTube style - clean readable text
+    youtube: 'Fontname=Roboto,FontSize=14,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&HCC000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=60,MarginL=60,MarginR=60',
   };
 
   console.log(`[Captions] Burning captions from: ${srtPath}`);
@@ -267,7 +275,7 @@ export async function burnCaptions(
   if (isAnimated) {
     filterString = `ass='${escapedPath}'`;
   } else {
-    const subtitleStyle = styleMap[style] || styleMap.default;
+    const subtitleStyle = styleMap[style] || styleMap.tiktok;
     filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
   }
   console.log(`[Captions] Filter: ${filterString}`);
@@ -307,13 +315,14 @@ export async function burnCaptions(
 }
 
 /**
- * Add headline text overlay to video with background box
+ * Add headline text overlay to video with platform-native styling
  */
 export async function addHeadline(
   inputPath: string,
   outputPath: string,
   headline: string,
-  position: 'top' | 'center' | 'bottom' = 'top'
+  position: 'top' | 'center' | 'bottom' = 'top',
+  captionStyle: string = 'tiktok'
 ): Promise<string> {
   // Y positions for the text
   const yPositions: Record<string, string> = {
@@ -339,12 +348,25 @@ export async function addHeadline(
     escapedHeadline = `${line1}\n${line2}`;
   }
 
-  // Use drawtext with box option for background
-  // Using sans-serif font (works on Linux/Docker), thin box padding for reels
-  // Only show for first 5 seconds with enable='between(t,0,5)'
-  const filterString = `drawtext=text='${escapedHeadline}':fontsize=40:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.75:boxborderw=12:enable='between(t,0,5)'`;
+  // Platform-native headline styles
+  // TikTok: Bold white text with black outline (no box)
+  // Instagram: White text on semi-transparent rounded box
+  // YouTube: Clean white text on dark box
+  let filterString: string;
 
-  console.log(`[Headline] Adding headline: "${headline}" at ${position}`);
+  if (captionStyle.startsWith('instagram')) {
+    // Instagram style - white text on semi-transparent dark box, smaller and cleaner
+    filterString = `drawtext=text='${escapedHeadline}':fontsize=36:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=16:enable='between(t,0,5)'`;
+  } else if (captionStyle === 'youtube') {
+    // YouTube style - clean white text on solid dark box
+    filterString = `drawtext=text='${escapedHeadline}':fontsize=38:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.85:boxborderw=14:enable='between(t,0,5)'`;
+  } else {
+    // TikTok style - bold white with heavy black outline, no box
+    filterString = `drawtext=text='${escapedHeadline}':fontsize=44:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:borderw=4:bordercolor=black:enable='between(t,0,5)'`;
+  }
+
+  console.log(`[Headline] Adding headline: "${headline}" at ${position} (style: ${captionStyle})`);
+
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
@@ -720,6 +742,7 @@ export interface CombinedProcessingOptions {
   colorGrade?: ColorGradePreset;
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
+  captionStyle?: string;
 }
 
 /**
@@ -742,7 +765,7 @@ export async function applyCombinedFilters(
     }
   }
 
-  // Add headline filter if specified
+  // Add headline filter if specified (with platform-native styling)
   if (options.headline) {
     const yPositions: Record<string, string> = {
       top: 'y=240',
@@ -765,9 +788,21 @@ export async function applyCombinedFilters(
     }
 
     const position = options.headlinePosition || 'top';
-    filters.push(
-      `drawtext=text='${escapedHeadline}':fontsize=40:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.75:boxborderw=12:enable='between(t,0,5)'`
-    );
+    const captionStyle = options.captionStyle || 'tiktok';
+
+    // Platform-native headline styles
+    let headlineFilter: string;
+    if (captionStyle.startsWith('instagram')) {
+      // Instagram style - white text on semi-transparent dark box
+      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=36:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=16:enable='between(t,0,5)'`;
+    } else if (captionStyle === 'youtube') {
+      // YouTube style - clean white text on solid dark box
+      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=38:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.85:boxborderw=14:enable='between(t,0,5)'`;
+    } else {
+      // TikTok style - bold white with heavy black outline, no box
+      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=44:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:borderw=4:bordercolor=black:enable='between(t,0,5)'`;
+    }
+    filters.push(headlineFilter);
   }
 
   // If no filters to apply, just copy the file
@@ -1071,7 +1106,7 @@ export async function processVideo(
   // Step 3: Add headline if provided
   if (options.headline) {
     stepOutput = path.join(outputDir, `${baseName}_final.mp4`);
-    await addHeadline(currentInput, stepOutput, options.headline, options.headlinePosition);
+    await addHeadline(currentInput, stepOutput, options.headline, options.headlinePosition, options.captionStyle);
     // Clean up intermediate file
     if (currentInput !== inputPath) fs.unlinkSync(currentInput);
     currentInput = stepOutput;

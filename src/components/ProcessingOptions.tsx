@@ -19,7 +19,7 @@ export interface ProcessingConfig {
   generateCaptions: boolean;
   headline: string;
   headlinePosition: 'top' | 'center' | 'bottom';
-  captionStyle: 'default' | 'bold' | 'outline' | 'animated';
+  captionStyle: 'tiktok' | 'tiktok-bold' | 'tiktok-outline' | 'instagram' | 'instagram-clean' | 'instagram-bold' | 'youtube' | 'animated';
   silenceThreshold: number;
   silenceDuration: number;
   useHookAsHeadline: boolean;
@@ -61,7 +61,7 @@ const PRESETS: Record<PresetKey, Preset> = {
     config: {
       aspectRatio: '9:16',
       generateCaptions: true,
-      captionStyle: 'bold',
+      captionStyle: 'tiktok-bold',
       normalizeAudio: true,
       silenceThreshold: -30,
       silenceDuration: 0.3,
@@ -73,7 +73,7 @@ const PRESETS: Record<PresetKey, Preset> = {
     config: {
       aspectRatio: '9:16',
       generateCaptions: true,
-      captionStyle: 'bold',
+      captionStyle: 'youtube',
       normalizeAudio: true,
       silenceThreshold: -30,
       silenceDuration: 0.4,
@@ -85,7 +85,7 @@ const PRESETS: Record<PresetKey, Preset> = {
     config: {
       aspectRatio: '9:16',
       generateCaptions: true,
-      captionStyle: 'default',
+      captionStyle: 'instagram',
       normalizeAudio: true,
       silenceThreshold: -30,
       silenceDuration: 0.3,
@@ -97,7 +97,7 @@ const PRESETS: Record<PresetKey, Preset> = {
     config: {
       aspectRatio: '16:9',
       generateCaptions: true,
-      captionStyle: 'default',
+      captionStyle: 'youtube',
       normalizeAudio: true,
       silenceThreshold: -35,
       silenceDuration: 0.5,
@@ -109,7 +109,7 @@ const PRESETS: Record<PresetKey, Preset> = {
     config: {
       aspectRatio: '1:1',
       generateCaptions: true,
-      captionStyle: 'bold',
+      captionStyle: 'instagram-bold',
       normalizeAudio: true,
     },
   },
@@ -133,7 +133,7 @@ export default function ProcessingOptions({
     generateCaptions: true,
     headline: '',
     headlinePosition: 'top',
-    captionStyle: 'default',
+    captionStyle: 'tiktok',
     silenceThreshold: -30,
     silenceDuration: 0.5,
     useHookAsHeadline: false,
@@ -276,9 +276,19 @@ export default function ProcessingOptions({
               onChange={(e) => setConfig({ ...config, captionStyle: e.target.value as ProcessingConfig['captionStyle'] })}
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
             >
-              <option value="default">Default (White with outline)</option>
-              <option value="bold">Bold (Larger, thicker)</option>
-              <option value="outline">Outline (Black outline)</option>
+              <optgroup label="TikTok Style">
+                <option value="tiktok">TikTok (Bold white, black outline)</option>
+                <option value="tiktok-bold">TikTok Bold (Larger, impact font)</option>
+                <option value="tiktok-outline">TikTok Outline (Heavy outline)</option>
+              </optgroup>
+              <optgroup label="Instagram Style">
+                <option value="instagram">Instagram (White on dark box)</option>
+                <option value="instagram-clean">Instagram Clean (Subtle shadow)</option>
+                <option value="instagram-bold">Instagram Bold (Stronger box)</option>
+              </optgroup>
+              <optgroup label="YouTube Style">
+                <option value="youtube">YouTube (Clean with dark background)</option>
+              </optgroup>
             </select>
           </div>
         )}
