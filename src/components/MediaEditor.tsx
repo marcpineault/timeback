@@ -2,12 +2,17 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-type EditorMode = 'trim' | 'split' | 'all';
+type EditorMode = 'trim' | 'split' | 'remove' | 'all';
 
 interface SplitPart {
   partNumber: number;
   filename: string;
   downloadUrl: string;
+}
+
+interface RemoveSection {
+  start: number;
+  end: number;
 }
 
 interface MediaEditorProps {
@@ -17,6 +22,7 @@ interface MediaEditorProps {
   onClose: () => void;
   onTrimComplete?: (filename: string) => void;
   onSplitComplete?: (parts: SplitPart[]) => void;
+  onRemoveComplete?: (filename: string, stats: { sectionsRemoved: number; timeRemoved: number }) => void;
   initialMode?: EditorMode;
 }
 
@@ -27,6 +33,7 @@ export default function MediaEditor({
   onClose,
   onTrimComplete,
   onSplitComplete,
+  onRemoveComplete,
   initialMode = 'all',
 }: MediaEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,7 +46,7 @@ export default function MediaEditor({
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingAction, setProcessingAction] = useState<'trim' | 'split' | null>(null);
+  const [processingAction, setProcessingAction] = useState<'trim' | 'split' | 'remove' | null>(null);
 
   // Trim state
   const [startTime, setStartTime] = useState(0);
@@ -48,6 +55,10 @@ export default function MediaEditor({
 
   // Split state
   const [splitPoints, setSplitPoints] = useState<number[]>([]);
+
+  // Remove sections state
+  const [sectionsToRemove, setSectionsToRemove] = useState<RemoveSection[]>([]);
+  const [removeMarkStart, setRemoveMarkStart] = useState<number | null>(null); // Temporary start point while marking
 
   // Drag state
   const [dragging, setDragging] = useState<'start' | 'end' | 'playhead' | null>(null);
@@ -81,6 +92,50 @@ export default function MediaEditor({
       }
     }
   }, [currentTime, duration, splitPoints]);
+
+  const handleMarkRemoveStart = useCallback(() => {
+    setRemoveMarkStart(currentTime);
+  }, [currentTime]);
+
+  const handleMarkRemoveEnd = useCallback(() => {
+    if (removeMarkStart !== null && currentTime > removeMarkStart) {
+      // Check for overlap with existing sections
+      const newSection: RemoveSection = { start: removeMarkStart, end: currentTime };
+
+      setSectionsToRemove(prev => {
+        // Add new section and sort by start time
+        const updated = [...prev, newSection].sort((a, b) => a.start - b.start);
+
+        // Merge overlapping sections
+        const merged: RemoveSection[] = [];
+        for (const section of updated) {
+          if (merged.length === 0) {
+            merged.push({ ...section });
+          } else {
+            const last = merged[merged.length - 1];
+            if (section.start <= last.end + 0.1) {
+              // Overlapping or adjacent - merge
+              last.end = Math.max(last.end, section.end);
+            } else {
+              merged.push({ ...section });
+            }
+          }
+        }
+        return merged;
+      });
+
+      setRemoveMarkStart(null);
+    }
+  }, [removeMarkStart, currentTime]);
+
+  const handleRemoveSection = useCallback((index: number) => {
+    setSectionsToRemove(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleClearRemoveSections = useCallback(() => {
+    setSectionsToRemove([]);
+    setRemoveMarkStart(null);
+  }, []);
 
   // Keyboard and escape handling
   useEffect(() => {
@@ -126,6 +181,16 @@ export default function MediaEditor({
         setEndTime(currentTime);
         setTrimEnabled(true);
       }
+
+      // R to mark remove start, E to mark remove end (when in remove or all mode)
+      if (e.code === 'KeyR' && (mode === 'remove' || mode === 'all') && e.target === document.body) {
+        e.preventDefault();
+        handleMarkRemoveStart();
+      }
+      if (e.code === 'KeyE' && (mode === 'remove' || mode === 'all') && e.target === document.body) {
+        e.preventDefault();
+        handleMarkRemoveEnd();
+      }
     };
 
     document.addEventListener('keydown', handleEscape);
@@ -137,7 +202,7 @@ export default function MediaEditor({
       document.removeEventListener('keydown', handleKeyboard);
       document.body.style.overflow = 'unset';
     };
-  }, [onClose, isProcessing, mode, currentTime, handlePlayPause, seekRelative, handleAddSplitPoint]);
+  }, [onClose, isProcessing, mode, currentTime, handlePlayPause, seekRelative, handleAddSplitPoint, handleMarkRemoveStart, handleMarkRemoveEnd]);
 
   // Video event handlers
   useEffect(() => {
@@ -350,6 +415,41 @@ export default function MediaEditor({
     }
   };
 
+  const handleApplyRemove = async () => {
+    if (sectionsToRemove.length === 0) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingAction('remove');
+
+    try {
+      const response = await fetch('/api/remove-sections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, sectionsToRemove }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Remove sections failed');
+      }
+
+      const data = await response.json();
+      onRemoveComplete?.(data.filename, {
+        sectionsRemoved: data.stats.sectionsRemoved,
+        timeRemoved: data.stats.timeRemoved,
+      });
+      onClose();
+    } catch (error) {
+      console.error('Remove sections error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to remove sections');
+    } finally {
+      setIsProcessing(false);
+      setProcessingAction(null);
+    }
+  };
+
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === modalRef.current && !isProcessing) {
       onClose();
@@ -396,8 +496,13 @@ export default function MediaEditor({
 
   const showTrimControls = mode === 'trim' || mode === 'all';
   const showSplitControls = mode === 'split' || mode === 'all';
+  const showRemoveControls = mode === 'remove' || mode === 'all';
   const hasTrimChanges = trimEnabled && (startTime > 0 || endTime < duration);
   const hasSplitChanges = splitPoints.length > 0;
+  const hasRemoveChanges = sectionsToRemove.length > 0;
+
+  // Calculate total time that will be removed
+  const totalRemoveTime = sectionsToRemove.reduce((sum, s) => sum + (s.end - s.start), 0);
 
   return (
     <div
@@ -460,6 +565,16 @@ export default function MediaEditor({
                   }`}
                 >
                   Split
+                </button>
+                <button
+                  onClick={() => setMode('remove')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    mode === 'remove'
+                      ? 'bg-red-500 text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Remove
                 </button>
               </div>
             </div>
@@ -533,6 +648,40 @@ export default function MediaEditor({
                     Split (S)
                   </button>
                 )}
+                {showRemoveControls && (
+                  <div className="flex items-center gap-2">
+                    {removeMarkStart === null ? (
+                      <button
+                        onClick={handleMarkRemoveStart}
+                        className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                        </svg>
+                        Mark Cut Start (R)
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleMarkRemoveEnd}
+                        disabled={currentTime <= removeMarkStart}
+                        className="px-2 py-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors flex items-center gap-1 animate-pulse"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Mark Cut End (E)
+                      </button>
+                    )}
+                    {removeMarkStart !== null && (
+                      <button
+                        onClick={() => setRemoveMarkStart(null)}
+                        className="px-2 py-1 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <span className="font-mono">{formatTime(duration)}</span>
@@ -556,6 +705,60 @@ export default function MediaEditor({
                     style={{ width: `${100 - endPercent}%` }}
                   />
                 </>
+              )}
+
+              {/* Remove sections overlay (red areas to be cut) */}
+              {showRemoveControls && sectionsToRemove.map((section, index) => (
+                <div
+                  key={`remove-${index}`}
+                  className="absolute top-0 bottom-0 bg-red-500/40 border-x-2 border-red-500 z-[7] group cursor-pointer"
+                  style={{
+                    left: `${(section.start / duration) * 100}%`,
+                    width: `${((section.end - section.start) / duration) * 100}%`,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Don't remove on click, show delete button instead
+                  }}
+                >
+                  {/* Cut indicator */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 opacity-80">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                      </svg>
+                      CUT
+                    </div>
+                  </div>
+                  {/* Remove button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveSection(index);
+                    }}
+                    className="absolute -top-2 right-1 w-5 h-5 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    title="Remove this cut mark"
+                  >
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+
+              {/* Pending remove mark (when R is pressed but not E yet) */}
+              {showRemoveControls && removeMarkStart !== null && (
+                <div
+                  className="absolute top-0 bottom-0 bg-red-500/20 border-l-2 border-red-500 border-dashed z-[7] animate-pulse"
+                  style={{
+                    left: `${(removeMarkStart / duration) * 100}%`,
+                    width: `${((currentTime - removeMarkStart) / duration) * 100}%`,
+                  }}
+                >
+                  <div className="absolute top-1 left-1 text-[10px] text-red-400 font-medium">
+                    Press E to end cut
+                  </div>
+                </div>
               )}
 
               {/* Segment colors for splits */}
@@ -663,6 +866,7 @@ export default function MediaEditor({
               <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">←</kbd><kbd className="px-1 py-0.5 bg-gray-700 rounded">→</kbd> Seek</span>
               {showTrimControls && <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">I</kbd> In <kbd className="px-1 py-0.5 bg-gray-700 rounded">O</kbd> Out</span>}
               {showSplitControls && <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">S</kbd> Split</span>}
+              {showRemoveControls && <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">R</kbd> Start Cut <kbd className="px-1 py-0.5 bg-gray-700 rounded">E</kbd> End Cut</span>}
             </div>
           </div>
 
@@ -696,6 +900,48 @@ export default function MediaEditor({
             </div>
           )}
 
+          {/* Remove Sections Preview */}
+          {showRemoveControls && sectionsToRemove.length > 0 && (
+            <div className="px-4 py-3 bg-red-500/10 border-t border-red-500/20">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-gray-400">
+                  Sections to remove ({sectionsToRemove.length}) - Total: <span className="text-red-400 font-medium">{formatTime(totalRemoveTime)}</span>
+                </p>
+                <button
+                  onClick={handleClearRemoveSections}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sectionsToRemove.map((section, index) => (
+                  <div
+                    key={index}
+                    className="px-3 py-1.5 rounded-lg text-xs text-white bg-red-500/30 border border-red-500/50 flex items-center gap-2 group"
+                  >
+                    <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                    </svg>
+                    <span>{formatTime(section.start)} - {formatTime(section.end)}</span>
+                    <span className="opacity-70">({formatTime(section.end - section.start)})</span>
+                    <button
+                      onClick={() => handleRemoveSection(index)}
+                      className="ml-1 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-500 mt-2">
+                New duration: {formatTime(duration - totalRemoveTime)} (removing {formatTime(totalRemoveTime)})
+              </p>
+            </div>
+          )}
+
           {/* Trim Info */}
           {showTrimControls && trimEnabled && (
             <div className="px-4 py-2 bg-blue-500/10 border-t border-blue-500/20">
@@ -722,7 +968,7 @@ export default function MediaEditor({
           <div className="px-4 py-4 bg-gray-800 border-t border-gray-700">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm text-gray-400">
-                {!hasTrimChanges && !hasSplitChanges ? (
+                {!hasTrimChanges && !hasSplitChanges && !hasRemoveChanges ? (
                   <span>Make edits using the timeline above</span>
                 ) : (
                   <span className="flex items-center gap-2">
@@ -740,6 +986,14 @@ export default function MediaEditor({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                         {splitPoints.length} split{splitPoints.length > 1 ? 's' : ''} ready
+                      </span>
+                    )}
+                    {hasRemoveChanges && (
+                      <span className="flex items-center gap-1 text-red-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {sectionsToRemove.length} cut{sectionsToRemove.length > 1 ? 's' : ''} ready
                       </span>
                     )}
                   </span>
@@ -801,8 +1055,31 @@ export default function MediaEditor({
                   </button>
                 )}
 
+                {/* Apply Remove button */}
+                {showRemoveControls && hasRemoveChanges && (
+                  <button
+                    onClick={handleApplyRemove}
+                    disabled={isProcessing}
+                    className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isProcessing && processingAction === 'remove' ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Removing...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                        </svg>
+                        Remove Cuts ({sectionsToRemove.length})
+                      </>
+                    )}
+                  </button>
+                )}
+
                 {/* Looks Good button when no changes */}
-                {!hasTrimChanges && !hasSplitChanges && (
+                {!hasTrimChanges && !hasSplitChanges && !hasRemoveChanges && (
                   <button
                     onClick={onClose}
                     className="px-5 py-2 bg-green-500 hover:bg-green-600 text-white text-sm rounded-lg font-medium transition-colors flex items-center gap-2"
