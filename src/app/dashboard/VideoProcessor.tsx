@@ -93,6 +93,23 @@ export default function VideoProcessor({
     setEditorVideo(null)
   }
 
+  const handleRemoveComplete = (filename: string, _stats: { sectionsRemoved: number; timeRemoved: number }) => {
+    // Update the video in queue with new filename (sections removed)
+    if (editorVideo) {
+      setVideoQueue(prev =>
+        prev.map(v => v.file.fileId === editorVideo.file.fileId
+          ? {
+              ...v,
+              outputFilename: filename,
+              downloadUrl: `/api/download/${filename}`,
+            }
+          : v
+        )
+      )
+    }
+    setEditorVideo(null)
+  }
+
   const handleRetry = async (fileId: string) => {
     if (!lastConfig) return
 
@@ -404,6 +421,7 @@ export default function VideoProcessor({
           onClose={handleCloseEditor}
           onTrimComplete={handleTrimComplete}
           onSplitComplete={handleSplitComplete}
+          onRemoveComplete={handleRemoveComplete}
         />
       )}
     </div>
