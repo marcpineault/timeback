@@ -70,7 +70,6 @@ export async function GET() {
     return NextResponse.json({
       configured: true,
       connected: true,
-      accessToken,
     });
   } catch (error) {
     console.error('[Google Drive] Status check error:', error);

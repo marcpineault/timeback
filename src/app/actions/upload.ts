@@ -109,8 +109,7 @@ export async function getS3UploadUrl(
 
     const { url, key } = await createUploadUrl(filename, contentType);
 
-    console.log(`[Upload] Generated S3 presigned PUT URL for: ${filename}`);
-    console.log(`[Upload] S3 key: ${key}`);
+    console.log(`[Upload] Generated S3 presigned PUT URL`);
 
     return { success: true, url, key };
   } catch (error) {
@@ -136,10 +135,7 @@ export async function confirmS3Upload(
     const filename = s3Key.split('/').pop() || s3Key;
     const fileId = filename.replace(/\.[^/.]+$/, '');
 
-    console.log(`[Upload] S3 upload confirmed!`);
-    console.log(`[Upload] File: ${originalName} (${(size / 1024 / 1024).toFixed(2)} MB)`);
-    console.log(`[Upload] S3 Key: ${s3Key}`);
-    console.log(`[Upload] Storage: CLOUDFLARE R2`);
+    console.log(`[Upload] S3 upload confirmed: ${originalName} (${(size / 1024 / 1024).toFixed(2)} MB)`);
 
     return {
       success: true,
@@ -433,7 +429,6 @@ export async function uploadVideo(formData: FormData): Promise<UploadResult> {
     };
   } catch (error) {
     console.error('Upload error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: `Failed to upload file: ${errorMessage}` };
+    return { success: false, error: 'Failed to upload file. Please try again.' };
   }
 }
