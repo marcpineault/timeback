@@ -478,7 +478,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`
-          border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer
+          border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all cursor-pointer
           ${isDragging
             ? 'border-blue-500 bg-blue-500/10'
             : 'border-gray-600 hover:border-gray-500 bg-gray-800/50'
@@ -496,9 +496,9 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           multiple
         />
         <label htmlFor="video-upload" className="cursor-pointer">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-3 sm:gap-4">
             <svg
-              className={`w-16 h-16 ${isDragging ? 'text-blue-500' : 'text-gray-500'}`}
+              className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-blue-500' : 'text-gray-500'}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -511,11 +511,11 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
               />
             </svg>
 
-            <p className="text-xl text-gray-300">
-              {isDragging ? 'Drop your videos here' : 'Drag and drop your videos'}
+            <p className="text-lg sm:text-xl text-gray-300">
+              {isDragging ? 'Drop your videos here' : 'Tap to upload videos'}
             </p>
-            <p className="text-gray-500">or click to browse</p>
-            <p className="text-sm text-gray-600">MP4, MOV, WebM, AVI supported • Multiple files allowed</p>
+            <p className="text-gray-500 text-sm sm:text-base">or drag and drop</p>
+            <p className="text-xs sm:text-sm text-gray-600">MP4, MOV, WebM, AVI • Multiple files</p>
           </div>
         </label>
       </div>

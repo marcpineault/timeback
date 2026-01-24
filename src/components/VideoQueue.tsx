@@ -53,10 +53,10 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
   return (
     <div className="bg-gray-800 rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-700/50 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <h3 className="font-medium text-white">Video Queue</h3>
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+      <div className="px-3 sm:px-4 py-3 bg-gray-700/50 flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+          <h3 className="font-medium text-white text-sm sm:text-base">Video Queue ({videos.length})</h3>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400">
             {completedCount > 0 && <span className="text-green-400">{completedCount} complete</span>}
             {processingCount > 0 && <span className="text-blue-400">{processingCount} processing</span>}
             {pendingCount > 0 && <span>{pendingCount} pending</span>}
@@ -65,9 +65,9 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
         </div>
         <button
           onClick={onClear}
-          className="text-sm text-gray-400 hover:text-white transition-colors"
+          className="text-xs sm:text-sm text-gray-400 hover:text-white transition-colors"
         >
-          Clear All
+          Clear
         </button>
       </div>
 
@@ -76,15 +76,15 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
         {videos.map((video) => (
           <div
             key={video.file.fileId}
-            className={`px-4 py-3 flex items-center gap-4 ${
+            className={`px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-4 ${
               video.status === 'processing' ? 'bg-blue-500/5' : ''
             }`}
           >
-            {/* Thumbnail with preview button */}
+            {/* Thumbnail - hidden on mobile */}
             <button
               onClick={() => video.file.previewUrl && onPreview?.(video)}
               disabled={!video.file.previewUrl}
-              className={`w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0 relative group transition-all ${
+              className={`hidden sm:flex w-12 h-12 bg-gray-700 rounded-lg items-center justify-center flex-shrink-0 relative group transition-all ${
                 video.file.previewUrl ? 'hover:bg-gray-600 cursor-pointer' : 'cursor-default'
               }`}
               title={video.file.previewUrl ? 'Click to preview' : 'Preview not available'}
@@ -103,22 +103,27 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
 
             {/* File Info */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-white truncate">{video.file.originalName}</p>
-              <p className="text-xs text-gray-500">
-                {video.error || formatFileSize(video.file.size)}
-              </p>
+              <p className="text-xs sm:text-sm text-white truncate">{video.file.originalName}</p>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>{formatFileSize(video.file.size)}</span>
+                <span className="sm:hidden">{getStatusBadge(video.status)}</span>
+              </div>
+              {video.error && <p className="text-xs text-red-400 truncate">{video.error}</p>}
             </div>
 
-            {/* Status */}
-            <div className="flex items-center gap-3">
+            {/* Status - hidden on mobile (shown inline above) */}
+            <div className="hidden sm:flex items-center gap-3">
               {getStatusBadge(video.status)}
+            </div>
 
+            {/* Actions */}
+            <div className="flex items-center gap-1 sm:gap-3">
               {/* Download button for completed */}
               {video.status === 'complete' && video.downloadUrl && (
                 <a
                   href={video.downloadUrl}
                   download={video.outputFilename}
-                  className="p-2 text-blue-400 hover:text-blue-300 transition-colors"
+                  className="p-1.5 sm:p-2 text-blue-400 hover:text-blue-300 transition-colors"
                   title="Download"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,7 +136,7 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
               {video.status === 'error' && onRetry && (
                 <button
                   onClick={() => onRetry(video.file.fileId)}
-                  className="p-2 text-amber-400 hover:text-amber-300 transition-colors"
+                  className="p-1.5 sm:p-2 text-amber-400 hover:text-amber-300 transition-colors"
                   title="Retry"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,7 +149,7 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
               {video.status !== 'processing' && (
                 <button
                   onClick={() => onRemove(video.file.fileId)}
-                  className="p-2 text-gray-500 hover:text-red-400 transition-colors"
+                  className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 transition-colors"
                   title="Remove"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

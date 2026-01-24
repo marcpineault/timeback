@@ -62,12 +62,12 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Usage Card */}
-        <div className="bg-gray-800 rounded-xl p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-gray-800 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-base sm:text-lg font-semibold text-white">
                 {PLANS[usage.plan as keyof typeof PLANS].name} Plan
               </h2>
               <p className="text-gray-400 text-sm">
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
             {usage.plan === 'FREE' && (
               <Link
                 href="/pricing"
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors text-center"
               >
                 Upgrade to Pro
               </Link>
@@ -106,9 +106,44 @@ export default async function DashboardPage() {
 
         {/* Recent Videos */}
         {usage.recentVideos.length > 0 && (
-          <div className="mt-8">
-            <h3 className="text-lg font-semibold text-white mb-4">Recent Videos</h3>
-            <div className="bg-gray-800 rounded-xl overflow-hidden">
+          <div className="mt-6 sm:mt-8">
+            <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">Recent Videos</h3>
+
+            {/* Mobile card view */}
+            <div className="sm:hidden space-y-3">
+              {usage.recentVideos.map((video) => (
+                <div key={video.id} className="bg-gray-800 rounded-xl p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-white text-sm font-medium truncate flex-1 mr-2">{video.originalName}</p>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                      video.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                      video.status === 'PROCESSING' ? 'bg-blue-500/20 text-blue-400' :
+                      video.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {video.status}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-xs">
+                      {new Date(video.createdAt).toLocaleDateString()}
+                    </span>
+                    {video.status === 'COMPLETED' && video.processedUrl && (
+                      <a
+                        href={video.processedUrl}
+                        className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                        download
+                      >
+                        Download
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table view */}
+            <div className="hidden sm:block bg-gray-800 rounded-xl overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-700/50">
                   <tr>
