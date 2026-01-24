@@ -57,10 +57,18 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
   const checkConnectionStatus = async () => {
     try {
       const response = await fetch('/api/google-drive/status');
+
+      // Handle API errors properly
+      if (!response.ok) {
+        setIsConfigured(false);
+        setIsConnected(false);
+        return;
+      }
+
       const data = await response.json();
 
-      setIsConfigured(data.configured);
-      setIsConnected(data.connected);
+      setIsConfigured(data.configured ?? false);
+      setIsConnected(data.connected ?? false);
 
       if (data.needsReconnect) {
         setError('Google Drive session expired. Please reconnect.');
@@ -79,11 +87,17 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
       const response = await fetch('/api/google-drive/auth');
       const data = await response.json();
 
+      if (!response.ok) {
+        setError(data.error || 'Failed to connect to Google Drive');
+        setIsConnecting(false);
+        return;
+      }
+
       if (data.authUrl) {
         // Redirect to Google OAuth
         window.location.href = data.authUrl;
       } else {
-        setError(data.error || 'Failed to get auth URL');
+        setError('Failed to get auth URL');
         setIsConnecting(false);
       }
     } catch {
