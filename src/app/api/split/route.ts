@@ -23,8 +23,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate split points are numbers
-    if (!splitPoints.every((p: unknown) => typeof p === 'number' && p > 0)) {
+    // Limit number of split points to prevent DoS
+    const MAX_SPLIT_POINTS = 50;
+    if (splitPoints.length > MAX_SPLIT_POINTS) {
+      return NextResponse.json(
+        { error: `Too many split points. Maximum is ${MAX_SPLIT_POINTS}` },
+        { status: 400 }
+      );
+    }
+
+    // Maximum video duration: ~27 hours (reasonable upper bound)
+    const MAX_VIDEO_DURATION = 100000;
+
+    // Validate split points are finite numbers within bounds
+    if (!splitPoints.every((p: unknown) =>
+      typeof p === 'number' &&
+      Number.isFinite(p) &&
+      p > 0 &&
+      p < MAX_VIDEO_DURATION
+    )) {
       return NextResponse.json(
         { error: 'Invalid split points' },
         { status: 400 }
@@ -47,7 +64,7 @@ export async function POST(request: NextRequest) {
     const video = await prisma.video.findFirst({
       where: {
         userId: user.id,
-        processedUrl: { contains: sanitizedFilename },
+        processedUrl: { endsWith: sanitizedFilename },
       },
     });
 
@@ -65,6 +82,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Video file not found' },
         { status: 404 }
+      );
+    }
+
+    // Security: Check for symlink attacks
+    const fileStat = fs.lstatSync(inputPath);
+    if (fileStat.isSymbolicLink()) {
+      console.error(`[Split API] Symlink attack detected: ${sanitizedFilename}`);
+      return NextResponse.json(
+        { error: 'Invalid file' },
+        { status: 403 }
       );
     }
 

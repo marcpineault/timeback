@@ -23,7 +23,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (startTime < 0 || endTime <= startTime) {
+    // Maximum video duration: ~27 hours (reasonable upper bound)
+    const MAX_VIDEO_DURATION = 100000;
+
+    if (
+      typeof startTime !== 'number' ||
+      typeof endTime !== 'number' ||
+      !Number.isFinite(startTime) ||
+      !Number.isFinite(endTime) ||
+      startTime < 0 ||
+      endTime <= startTime ||
+      endTime > MAX_VIDEO_DURATION
+    ) {
       return NextResponse.json(
         { error: 'Invalid trim times' },
         { status: 400 }
@@ -46,7 +57,7 @@ export async function POST(request: NextRequest) {
     const video = await prisma.video.findFirst({
       where: {
         userId: user.id,
-        processedUrl: { contains: sanitizedFilename },
+        processedUrl: { endsWith: sanitizedFilename },
       },
     });
 
@@ -64,6 +75,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Video file not found' },
         { status: 404 }
+      );
+    }
+
+    // Security: Check for symlink attacks
+    const fileStat = fs.lstatSync(inputPath);
+    if (fileStat.isSymbolicLink()) {
+      console.error(`[Trim API] Symlink attack detected: ${sanitizedFilename}`);
+      return NextResponse.json(
+        { error: 'Invalid file' },
+        { status: 403 }
       );
     }
 

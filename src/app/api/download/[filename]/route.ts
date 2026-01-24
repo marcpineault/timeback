@@ -33,7 +33,7 @@ export async function GET(
     const video = await prisma.video.findFirst({
       where: {
         userId: user.id,
-        processedUrl: { contains: sanitizedFilename },
+        processedUrl: { endsWith: sanitizedFilename },
       },
     });
 
@@ -54,8 +54,17 @@ export async function GET(
       );
     }
 
+    // Security: Check for symlink attacks
+    const stat = fs.lstatSync(filepath);
+    if (stat.isSymbolicLink()) {
+      console.error(`[Download] Symlink attack detected: ${sanitizedFilename}`);
+      return NextResponse.json(
+        { error: 'Invalid file' },
+        { status: 403 }
+      );
+    }
+
     const fileBuffer = fs.readFileSync(filepath);
-    const stat = fs.statSync(filepath);
 
     // Schedule file deletion after serving (give time for download to complete)
     // Delete after 5 minutes to allow for retries
