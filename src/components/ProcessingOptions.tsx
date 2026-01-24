@@ -52,7 +52,7 @@ const PRESETS: Record<PresetKey, Preset> = {
     config: {
       aspectRatio: '9:16',
       generateCaptions: true,
-      captionStyle: 'animated',
+      captionStyle: 'bold',
       normalizeAudio: true,
       silenceThreshold: -30,
       silenceDuration: 0.3,
@@ -78,7 +78,6 @@ const PRESETS: Record<PresetKey, Preset> = {
       generateCaptions: true,
       captionStyle: 'default',
       normalizeAudio: true,
-      colorGrade: 'vibrant',
       silenceThreshold: -30,
       silenceDuration: 0.3,
     },
@@ -103,7 +102,6 @@ const PRESETS: Record<PresetKey, Preset> = {
       generateCaptions: true,
       captionStyle: 'bold',
       normalizeAudio: true,
-      colorGrade: 'warm',
     },
   },
 };
@@ -290,57 +288,6 @@ export default function ProcessingOptions({
         </p>
       </div>
 
-      {/* Color Grading Settings */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-white">Color Grading</h3>
-        <select
-          value={config.colorGrade}
-          onChange={(e) => setConfig({ ...config, colorGrade: e.target.value as ProcessingConfig['colorGrade'] })}
-          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-        >
-          <option value="none">None (Original colors)</option>
-          <option value="warm">Warm (Golden, cozy tones)</option>
-          <option value="cool">Cool (Blue, professional tones)</option>
-          <option value="cinematic">Cinematic (Contrast + teal/orange)</option>
-          <option value="vibrant">Vibrant (Saturated, punchy)</option>
-          <option value="vintage">Vintage (Faded, nostalgic)</option>
-        </select>
-      </div>
-
-      {/* Auto-Zoom Settings */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-white">Auto-Zoom</h3>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={config.autoZoom}
-              onChange={(e) => setConfig({ ...config, autoZoom: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
-            />
-            <span className="text-gray-400">Zoom during speech</span>
-          </label>
-        </div>
-        {config.autoZoom && (
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Zoom Intensity: {config.autoZoomIntensity}%
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={config.autoZoomIntensity}
-              onChange={(e) => setConfig({ ...config, autoZoomIntensity: Number(e.target.value) })}
-              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Subtle zoom effect during speaking for increased engagement
-            </p>
-          </div>
-        )}
-      </div>
-
       {/* Captions Settings */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -367,35 +314,8 @@ export default function ProcessingOptions({
               <option value="default">Default (White with outline)</option>
               <option value="bold">Bold (Larger, thicker)</option>
               <option value="outline">Outline (Black outline)</option>
-              <option value="animated">Animated (Word-by-word highlight)</option>
             </select>
-            {config.captionStyle === 'animated' && (
-              <p className="text-sm text-yellow-400 mt-2">
-                Words highlight one-by-one as they are spoken - great for engagement!
-              </p>
-            )}
           </div>
-        )}
-      </div>
-
-      {/* AI B-Roll Settings */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-white">AI B-Roll</h3>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={config.generateBRoll}
-              onChange={(e) => setConfig({ ...config, generateBRoll: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
-            />
-            <span className="text-gray-400">Generate AI visuals</span>
-          </label>
-        </div>
-        {config.generateBRoll && (
-          <p className="text-sm text-gray-500">
-            AI will analyze the transcript and generate relevant visuals as full-screen cutaways at key moments.
-          </p>
         )}
       </div>
 
