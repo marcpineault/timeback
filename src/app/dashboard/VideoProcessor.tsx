@@ -8,6 +8,7 @@ import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
 import VideoPreview from '@/components/VideoPreview'
 import VideoTrimmer from '@/components/VideoTrimmer'
 import VideoSplitter from '@/components/VideoSplitter'
+import GoogleDriveUpload from '@/components/GoogleDriveUpload'
 
 interface VideoProcessorProps {
   userId: string
@@ -389,6 +390,14 @@ export default function VideoProcessor({
               </p>
             </div>
           </div>
+
+          {/* Google Drive Bulk Upload */}
+          <GoogleDriveUpload
+            files={completedVideos.map((v) => ({
+              name: v.outputFilename || `video_${v.file.fileId}.mp4`,
+              url: v.downloadUrl!,
+            }))}
+          />
         </div>
       )}
 
