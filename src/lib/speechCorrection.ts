@@ -1,7 +1,12 @@
 import OpenAI from 'openai';
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { TranscriptionWord } from './whisper';
+
+const execAsync = promisify(exec);
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -56,36 +61,172 @@ export const DEFAULT_SPEECH_CORRECTION_CONFIG: SpeechCorrectionConfig = {
 };
 
 /**
+ * Detect short audio segments that could be filler sounds (um, uh, etc.)
+ * Uses FFmpeg to analyze audio and find short voiced segments
+ */
+async function detectFillerSoundsFromAudio(
+  videoPath: string,
+  outputDir: string
+): Promise<Array<{ start: number; end: number; duration: number }>> {
+  console.log('[Speech Correction] Analyzing audio for filler sounds...');
+
+  const audioPath = path.join(outputDir, `temp_audio_analysis_${Date.now()}.wav`);
+
+  try {
+    // Extract audio as WAV for analysis
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(videoPath)
+        .noVideo()
+        .audioCodec('pcm_s16le')
+        .audioFrequency(16000)
+        .audioChannels(1)
+        .output(audioPath)
+        .on('end', () => resolve())
+        .on('error', reject)
+        .run();
+    });
+
+    // Use FFmpeg's silencedetect to find speech segments
+    // Use lower noise threshold (-40dB) to detect quieter fillers
+    // Use shorter minimum silence duration (0.08s) to catch brief pauses around fillers
+    const { stdout } = await execAsync(
+      `ffmpeg -i "${audioPath}" -af "silencedetect=noise=-40dB:d=0.08" -f null - 2>&1`
+    );
+
+    // Parse silence detection output
+    const silenceStarts: number[] = [];
+    const silenceEnds: number[] = [];
+
+    const lines = stdout.split('\n');
+    for (const line of lines) {
+      const startMatch = line.match(/silence_start: ([\d.]+)/);
+      const endMatch = line.match(/silence_end: ([\d.]+)/);
+
+      if (startMatch) {
+        silenceStarts.push(parseFloat(startMatch[1]));
+      }
+      if (endMatch) {
+        silenceEnds.push(parseFloat(endMatch[1]));
+      }
+    }
+
+    console.log(`[Speech Correction] Found ${silenceStarts.length} silence starts, ${silenceEnds.length} silence ends`);
+
+    // Find short speech segments between silences
+    // These could be filler sounds
+    const potentialFillers: Array<{ start: number; end: number; duration: number }> = [];
+
+    // Add implicit start at 0 if first silence doesn't start at 0
+    if (silenceStarts.length > 0 && silenceStarts[0] > 0.12) {
+      // There's speech at the start - check if it's short
+      const duration = silenceStarts[0];
+      if (duration >= 0.1 && duration <= 0.9) {
+        potentialFillers.push({ start: 0, end: silenceStarts[0], duration });
+      }
+    }
+
+    // Check segments between silence end and next silence start
+    for (let i = 0; i < silenceEnds.length; i++) {
+      const speechStart = silenceEnds[i];
+      // Find the next silence start after this silence end
+      const nextSilenceIdx = silenceStarts.findIndex(s => s > speechStart);
+      const speechEnd = nextSilenceIdx >= 0 ? silenceStarts[nextSilenceIdx] : null;
+
+      if (speechEnd !== null && speechEnd > speechStart) {
+        const duration = speechEnd - speechStart;
+
+        // Filler sounds are typically 0.1-0.8 seconds
+        // Also check for repeated short segments (stutters)
+        if (duration >= 0.1 && duration <= 0.8) {
+          potentialFillers.push({ start: speechStart, end: speechEnd, duration });
+        }
+      }
+    }
+
+    // Also detect closely spaced short segments that might be stutters
+    // Look for patterns like "I-I-I" or "th-the"
+    const stutterCandidates: Array<{ start: number; end: number; duration: number }> = [];
+    for (let i = 0; i < potentialFillers.length - 1; i++) {
+      const current = potentialFillers[i];
+      const next = potentialFillers[i + 1];
+
+      // If two short segments are close together, might be a stutter
+      if (next.start - current.end < 0.15 && current.duration < 0.3 && next.duration < 0.3) {
+        // Mark the first one as a stutter candidate (we'll remove the first, keep the second)
+        stutterCandidates.push(current);
+      }
+    }
+
+    // Combine and deduplicate
+    const allFillers = [...potentialFillers, ...stutterCandidates];
+    const uniqueFillers = allFillers.filter((filler, index, self) =>
+      index === self.findIndex(f => Math.abs(f.start - filler.start) < 0.05)
+    );
+
+    console.log(`[Speech Correction] Found ${uniqueFillers.length} potential filler sounds from audio analysis`);
+    uniqueFillers.slice(0, 20).forEach((f, i) => {
+      console.log(`  Audio filler ${i + 1}: ${f.start.toFixed(2)}s - ${f.end.toFixed(2)}s (${f.duration.toFixed(2)}s)`);
+    });
+
+    // Clean up
+    if (fs.existsSync(audioPath)) {
+      fs.unlinkSync(audioPath);
+    }
+
+    return uniqueFillers;
+  } catch (error) {
+    console.error('[Speech Correction] Audio analysis failed:', error);
+    // Clean up on error
+    if (fs.existsSync(audioPath)) {
+      fs.unlinkSync(audioPath);
+    }
+    return [];
+  }
+}
+
+/**
  * Common filler words and their variations (normalized to lowercase)
  * These are detected programmatically before GPT analysis
  */
 const FILLER_WORD_PATTERNS: RegExp[] = [
   /^u+[hm]+$/i,           // um, uh, umm, uhh, uhhm, etc.
   /^[ae]+[hm]+$/i,        // ah, ahm, eh, ehm, etc.
-  /^[hm]+m+$/i,           // hmm, hmmm, mm, mmm
+  /^[hm]+m*$/i,           // hmm, hmmm, mm, mmm, hm
   /^e+r+$/i,              // er, err, errr
   /^o+h+$/i,              // oh, ohh
   /^a+h+$/i,              // ah, ahh
+  /^u+h*$/i,              // uh, u, uhh (standalone)
+  /^m+$/i,                // m, mm, mmm
+  /^h+m+$/i,              // hm, hmm
+  /^a+$/i,                // a, aa (when short duration)
+  /^i+$/i,                // i (false start - "I... I...")
 ];
 
 /**
  * Single filler words (exact match, case insensitive)
  */
 const SINGLE_FILLER_WORDS = new Set([
-  'um', 'uh', 'umm', 'uhh', 'uhm', 'uhhh', 'ummm',
-  'er', 'err', 'eh', 'ehh',
-  'ah', 'ahh', 'oh', 'ohh',
-  'hmm', 'hm', 'hmmm', 'mm', 'mmm', 'mhm',
-  'so', // at start of sentence
-  'well', // at start
-  'anyway', 'anyways',
-  'basically',
-  'literally',
-  'actually',
-  'obviously',
-  'right', // as filler
-  'okay', 'ok',
-  'yeah', 'yep', 'yup', // when used as filler mid-sentence
+  // Core filler sounds
+  'um', 'uh', 'umm', 'uhh', 'uhm', 'uhhh', 'ummm', 'huh',
+  'er', 'err', 'eh', 'ehh', 'erm',
+  'ah', 'ahh', 'oh', 'ohh', 'ooh',
+  'hmm', 'hm', 'hmmm', 'mm', 'mmm', 'mhm', 'mmhm', 'uh-huh',
+  // Sentence starters often used as fillers
+  'so', 'well', 'now', 'but',
+  // Common filler words
+  'anyway', 'anyways', 'anyhow',
+  'basically', 'essentially',
+  'literally', 'figuratively',
+  'actually', 'technically',
+  'obviously', 'clearly',
+  'honestly', 'frankly',
+  'really', 'totally', 'definitely',
+  'just', // when overused
+  'right', 'okay', 'ok', 'alright',
+  'yeah', 'yep', 'yup', 'yes', 'ya', 'yah',
+  'no', 'nope', 'nah', // when not answering a question
+  // Hedging words
+  'maybe', 'perhaps', 'probably',
 ]);
 
 /**
@@ -256,7 +397,6 @@ function preDetectMistakes(
         let endWordIndex = -1;
 
         for (let i = 0; i < words.length; i++) {
-          const wordStart = charCount;
           const wordEnd = charCount + normalizeWord(words[i].word).length;
 
           if (startWordIndex === -1 && wordEnd > phraseIndex) {
@@ -653,6 +793,74 @@ export async function applySpeechCorrections(
 }
 
 /**
+ * Correlate audio-detected fillers with transcript words
+ * This finds transcript words that overlap with audio-detected filler sounds
+ */
+function correlateAudioFillersWithTranscript(
+  audioFillers: Array<{ start: number; end: number; duration: number }>,
+  words: TranscriptionWord[]
+): SpeechMistake[] {
+  const mistakes: SpeechMistake[] = [];
+
+  for (const filler of audioFillers) {
+    // Find words that overlap with this audio filler
+    const overlappingWords = words.filter(w =>
+      (w.start >= filler.start - 0.1 && w.start <= filler.end + 0.1) ||
+      (w.end >= filler.start - 0.1 && w.end <= filler.end + 0.1) ||
+      (w.start <= filler.start && w.end >= filler.end)
+    );
+
+    if (overlappingWords.length > 0) {
+      // Check if any overlapping word looks like a filler
+      const fillerWord = overlappingWords.find(w => isFillerWord(w.word));
+
+      if (fillerWord) {
+        mistakes.push({
+          type: 'filler_word',
+          startTime: fillerWord.start,
+          endTime: fillerWord.end,
+          text: fillerWord.word,
+          reason: 'Audio-confirmed filler word',
+        });
+        console.log(`  [Audio+Transcript] Confirmed filler: "${fillerWord.word}" at ${fillerWord.start.toFixed(2)}s`);
+      } else {
+        // No filler word in transcript, but audio detected something
+        // This might be a filler that Whisper cleaned up
+        // Use the audio timestamps directly
+        const text = overlappingWords.map(w => w.word).join(' ');
+
+        // Only add if it's short enough to be a filler (not a real phrase)
+        if (overlappingWords.length <= 2 && filler.duration < 0.8) {
+          mistakes.push({
+            type: 'filler_word',
+            startTime: filler.start,
+            endTime: filler.end,
+            text: text || '[hesitation]',
+            reason: 'Audio-detected hesitation sound',
+          });
+          console.log(`  [Audio] Detected hesitation at ${filler.start.toFixed(2)}s (transcript: "${text}")`);
+        }
+      }
+    } else {
+      // No overlapping words - this is a gap in transcription
+      // Could be a filler that Whisper completely skipped
+      if (filler.duration >= 0.15 && filler.duration <= 0.6) {
+        mistakes.push({
+          type: 'filler_word',
+          startTime: filler.start,
+          endTime: filler.end,
+          text: '[filler sound]',
+          reason: 'Audio-detected filler (not in transcript)',
+        });
+        console.log(`  [Audio Only] Detected filler at ${filler.start.toFixed(2)}s (${filler.duration.toFixed(2)}s)`);
+      }
+    }
+  }
+
+  return mistakes;
+}
+
+/**
  * Full speech correction pipeline: analyze and apply corrections
  */
 export async function correctSpeechMistakes(
@@ -669,21 +877,57 @@ export async function correctSpeechMistakes(
   console.log('[Speech Correction] Starting full speech correction pipeline...');
   console.log(`[Speech Correction] Config: ${JSON.stringify(config)}`);
 
-  // Step 1: Detect mistakes using combined approach
-  const mistakes = await detectSpeechMistakes(words, config);
+  // Get output directory for temp files
+  const outputDir = path.dirname(outputPath);
 
-  if (mistakes.length === 0) {
+  // Step 1: Run audio-level filler detection (independent of transcript)
+  let audioFillerMistakes: SpeechMistake[] = [];
+  if (config.removeFillerWords) {
+    console.log('[Speech Correction] Step 1: Audio-level filler detection...');
+    const audioFillers = await detectFillerSoundsFromAudio(inputPath, outputDir);
+    audioFillerMistakes = correlateAudioFillersWithTranscript(audioFillers, words);
+    console.log(`[Speech Correction] Audio detection found ${audioFillerMistakes.length} potential fillers`);
+  }
+
+  // Step 2: Detect mistakes from transcript (programmatic + GPT)
+  console.log('[Speech Correction] Step 2: Transcript-based detection...');
+  const transcriptMistakes = await detectSpeechMistakes(words, config);
+
+  // Step 3: Merge audio-detected and transcript-detected mistakes
+  console.log('[Speech Correction] Step 3: Merging detections...');
+  const allMistakes = [...transcriptMistakes];
+
+  for (const audioMistake of audioFillerMistakes) {
+    // Check if this overlaps with an existing detection
+    const overlaps = allMistakes.some(existing =>
+      Math.abs(audioMistake.startTime - existing.startTime) < 0.2 ||
+      (audioMistake.startTime >= existing.startTime - 0.1 && audioMistake.startTime <= existing.endTime + 0.1)
+    );
+
+    if (!overlaps) {
+      allMistakes.push(audioMistake);
+      console.log(`  Added audio-only detection: "${audioMistake.text}" at ${audioMistake.startTime.toFixed(2)}s`);
+    }
+  }
+
+  // Sort by start time
+  allMistakes.sort((a, b) => a.startTime - b.startTime);
+
+  console.log(`[Speech Correction] Total combined mistakes: ${allMistakes.length}`);
+
+  if (allMistakes.length === 0) {
     console.log('[Speech Correction] No mistakes detected, copying file');
     fs.copyFileSync(inputPath, outputPath);
     return { outputPath, mistakes: [], segmentsRemoved: 0, timeRemoved: 0 };
   }
 
-  // Step 2: Apply corrections
-  const result = await applySpeechCorrections(inputPath, outputPath, mistakes);
+  // Step 4: Apply corrections
+  console.log('[Speech Correction] Step 4: Applying corrections...');
+  const result = await applySpeechCorrections(inputPath, outputPath, allMistakes);
 
   return {
     outputPath: result.outputPath,
-    mistakes,
+    mistakes: allMistakes,
     segmentsRemoved: result.segmentsRemoved,
     timeRemoved: result.timeRemoved,
   };

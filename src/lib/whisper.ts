@@ -62,21 +62,38 @@ export async function extractAudio(
  */
 export async function transcribeAudio(
   audioPath: string,
-  includeWords: boolean = false
+  options: {
+    includeWords?: boolean;
+    includeFillerWords?: boolean;
+  } = {}
 ): Promise<{ text: string; segments: TranscriptionSegment[]; words?: TranscriptionWord[] }> {
   const openai = getOpenAIClient();
   const audioFile = fs.createReadStream(audioPath);
 
   // Request word-level timestamps if needed for animated captions
-  const granularities: ('segment' | 'word')[] = includeWords
+  const granularities: ('segment' | 'word')[] = options.includeWords
     ? ['segment', 'word']
     : ['segment'];
+
+  // When we want to detect filler words for speech correction,
+  // we need to prompt Whisper to include them (it normally cleans them up)
+  // This prompt tells Whisper to transcribe verbatim including hesitations
+  const fillerWordsPrompt = options.includeFillerWords
+    ? 'Um, uh, er, ah, like, you know, I mean, basically, actually, so, well, right, okay. Include all filler words, hesitations, stutters, and verbal tics exactly as spoken. Transcribe verbatim without cleaning up speech.'
+    : undefined;
+
+  console.log(`[Transcription] Transcribing with options:`, {
+    includeWords: options.includeWords,
+    includeFillerWords: options.includeFillerWords,
+    hasPrompt: !!fillerWordsPrompt,
+  });
 
   const response = await openai.audio.transcriptions.create({
     file: audioFile,
     model: 'whisper-1',
     response_format: 'verbose_json',
     timestamp_granularities: granularities,
+    ...(fillerWordsPrompt && { prompt: fillerWordsPrompt }),
   });
 
   const segments: TranscriptionSegment[] = (response.segments || []).map((seg) => ({
@@ -86,13 +103,18 @@ export async function transcribeAudio(
   }));
 
   // Extract word-level timestamps if requested
-  const words: TranscriptionWord[] | undefined = includeWords
+  const words: TranscriptionWord[] | undefined = options.includeWords
     ? ((response as { words?: Array<{ word: string; start: number; end: number }> }).words || []).map((w) => ({
         word: w.word,
         start: w.start,
         end: w.end,
       }))
     : undefined;
+
+  console.log(`[Transcription] Result: ${segments.length} segments, ${words?.length || 0} words`);
+  if (words && words.length > 0) {
+    console.log(`[Transcription] First 20 words: ${words.slice(0, 20).map(w => w.word).join(' ')}`);
+  }
 
   return {
     text: response.text,
@@ -358,7 +380,10 @@ export function extractHook(text: string, maxLength: number = 60): string {
 export async function transcribeVideo(
   videoPath: string,
   outputDir: string,
-  options: { animated?: boolean } = {}
+  options: {
+    animated?: boolean;
+    forSpeechCorrection?: boolean;
+  } = {}
 ): Promise<TranscriptionResult> {
   const baseName = path.basename(videoPath, path.extname(videoPath));
   const audioPath = path.join(outputDir, `${baseName}_audio.mp3`);
@@ -369,14 +394,20 @@ export async function transcribeVideo(
   // Extract audio
   await extractAudio(videoPath, audioPath);
 
-  // Transcribe (include word-level timestamps for animated captions)
-  const { text, segments, words } = await transcribeAudio(audioPath, options.animated);
+  // Transcribe
+  // - Include word-level timestamps for animated captions or speech correction
+  // - Include filler words prompt when doing speech correction
+  const needsWords = options.animated || options.forSpeechCorrection;
+  const { text, segments, words } = await transcribeAudio(audioPath, {
+    includeWords: needsWords,
+    includeFillerWords: options.forSpeechCorrection,
+  });
 
-  // Generate subtitle file
+  // Generate subtitle file (skip if this is just for speech correction)
   if (options.animated && words && words.length > 0) {
     generateAnimatedAss(words, srtPath);
     console.log(`[Transcription] Generated animated ASS with ${words.length} words`);
-  } else {
+  } else if (!options.forSpeechCorrection || options.animated !== undefined) {
     generateSrt(segments, srtPath);
     console.log(`[Transcription] Generated SRT with ${segments.length} segments`);
   }

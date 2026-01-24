@@ -165,16 +165,22 @@ export async function POST(request: NextRequest) {
     let transcriptionSegments: { start: number; end: number; text: string }[] = [];
     let transcriptionWords: TranscriptionWord[] = [];
 
-    // Need word-level timestamps for speech correction or animated captions
-    const needsWordTimestamps = speechCorrection || captionStyle === 'animated';
-
     if (generateCaptions || useHookAsHeadline || generateBRoll || speechCorrection) {
       console.log('[Process] Step 2: Transcribing silence-removed video...');
       // Use animated transcription (word-level timestamps) for animated caption style or speech correction
-      const transcription = await transcribeVideo(currentInput, processedDir, { animated: needsWordTimestamps });
+      // Use forSpeechCorrection to prompt Whisper to include filler words
+      const transcription = await transcribeVideo(currentInput, processedDir, {
+        animated: captionStyle === 'animated',
+        forSpeechCorrection: speechCorrection,
+      });
       srtPath = transcription.srtPath;
       transcriptionSegments = transcription.segments;
       transcriptionWords = transcription.words || [];
+
+      if (speechCorrection) {
+        console.log(`[Process] Transcription for speech correction: ${transcriptionWords.length} words`);
+        console.log(`[Process] Sample words: ${transcriptionWords.slice(0, 30).map(w => w.word).join(' ')}`);
+      }
 
       // Extract hook if needed
       if (useHookAsHeadline) {
