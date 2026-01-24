@@ -56,28 +56,255 @@ export const DEFAULT_SPEECH_CORRECTION_CONFIG: SpeechCorrectionConfig = {
 };
 
 /**
- * Common filler words to detect
+ * Common filler words and their variations (normalized to lowercase)
+ * These are detected programmatically before GPT analysis
  */
-const FILLER_WORDS = [
-  'um', 'uh', 'uhm', 'uhh', 'umm',
-  'er', 'err', 'eh',
-  'like',  // when used as filler
-  'you know',
-  'basically',
-  'actually',  // when overused
-  'so',  // when used as filler at start
-  'well',  // when used as filler
-  'right',  // when used as filler
-  'okay', 'ok',
-  'I mean',
-  'kind of', 'kinda',
-  'sort of', 'sorta',
+const FILLER_WORD_PATTERNS: RegExp[] = [
+  /^u+[hm]+$/i,           // um, uh, umm, uhh, uhhm, etc.
+  /^[ae]+[hm]+$/i,        // ah, ahm, eh, ehm, etc.
+  /^[hm]+m+$/i,           // hmm, hmmm, mm, mmm
+  /^e+r+$/i,              // er, err, errr
+  /^o+h+$/i,              // oh, ohh
+  /^a+h+$/i,              // ah, ahh
 ];
 
 /**
- * Analyze transcription using GPT to detect speech mistakes
+ * Single filler words (exact match, case insensitive)
  */
-export async function detectSpeechMistakes(
+const SINGLE_FILLER_WORDS = new Set([
+  'um', 'uh', 'umm', 'uhh', 'uhm', 'uhhh', 'ummm',
+  'er', 'err', 'eh', 'ehh',
+  'ah', 'ahh', 'oh', 'ohh',
+  'hmm', 'hm', 'hmmm', 'mm', 'mmm', 'mhm',
+  'so', // at start of sentence
+  'well', // at start
+  'anyway', 'anyways',
+  'basically',
+  'literally',
+  'actually',
+  'obviously',
+  'right', // as filler
+  'okay', 'ok',
+  'yeah', 'yep', 'yup', // when used as filler mid-sentence
+]);
+
+/**
+ * Multi-word filler phrases
+ */
+const FILLER_PHRASES = [
+  'you know',
+  'i mean',
+  'kind of',
+  'sort of',
+  'you know what',
+  'like i said',
+  'to be honest',
+  'at the end of the day',
+  'if you will',
+  'so to speak',
+];
+
+/**
+ * Normalize a word for comparison
+ */
+function normalizeWord(word: string): string {
+  return word.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Check if a word is a filler word
+ */
+function isFillerWord(word: string): boolean {
+  const normalized = normalizeWord(word);
+
+  // Check exact matches
+  if (SINGLE_FILLER_WORDS.has(normalized)) {
+    return true;
+  }
+
+  // Check regex patterns (for variations like "uhhhhm")
+  for (const pattern of FILLER_WORD_PATTERNS) {
+    if (pattern.test(normalized)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Pre-detect obvious mistakes programmatically (doesn't rely on GPT)
+ * This catches things GPT might miss
+ */
+function preDetectMistakes(
+  words: TranscriptionWord[],
+  config: SpeechCorrectionConfig
+): SpeechMistake[] {
+  const mistakes: SpeechMistake[] = [];
+
+  console.log('[Speech Correction] Running programmatic pre-detection...');
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const normalized = normalizeWord(word.word);
+
+    // Skip empty words
+    if (!normalized) continue;
+
+    // 1. Detect filler words
+    if (config.removeFillerWords && isFillerWord(word.word)) {
+      // Check context - don't remove "like" in "I like pizza" or "like this"
+      const prevWord = i > 0 ? normalizeWord(words[i - 1].word) : '';
+      const nextWord = i < words.length - 1 ? normalizeWord(words[i + 1].word) : '';
+
+      // "like" needs context check
+      if (normalized === 'like') {
+        // Keep "like" if it's used as a verb or comparison
+        const verbContexts = ['i', 'you', 'we', 'they', 'would', 'dont', 'didnt', 'do'];
+        const comparisonContexts = ['looks', 'look', 'sounds', 'sound', 'feels', 'feel', 'seems', 'seem'];
+
+        if (verbContexts.includes(prevWord) || comparisonContexts.includes(prevWord)) {
+          continue; // Skip - this is "I like X" or "looks like X"
+        }
+        if (nextWord === 'this' || nextWord === 'that' || nextWord === 'a' || nextWord === 'the') {
+          continue; // Skip - this might be comparison "like this"
+        }
+      }
+
+      // "so" and "well" only at sentence starts or after pauses
+      if ((normalized === 'so' || normalized === 'well') && i > 0) {
+        // Check if there's a significant time gap (indicating sentence start)
+        const gap = word.start - words[i - 1].end;
+        if (gap < 0.5) {
+          continue; // Skip - probably not a filler
+        }
+      }
+
+      mistakes.push({
+        type: 'filler_word',
+        startTime: word.start,
+        endTime: word.end,
+        text: word.word,
+        reason: 'Filler word detected',
+      });
+
+      console.log(`  [Pre-detect] Filler word: "${word.word}" at ${word.start.toFixed(2)}s`);
+    }
+
+    // 2. Detect repeated consecutive words
+    if (config.removeRepeatedWords && i > 0) {
+      const prevNormalized = normalizeWord(words[i - 1].word);
+
+      if (normalized === prevNormalized && normalized.length > 1) {
+        // This is a repeated word - mark the FIRST occurrence for removal
+        // (keep the second one as it's usually said more clearly)
+        const alreadyMarked = mistakes.some(
+          m => m.startTime === words[i - 1].start && m.type === 'repeated_word'
+        );
+
+        if (!alreadyMarked) {
+          mistakes.push({
+            type: 'repeated_word',
+            startTime: words[i - 1].start,
+            endTime: words[i - 1].end,
+            text: `${words[i - 1].word} ${word.word}`,
+            reason: 'Repeated word - removing first occurrence',
+          });
+
+          console.log(`  [Pre-detect] Repeated word: "${words[i - 1].word}" at ${words[i - 1].start.toFixed(2)}s`);
+        }
+      }
+    }
+
+    // 3. Detect stuttering patterns (partial word repetitions)
+    if (i > 0) {
+      const prevNormalized = normalizeWord(words[i - 1].word);
+
+      // Check if previous word is a partial/stuttered version of current word
+      if (prevNormalized.length >= 1 && prevNormalized.length < normalized.length) {
+        if (normalized.startsWith(prevNormalized) ||
+            (prevNormalized.length <= 3 && normalized.substring(0, 2) === prevNormalized.substring(0, 2))) {
+          mistakes.push({
+            type: 'stutter',
+            startTime: words[i - 1].start,
+            endTime: words[i - 1].end,
+            text: words[i - 1].word,
+            reason: `Stutter before "${word.word}"`,
+          });
+
+          console.log(`  [Pre-detect] Stutter: "${words[i - 1].word}" before "${word.word}" at ${words[i - 1].start.toFixed(2)}s`);
+        }
+      }
+    }
+  }
+
+  // 4. Detect multi-word filler phrases
+  if (config.removeFillerWords) {
+    const fullText = words.map(w => normalizeWord(w.word)).join(' ');
+
+    for (const phrase of FILLER_PHRASES) {
+      const normalizedPhrase = phrase.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+      let searchStart = 0;
+
+      while (true) {
+        const phraseIndex = fullText.indexOf(normalizedPhrase, searchStart);
+        if (phraseIndex === -1) break;
+
+        // Find which words this corresponds to
+        let charCount = 0;
+        let startWordIndex = -1;
+        let endWordIndex = -1;
+
+        for (let i = 0; i < words.length; i++) {
+          const wordStart = charCount;
+          const wordEnd = charCount + normalizeWord(words[i].word).length;
+
+          if (startWordIndex === -1 && wordEnd > phraseIndex) {
+            startWordIndex = i;
+          }
+          if (wordEnd >= phraseIndex + normalizedPhrase.length) {
+            endWordIndex = i;
+            break;
+          }
+
+          charCount = wordEnd + 1; // +1 for space
+        }
+
+        if (startWordIndex !== -1 && endWordIndex !== -1) {
+          const phraseText = words.slice(startWordIndex, endWordIndex + 1).map(w => w.word).join(' ');
+
+          // Check if already detected
+          const alreadyDetected = mistakes.some(
+            m => m.startTime === words[startWordIndex].start && m.endTime === words[endWordIndex].end
+          );
+
+          if (!alreadyDetected) {
+            mistakes.push({
+              type: 'filler_word',
+              startTime: words[startWordIndex].start,
+              endTime: words[endWordIndex].end,
+              text: phraseText,
+              reason: `Filler phrase: "${phrase}"`,
+            });
+
+            console.log(`  [Pre-detect] Filler phrase: "${phraseText}" at ${words[startWordIndex].start.toFixed(2)}s`);
+          }
+        }
+
+        searchStart = phraseIndex + 1;
+      }
+    }
+  }
+
+  console.log(`[Speech Correction] Pre-detection found ${mistakes.length} mistakes`);
+  return mistakes;
+}
+
+/**
+ * Analyze transcription using GPT to detect speech mistakes
+ * This is used IN ADDITION to programmatic detection
+ */
+export async function detectSpeechMistakesWithGPT(
   words: TranscriptionWord[],
   config: SpeechCorrectionConfig = DEFAULT_SPEECH_CORRECTION_CONFIG
 ): Promise<SpeechMistake[]> {
@@ -99,57 +326,84 @@ export async function detectSpeechMistakes(
   // Create transcript text for context
   const transcriptText = words.map(w => w.word).join(' ');
 
-  console.log(`[Speech Correction] Analyzing ${words.length} words for mistakes...`);
-  console.log(`[Speech Correction] Config: ${JSON.stringify(config)}`);
+  console.log(`[Speech Correction] Analyzing ${words.length} words with GPT...`);
 
-  const systemPrompt = `You are an expert video editor AI assistant. Your task is to analyze a transcript and identify speech mistakes that should be cut from a video to make it sound more professional and polished.
+  const aggressivenessInstructions = {
+    conservative: 'Be conservative - only flag clear, obvious mistakes that definitely disrupt the flow.',
+    moderate: 'Be moderately aggressive - flag mistakes that a professional editor would remove.',
+    aggressive: 'Be very aggressive - flag everything that could possibly be a mistake. When in doubt, flag it.',
+  };
 
-Types of mistakes to identify:
-${config.removeRepeatedWords ? '- REPEATED_WORD: Duplicate words like "the the", "I I", "and and"' : ''}
-${config.removeFillerWords ? '- FILLER_WORD: Words like "um", "uh", "like" (when used as filler), "you know", "basically", "actually", "so" (at sentence start), "I mean"' : ''}
-${config.removeFalseStarts ? '- FALSE_START: Incomplete sentences that get restarted, abandoned phrases' : ''}
-${config.removeSelfCorrections ? '- SELF_CORRECTION: When someone says something wrong then corrects themselves, identify the WRONG part to cut (e.g., "I went to the store- I mean the mall" - cut "I went to the store- I mean")' : ''}
-- STUTTER: Stuttering patterns like "b-b-but", "wh-what", "the-the-the"
-- REPEATED_PHRASE: Phrases repeated multiple times like "so basically, so basically"
+  const systemPrompt = `You are an expert video editor analyzing a transcript to find speech mistakes to cut. Your job is to be THOROUGH and find ALL mistakes.
 
-Aggressiveness level: ${config.aggressiveness}
-- conservative: Only flag obvious, clear mistakes that definitely should be removed
-- moderate: Flag most mistakes but preserve natural speech patterns that add character
-- aggressive: Remove all identified issues for maximum polish
+MISTAKES TO FIND:
+${config.removeRepeatedWords ? `
+1. REPEATED_WORD: Any word said twice in a row or very close together
+   - "the the", "I I", "and and", "to to", "a a"
+   - "we we need", "it it was", "that that"
+   - Even small words count!` : ''}
+${config.removeFillerWords ? `
+2. FILLER_WORD: Verbal fillers and hesitations
+   - "um", "uh", "uhm", "er", "ah", "oh", "hmm", "mm"
+   - "like" when used as a filler (NOT as a verb or comparison)
+   - "you know" as a filler phrase
+   - "I mean" when not actually clarifying
+   - "basically", "literally", "actually", "obviously" when overused
+   - "so" or "well" at the start of sentences as a filler
+   - "right" or "okay" used as verbal tics` : ''}
+${config.removeFalseStarts ? `
+3. FALSE_START: Incomplete thoughts that get restarted
+   - "I was going to-- I decided to..."
+   - "We should-- actually let's..."
+   - Any sentence that gets abandoned and restarted` : ''}
+${config.removeSelfCorrections ? `
+4. SELF_CORRECTION: When someone says something wrong then corrects it
+   - "I went to the store-- I mean the mall" → cut "I went to the store-- I mean"
+   - "It costs fifty-- sorry, sixty dollars" → cut "fifty-- sorry,"
+   - Always keep the CORRECT version, cut the wrong part` : ''}
+5. STUTTER: Stuttering or partial words
+   - "b-b-but", "wh-what", "I-I-I"
+   - Any partial word repetition
 
-IMPORTANT RULES:
-1. Only identify actual mistakes - do not flag intentional repetition for emphasis
-2. For self-corrections, only cut the INCORRECT part, keep the correction
-3. Be precise with word indices - each word has a unique index
-4. Consider context - "like" as a comparison ("like this") should NOT be cut
-5. Group consecutive mistakes together when they form one logical cut
-6. Preserve meaning - never cut words that would make the sentence incomprehensible
+${aggressivenessInstructions[config.aggressiveness]}
 
-Return a JSON object with a "mistakes" array. Each mistake should have:
-- type: The type of mistake (REPEATED_WORD, FILLER_WORD, FALSE_START, SELF_CORRECTION, STUTTER, REPEATED_PHRASE)
-- startIndex: The index of the first word to cut
-- endIndex: The index of the last word to cut (inclusive)
-- text: The actual text being cut
-- reason: Brief explanation of why this should be cut
+CRITICAL RULES:
+1. Be THOROUGH - find every single mistake
+2. For repeated words, mark the FIRST occurrence for removal (keep the clearer second one)
+3. For self-corrections, mark the WRONG part (keep the correction)
+4. Each word has an index - use exact indices
+5. Do NOT flag "like" when used as "I like X" or "looks like X"
+6. Do NOT flag intentional emphasis or rhetorical repetition
 
-Example response:
+OUTPUT FORMAT - Return JSON:
 {
   "mistakes": [
-    {"type": "FILLER_WORD", "startIndex": 5, "endIndex": 5, "text": "um", "reason": "Filler word"},
-    {"type": "REPEATED_WORD", "startIndex": 12, "endIndex": 13, "text": "the the", "reason": "Duplicate word"},
-    {"type": "SELF_CORRECTION", "startIndex": 20, "endIndex": 25, "text": "I went to the store- I mean", "reason": "Self-correction, keeping the correct version"}
+    {
+      "type": "FILLER_WORD",
+      "startIndex": 5,
+      "endIndex": 5,
+      "text": "um",
+      "reason": "Filler word"
+    },
+    {
+      "type": "REPEATED_WORD",
+      "startIndex": 10,
+      "endIndex": 10,
+      "text": "the",
+      "reason": "First of repeated 'the the'"
+    }
   ]
 }`;
 
-  const userPrompt = `Analyze this transcript for speech mistakes:
+  const userPrompt = `Find ALL speech mistakes in this transcript. Be thorough!
 
 TRANSCRIPT:
 "${transcriptText}"
 
-WORD LIST WITH INDICES AND TIMESTAMPS:
+WORD LIST (with indices and timestamps):
 ${JSON.stringify(wordList, null, 2)}
 
-Identify all speech mistakes that should be cut to make this video more professional. Return ONLY a JSON object with the mistakes array.`;
+Return a JSON object with all mistakes found. Check every single word!`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -159,11 +413,11 @@ Identify all speech mistakes that should be cut to make this video more professi
         { role: 'user', content: userPrompt },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3, // Lower temperature for more consistent results
+      temperature: 0.1, // Very low temperature for consistency
     });
 
     const content = response.choices[0].message.content || '{"mistakes": []}';
-    console.log(`[Speech Correction] GPT response: ${content.substring(0, 500)}...`);
+    console.log(`[Speech Correction] GPT response: ${content.substring(0, 1000)}...`);
 
     const parsed = JSON.parse(content);
     const rawMistakes = parsed.mistakes || [];
@@ -174,26 +428,70 @@ Identify all speech mistakes that should be cut to make this video more professi
         m.startIndex !== undefined &&
         m.endIndex !== undefined &&
         m.startIndex >= 0 &&
-        m.endIndex < words.length
+        m.endIndex < words.length &&
+        m.startIndex <= m.endIndex
       )
       .map((m: { type: string; startIndex: number; endIndex: number; text: string; reason: string }) => ({
         type: m.type.toLowerCase().replace(/_/g, '_') as MistakeType,
         startTime: words[m.startIndex].start,
         endTime: words[m.endIndex].end,
-        text: m.text,
-        reason: m.reason,
+        text: m.text || words.slice(m.startIndex, m.endIndex + 1).map(w => w.word).join(' '),
+        reason: m.reason || 'Detected by AI',
       }));
 
-    console.log(`[Speech Correction] Detected ${mistakes.length} mistakes`);
-    mistakes.forEach((m, i) => {
-      console.log(`  ${i + 1}. [${m.type}] "${m.text}" (${m.startTime.toFixed(2)}s - ${m.endTime.toFixed(2)}s): ${m.reason}`);
-    });
-
+    console.log(`[Speech Correction] GPT detected ${mistakes.length} additional mistakes`);
     return mistakes;
   } catch (error) {
-    console.error('[Speech Correction] Error detecting mistakes:', error);
+    console.error('[Speech Correction] Error in GPT detection:', error);
     return [];
   }
+}
+
+/**
+ * Combined detection: programmatic + GPT
+ */
+export async function detectSpeechMistakes(
+  words: TranscriptionWord[],
+  config: SpeechCorrectionConfig = DEFAULT_SPEECH_CORRECTION_CONFIG
+): Promise<SpeechMistake[]> {
+  if (!words || words.length === 0) {
+    return [];
+  }
+
+  console.log(`[Speech Correction] Starting combined detection for ${words.length} words...`);
+  console.log(`[Speech Correction] Transcript: "${words.map(w => w.word).join(' ')}"`);
+
+  // Step 1: Programmatic pre-detection (fast, reliable for obvious patterns)
+  const programmaticMistakes = preDetectMistakes(words, config);
+
+  // Step 2: GPT-based detection (catches context-dependent mistakes)
+  const gptMistakes = await detectSpeechMistakesWithGPT(words, config);
+
+  // Step 3: Merge and deduplicate
+  const allMistakes = [...programmaticMistakes];
+
+  for (const gptMistake of gptMistakes) {
+    // Check if this overlaps with an existing mistake
+    const overlaps = allMistakes.some(existing =>
+      (gptMistake.startTime >= existing.startTime && gptMistake.startTime <= existing.endTime) ||
+      (gptMistake.endTime >= existing.startTime && gptMistake.endTime <= existing.endTime) ||
+      (gptMistake.startTime <= existing.startTime && gptMistake.endTime >= existing.endTime)
+    );
+
+    if (!overlaps) {
+      allMistakes.push(gptMistake);
+    }
+  }
+
+  // Sort by start time
+  allMistakes.sort((a, b) => a.startTime - b.startTime);
+
+  console.log(`[Speech Correction] Total combined mistakes: ${allMistakes.length}`);
+  allMistakes.forEach((m, i) => {
+    console.log(`  ${i + 1}. [${m.type}] "${m.text}" (${m.startTime.toFixed(2)}s - ${m.endTime.toFixed(2)}s): ${m.reason}`);
+  });
+
+  return allMistakes;
 }
 
 /**
@@ -203,7 +501,7 @@ Identify all speech mistakes that should be cut to make this video more professi
 export function calculateSegmentsToKeep(
   mistakes: SpeechMistake[],
   totalDuration: number,
-  padding: number = 0.05 // Small padding around cuts for smoother transitions
+  padding: number = 0.02 // Smaller padding for tighter cuts
 ): Array<{ start: number; end: number }> {
   if (mistakes.length === 0) {
     return [{ start: 0, end: totalDuration }];
@@ -216,6 +514,7 @@ export function calculateSegmentsToKeep(
   const mergedCuts: Array<{ start: number; end: number }> = [];
 
   for (const mistake of sortedMistakes) {
+    // Use small padding to ensure clean cuts
     const cutStart = Math.max(0, mistake.startTime - padding);
     const cutEnd = Math.min(totalDuration, mistake.endTime + padding);
 
@@ -224,7 +523,7 @@ export function calculateSegmentsToKeep(
     } else {
       const lastCut = mergedCuts[mergedCuts.length - 1];
       // If this cut overlaps or is very close to the last one, merge them
-      if (cutStart <= lastCut.end + 0.1) {
+      if (cutStart <= lastCut.end + 0.05) {
         lastCut.end = Math.max(lastCut.end, cutEnd);
       } else {
         mergedCuts.push({ start: cutStart, end: cutEnd });
@@ -250,8 +549,8 @@ export function calculateSegmentsToKeep(
     segmentsToKeep.push({ start: lastEnd, end: totalDuration });
   }
 
-  // Filter out very short segments (less than 100ms)
-  const filteredSegments = segmentsToKeep.filter(seg => (seg.end - seg.start) >= 0.1);
+  // Filter out very short segments (less than 50ms)
+  const filteredSegments = segmentsToKeep.filter(seg => (seg.end - seg.start) >= 0.05);
 
   console.log(`[Speech Correction] Keeping ${filteredSegments.length} segments:`);
   filteredSegments.forEach((seg, i) => {
@@ -368,8 +667,9 @@ export async function correctSpeechMistakes(
   timeRemoved: number;
 }> {
   console.log('[Speech Correction] Starting full speech correction pipeline...');
+  console.log(`[Speech Correction] Config: ${JSON.stringify(config)}`);
 
-  // Step 1: Detect mistakes using AI
+  // Step 1: Detect mistakes using combined approach
   const mistakes = await detectSpeechMistakes(words, config);
 
   if (mistakes.length === 0) {
