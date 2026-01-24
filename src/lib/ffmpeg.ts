@@ -232,25 +232,25 @@ export async function burnCaptions(
   // Check if this is an animated ASS file
   const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
 
-  // Platform-specific caption styles
-  // Alignment=2 is bottom-center, MarginV positions vertically
-  // MarginL/MarginR add horizontal padding for safe zone (~80-100px each side)
+  // Platform-specific caption styles optimized for safe zones
+  // For 1080x1920 (9:16): Avoid bottom 320px (buttons), right 150px (engagement icons), top 200px (username)
+  // Alignment=2 is bottom-center, MarginV is from bottom edge
+  // MarginV=440 places captions in lower third but ABOVE like/comment/share buttons
   const styleMap: Record<string, string> = {
-    // TikTok style - bold white text with strong black outline (like native TikTok captions)
-    tiktok: 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
-    // TikTok Bold - larger and bolder for more impact
-    'tiktok-bold': 'Fontname=Impact,FontSize=20,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=1,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
+    // TikTok style - clean white text with black outline, positioned in safe zone
+    tiktok: 'Fontname=Arial,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
+    // TikTok Bold - slightly larger for emphasis
+    'tiktok-bold': 'Fontname=Arial Black,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
     // TikTok Outline - clean outline look
-    'tiktok-outline': 'Fontname=Arial Black,FontSize=18,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=4,Shadow=0,Alignment=2,MarginV=120,MarginL=80,MarginR=80',
-    // Instagram style - cleaner, softer look with semi-transparent background box effect
-    // Uses BorderStyle=4 for opaque box background instead of outline
-    instagram: 'Fontname=Helvetica,FontSize=16,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=140,MarginL=100,MarginR=100',
+    'tiktok-outline': 'Fontname=Arial,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=3,Shadow=0,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
+    // Instagram style - white text on subtle dark background box
+    instagram: 'Fontname=Helvetica,FontSize=12,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
     // Instagram Clean - minimal white text with subtle shadow
-    'instagram-clean': 'Fontname=Helvetica,FontSize=16,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H40000000,Outline=2,Shadow=1,Alignment=2,MarginV=140,MarginL=100,MarginR=100',
-    // Instagram Bold - bolder Instagram style
-    'instagram-bold': 'Fontname=Arial,FontSize=17,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H99000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=140,MarginL=100,MarginR=100',
-    // YouTube style - clean readable text
-    youtube: 'Fontname=Roboto,FontSize=14,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&HCC000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=60,MarginL=60,MarginR=60',
+    'instagram-clean': 'Fontname=Helvetica,FontSize=12,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H40000000,Outline=1,Shadow=1,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
+    // Instagram Bold - slightly bolder
+    'instagram-bold': 'Fontname=Arial,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
+    // YouTube style - clean readable text with background
+    youtube: 'Fontname=Roboto,FontSize=12,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&HCC000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=400,MarginL=60,MarginR=60',
   };
 
   console.log(`[Captions] Burning captions from: ${srtPath}`);
@@ -316,6 +316,7 @@ export async function burnCaptions(
 
 /**
  * Add headline text overlay to video with platform-native styling
+ * Positioned in safe zone: below top 200px, avoiding right 150px for engagement buttons
  */
 export async function addHeadline(
   inputPath: string,
@@ -324,23 +325,25 @@ export async function addHeadline(
   position: 'top' | 'center' | 'bottom' = 'top',
   captionStyle: string = 'tiktok'
 ): Promise<string> {
-  // Y positions for the text
+  // Y positions optimized for safe zones (1080x1920)
+  // Top: y=220 puts headline below username area but in upper third (above speaker's head)
+  // Center: middle of frame
+  // Bottom: y=1400 is above the bottom safe zone
   const yPositions: Record<string, string> = {
-    top: 'y=240',
+    top: 'y=220',
     center: 'y=(h-text_h)/2',
-    bottom: 'y=h-text_h-240',
+    bottom: 'y=1400',
   };
 
   // Escape special characters for FFmpeg drawtext filter
-  // Replace apostrophes and quotes, escape colons and backslashes
   let escapedHeadline = headline
     .replace(/\\/g, '\\\\')
-    .replace(/'/g, '\u2019')  // Replace apostrophe with unicode right single quote
-    .replace(/"/g, '\u201d')  // Replace double quote with unicode right double quote
+    .replace(/'/g, '\u2019')
+    .replace(/"/g, '\u201d')
     .replace(/:/g, '\\:');
 
-  // Split into two lines if longer than ~30 chars
-  if (escapedHeadline.length > 30) {
+  // Split into two lines if longer than ~25 chars for cleaner look
+  if (escapedHeadline.length > 25) {
     const words = escapedHeadline.split(' ');
     const midpoint = Math.ceil(words.length / 2);
     const line1 = words.slice(0, midpoint).join(' ');
@@ -348,21 +351,19 @@ export async function addHeadline(
     escapedHeadline = `${line1}\n${line2}`;
   }
 
-  // Platform-native headline styles
-  // TikTok: Bold white text with black outline (no box)
-  // Instagram: White text on semi-transparent rounded box
-  // YouTube: Clean white text on dark box
+  // Platform-native headline styles - clean, simple, and readable
+  // x position slightly left of center to avoid right-side engagement buttons
   let filterString: string;
 
   if (captionStyle.startsWith('instagram')) {
-    // Instagram style - white text on semi-transparent dark box, smaller and cleaner
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=36:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=16:enable='between(t,0,5)'`;
+    // Instagram style - clean white on subtle dark pill/box
+    filterString = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
   } else if (captionStyle === 'youtube') {
-    // YouTube style - clean white text on solid dark box
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=38:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.85:boxborderw=14:enable='between(t,0,5)'`;
+    // YouTube style - clean white text on dark background
+    filterString = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.7:boxborderw=10:enable='between(t,0,5)'`;
   } else {
-    // TikTok style - bold white with heavy black outline, no box
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=44:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:borderw=4:bordercolor=black:enable='between(t,0,5)'`;
+    // TikTok style - simple white text with clean black outline
+    filterString = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:borderw=2:bordercolor=black:enable='between(t,0,5)'`;
   }
 
   console.log(`[Headline] Adding headline: "${headline}" at ${position} (style: ${captionStyle})`);
@@ -765,12 +766,13 @@ export async function applyCombinedFilters(
     }
   }
 
-  // Add headline filter if specified (with platform-native styling)
+  // Add headline filter if specified (with platform-native styling, safe zone optimized)
   if (options.headline) {
+    // Y positions optimized for safe zones (1080x1920)
     const yPositions: Record<string, string> = {
-      top: 'y=240',
+      top: 'y=220',
       center: 'y=(h-text_h)/2',
-      bottom: 'y=h-text_h-240',
+      bottom: 'y=1400',
     };
 
     let escapedHeadline = options.headline
@@ -779,7 +781,8 @@ export async function applyCombinedFilters(
       .replace(/"/g, '\u201d')
       .replace(/:/g, '\\:');
 
-    if (escapedHeadline.length > 30) {
+    // Split into two lines if longer than ~25 chars
+    if (escapedHeadline.length > 25) {
       const words = escapedHeadline.split(' ');
       const midpoint = Math.ceil(words.length / 2);
       const line1 = words.slice(0, midpoint).join(' ');
@@ -790,17 +793,14 @@ export async function applyCombinedFilters(
     const position = options.headlinePosition || 'top';
     const captionStyle = options.captionStyle || 'tiktok';
 
-    // Platform-native headline styles
+    // Platform-native headline styles - clean and simple, slightly left of center
     let headlineFilter: string;
     if (captionStyle.startsWith('instagram')) {
-      // Instagram style - white text on semi-transparent dark box
-      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=36:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=16:enable='between(t,0,5)'`;
+      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
     } else if (captionStyle === 'youtube') {
-      // YouTube style - clean white text on solid dark box
-      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=38:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:box=1:boxcolor=black@0.85:boxborderw=14:enable='between(t,0,5)'`;
+      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.7:boxborderw=10:enable='between(t,0,5)'`;
     } else {
-      // TikTok style - bold white with heavy black outline, no box
-      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=44:fontcolor=white:x=(w-text_w)/2:${yPositions[position]}:borderw=4:bordercolor=black:enable='between(t,0,5)'`;
+      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:borderw=2:bordercolor=black:enable='between(t,0,5)'`;
     }
     filters.push(headlineFilter);
   }
