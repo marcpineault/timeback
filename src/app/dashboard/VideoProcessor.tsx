@@ -7,6 +7,7 @@ import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOpti
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
 import VideoPreview from '@/components/VideoPreview'
 import VideoTrimmer from '@/components/VideoTrimmer'
+import VideoSplitter from '@/components/VideoSplitter'
 
 interface VideoProcessorProps {
   userId: string
@@ -25,6 +26,7 @@ export default function VideoProcessor({
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewVideo, setPreviewVideo] = useState<QueuedVideo | null>(null)
   const [trimmerVideo, setTrimmerVideo] = useState<QueuedVideo | null>(null)
+  const [splitterVideo, setSplitterVideo] = useState<QueuedVideo | null>(null)
   const [lastConfig, setLastConfig] = useState<ProcessingConfig | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [isDownloading, setIsDownloading] = useState(false)
@@ -68,6 +70,35 @@ export default function VideoProcessor({
       prev.map(v => v.outputFilename === filename ? { ...v } : v)
     )
     setTrimmerVideo(null)
+  }
+
+  const handleOpenSplitter = (video: QueuedVideo) => {
+    setSplitterVideo(video)
+  }
+
+  const handleCloseSplitter = () => {
+    setSplitterVideo(null)
+  }
+
+  const handleSplitComplete = (parts: { partNumber: number; filename: string; downloadUrl: string }[]) => {
+    // Remove the original video and add the split parts
+    if (splitterVideo) {
+      setVideoQueue(prev => {
+        const filtered = prev.filter(v => v.file.fileId !== splitterVideo.file.fileId)
+        const newVideos: QueuedVideo[] = parts.map(part => ({
+          file: {
+            ...splitterVideo.file,
+            fileId: `${splitterVideo.file.fileId}_part${part.partNumber}`,
+            originalName: `${splitterVideo.file.originalName.replace(/\.[^/.]+$/, '')} (Part ${part.partNumber}).mp4`,
+          },
+          status: 'complete' as const,
+          downloadUrl: part.downloadUrl,
+          outputFilename: part.filename,
+        }))
+        return [...filtered, ...newVideos]
+      })
+    }
+    setSplitterVideo(null)
   }
 
   const handleRetry = async (fileId: string) => {
@@ -252,6 +283,7 @@ export default function VideoProcessor({
         onPreview={handlePreviewVideo}
         onRetry={lastConfig ? handleRetry : undefined}
         onTrim={handleOpenTrimmer}
+        onSplit={handleOpenSplitter}
       />
 
       {hasVideosToProcess && !isProcessing && (
@@ -334,19 +366,26 @@ export default function VideoProcessor({
               </div>
             </div>
             {/* Review tip */}
-            <div className="flex items-start gap-2 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-              <svg className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start gap-2 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
+              <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-sm text-purple-200">
-                <span className="font-medium">Tip:</span> Click the{' '}
-                <span className="inline-flex items-center gap-1">
-                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <p className="text-sm text-gray-300">
+                <span className="font-medium">Tip:</span> Use the{' '}
+                <span className="inline-flex items-center gap-1 text-purple-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
                   </svg>
                   trim
                 </span>{' '}
-                button on any video above to preview and trim the start or end before downloading.
+                button to cut the start or end, or the{' '}
+                <span className="inline-flex items-center gap-1 text-orange-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  split
+                </span>{' '}
+                button to divide your video into multiple parts.
               </p>
             </div>
           </div>
@@ -370,6 +409,17 @@ export default function VideoProcessor({
           filename={trimmerVideo.outputFilename}
           onClose={handleCloseTrimmer}
           onTrimComplete={handleTrimComplete}
+        />
+      )}
+
+      {/* Video Splitter Modal */}
+      {splitterVideo && splitterVideo.downloadUrl && splitterVideo.outputFilename && (
+        <VideoSplitter
+          videoUrl={splitterVideo.downloadUrl}
+          videoName={splitterVideo.file.originalName}
+          filename={splitterVideo.outputFilename}
+          onClose={handleCloseSplitter}
+          onSplitComplete={handleSplitComplete}
         />
       )}
     </div>

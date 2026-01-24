@@ -878,6 +878,76 @@ export async function trimVideo(
   });
 }
 
+export interface SplitSegment {
+  startTime: number;
+  endTime: number;
+  outputPath: string;
+}
+
+/**
+ * Split video into multiple segments at specified timestamps
+ */
+export async function splitVideo(
+  inputPath: string,
+  outputDir: string,
+  splitPoints: number[],
+  baseFilename: string
+): Promise<string[]> {
+  // Get video duration
+  const duration = await getVideoDuration(inputPath);
+
+  // Create segments from split points
+  const allPoints = [0, ...splitPoints.sort((a, b) => a - b), duration];
+  const segments: SplitSegment[] = [];
+
+  for (let i = 0; i < allPoints.length - 1; i++) {
+    const startTime = allPoints[i];
+    const endTime = allPoints[i + 1];
+    const outputPath = path.join(outputDir, `${baseFilename}_part${i + 1}.mp4`);
+    segments.push({ startTime, endTime, outputPath });
+  }
+
+  console.log(`[Split] Splitting video into ${segments.length} parts`);
+
+  const outputPaths: string[] = [];
+
+  for (const segment of segments) {
+    const segmentDuration = segment.endTime - segment.startTime;
+    console.log(`[Split] Creating part: ${segment.startTime.toFixed(2)}s - ${segment.endTime.toFixed(2)}s`);
+
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(inputPath)
+        .setStartTime(segment.startTime)
+        .setDuration(segmentDuration)
+        .outputOptions([
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '2',
+          '-max_muxing_queue_size', '512',
+          '-bufsize', '1M',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+          '-avoid_negative_ts', 'make_zero',
+        ])
+        .output(segment.outputPath)
+        .on('end', () => {
+          console.log(`[Split] Part created: ${segment.outputPath}`);
+          outputPaths.push(segment.outputPath);
+          resolve();
+        })
+        .on('error', (err) => {
+          console.error(`[Split] Error:`, err);
+          reject(err);
+        })
+        .run();
+    });
+  }
+
+  console.log(`[Split] Complete! Created ${outputPaths.length} parts`);
+  return outputPaths;
+}
+
 /**
  * Full processing pipeline: remove silence, add captions, add headline
  */

@@ -17,9 +17,10 @@ interface VideoQueueProps {
   onPreview?: (video: QueuedVideo) => void;
   onRetry?: (fileId: string) => void;
   onTrim?: (video: QueuedVideo) => void;
+  onSplit?: (video: QueuedVideo) => void;
 }
 
-export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRetry, onTrim }: VideoQueueProps) {
+export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRetry, onTrim, onSplit }: VideoQueueProps) {
   if (videos.length === 0) return null;
 
   const completedCount = videos.filter(v => v.status === 'complete').length;
@@ -137,10 +138,23 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
                 <button
                   onClick={() => onTrim(video)}
                   className="p-1.5 sm:p-2 text-purple-400 hover:text-purple-300 transition-colors"
-                  title="Review & Trim"
+                  title="Trim"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Split button for completed */}
+              {video.status === 'complete' && video.downloadUrl && onSplit && (
+                <button
+                  onClick={() => onSplit(video)}
+                  className="p-1.5 sm:p-2 text-orange-400 hover:text-orange-300 transition-colors"
+                  title="Split"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
                 </button>
               )}
