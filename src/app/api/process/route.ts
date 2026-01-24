@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       silenceDuration: silenceDuration ?? 0.4,
       headline: headline || undefined,
       headlinePosition: headlinePosition || 'top',
-      captionStyle: captionStyle || 'default',
+      captionStyle: captionStyle || 'tiktok',
     };
 
     // Step 1: Remove silence FIRST
@@ -311,6 +311,7 @@ export async function POST(request: NextRequest) {
         colorGrade: colorGrade as ColorGradePreset,
         headline: finalHeadline,
         headlinePosition: options.headlinePosition,
+        captionStyle,
       });
       // Clean up intermediate file
       if (currentInput !== inputPath) {
@@ -320,7 +321,7 @@ export async function POST(request: NextRequest) {
     } else if (finalHeadline) {
       console.log(`[Process] Step 4: Adding headline: "${finalHeadline}"`);
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
-      await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition);
+      await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
         await fs.unlink(currentInput).catch(() => {})

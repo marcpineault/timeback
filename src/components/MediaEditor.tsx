@@ -614,9 +614,9 @@ export default function MediaEditor({
     <div
       ref={modalRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/90 backdrop-blur-sm overflow-y-auto py-8"
     >
-      <div className="relative w-full max-w-5xl mx-4">
+      <div className="relative w-full max-w-5xl mx-4 my-auto">
         {/* Close button */}
         <button
           onClick={onClose}

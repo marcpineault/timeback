@@ -154,13 +154,55 @@ function formatAssTime(seconds: number): string {
 }
 
 /**
+ * Split text into short chunks for TikTok-style captions
+ * Max ~6 words per caption (fits nicely on 2 lines of ~3 words each)
+ */
+function splitIntoShortCaptions(
+  text: string,
+  start: number,
+  end: number,
+  maxWords: number = 6
+): TranscriptionSegment[] {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) {
+    return [{ text, start, end }];
+  }
+
+  const chunks: TranscriptionSegment[] = [];
+  const totalDuration = end - start;
+  const wordDuration = totalDuration / words.length;
+
+  for (let i = 0; i < words.length; i += maxWords) {
+    const chunkWords = words.slice(i, i + maxWords);
+    const chunkStart = start + (i * wordDuration);
+    const chunkEnd = Math.min(end, start + ((i + chunkWords.length) * wordDuration));
+
+    chunks.push({
+      text: chunkWords.join(' '),
+      start: chunkStart,
+      end: chunkEnd,
+    });
+  }
+
+  return chunks;
+}
+
+/**
  * Generate SRT file from transcription segments
+ * Splits long segments into shorter TikTok-style captions (max 2 lines)
  */
 export function generateSrt(
   segments: TranscriptionSegment[],
   outputPath: string
 ): string {
-  const srtContent = segments
+  // Split long segments into shorter captions
+  const shortSegments: TranscriptionSegment[] = [];
+  for (const segment of segments) {
+    const split = splitIntoShortCaptions(segment.text, segment.start, segment.end);
+    shortSegments.push(...split);
+  }
+
+  const srtContent = shortSegments
     .map((segment, index) => {
       return `${index + 1}\n${formatSrtTime(segment.start)} --> ${formatSrtTime(
         segment.end
@@ -173,11 +215,12 @@ export function generateSrt(
 }
 
 /**
- * Group words into lines for display (max ~5 words per line for readability)
+ * Group words into lines for display
+ * TikTok style: max 3-4 words per line for easy reading
  */
 function groupWordsIntoLines(
   words: TranscriptionWord[],
-  maxWordsPerLine: number = 5
+  maxWordsPerLine: number = 3
 ): Array<{ words: TranscriptionWord[]; start: number; end: number }> {
   const lines: Array<{ words: TranscriptionWord[]; start: number; end: number }> = [];
   let currentLine: TranscriptionWord[] = [];
