@@ -838,6 +838,47 @@ export async function applyAutoZoom(
 }
 
 /**
+ * Trim video to specified start and end times
+ */
+export async function trimVideo(
+  inputPath: string,
+  outputPath: string,
+  startTime: number,
+  endTime: number
+): Promise<string> {
+  const duration = endTime - startTime;
+
+  console.log(`[Trim] Trimming video from ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s (duration: ${duration.toFixed(2)}s)`);
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .setStartTime(startTime)
+      .setDuration(duration)
+      .outputOptions([
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '2',
+        '-max_muxing_queue_size', '512',
+        '-bufsize', '1M',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-avoid_negative_ts', 'make_zero',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Trim] Complete!`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[Trim] Error:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
+/**
  * Full processing pipeline: remove silence, add captions, add headline
  */
 export async function processVideo(

@@ -16,9 +16,10 @@ interface VideoQueueProps {
   onClear: () => void;
   onPreview?: (video: QueuedVideo) => void;
   onRetry?: (fileId: string) => void;
+  onTrim?: (video: QueuedVideo) => void;
 }
 
-export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRetry }: VideoQueueProps) {
+export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRetry, onTrim }: VideoQueueProps) {
   if (videos.length === 0) return null;
 
   const completedCount = videos.filter(v => v.status === 'complete').length;
@@ -118,6 +119,32 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
 
             {/* Actions */}
             <div className="flex items-center gap-1 sm:gap-3">
+              {/* Preview button for completed videos */}
+              {video.status === 'complete' && video.downloadUrl && onPreview && (
+                <button
+                  onClick={() => onPreview(video)}
+                  className="p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors"
+                  title="Preview"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Trim button for completed */}
+              {video.status === 'complete' && video.downloadUrl && onTrim && (
+                <button
+                  onClick={() => onTrim(video)}
+                  className="p-1.5 sm:p-2 text-purple-400 hover:text-purple-300 transition-colors"
+                  title="Review & Trim"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                  </svg>
+                </button>
+              )}
+
               {/* Download button for completed */}
               {video.status === 'complete' && video.downloadUrl && (
                 <a
