@@ -1,12 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-
-interface GoogleDriveTokens {
-  access_token: string;
-  refresh_token?: string;
-  expiry_date?: number;
-}
+import { useState, useEffect } from 'react';
 
 interface FileToUpload {
   name: string;
@@ -20,7 +14,7 @@ interface GoogleDriveUploadProps {
 
 export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUploadProps) {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
-  const [tokens, setTokens] = useState<GoogleDriveTokens | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
@@ -32,45 +26,24 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
   const [error, setError] = useState<string | null>(null);
   const [createFolder, setCreateFolder] = useState(true);
 
-  // Check if Google Drive is configured
+  // Check connection status on mount and after OAuth callback
   useEffect(() => {
-    fetch('/api/google-drive/config')
-      .then((res) => res.json())
-      .then((data) => setIsConfigured(data.configured))
-      .catch(() => setIsConfigured(false));
+    checkConnectionStatus();
   }, []);
 
-  // Load tokens from localStorage on mount
-  useEffect(() => {
-    const storedTokens = localStorage.getItem('gdrive_tokens');
-    if (storedTokens) {
-      try {
-        const parsed = JSON.parse(storedTokens);
-        setTokens(parsed);
-      } catch {
-        localStorage.removeItem('gdrive_tokens');
-      }
-    }
-  }, []);
-
-  // Handle OAuth callback tokens from URL
+  // Handle OAuth callback messages
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tokenData = params.get('gdrive_tokens');
+    const connected = params.get('gdrive_connected');
     const gdriveError = params.get('gdrive_error');
 
-    if (tokenData) {
-      try {
-        const decoded = JSON.parse(atob(tokenData));
-        setTokens(decoded);
-        localStorage.setItem('gdrive_tokens', JSON.stringify(decoded));
-        // Clean URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('gdrive_tokens');
-        window.history.replaceState({}, '', url.pathname);
-      } catch (e) {
-        console.error('Failed to parse tokens:', e);
-      }
+    if (connected === 'true') {
+      // Refresh status after successful OAuth
+      checkConnectionStatus();
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('gdrive_connected');
+      window.history.replaceState({}, '', url.pathname);
     }
 
     if (gdriveError) {
@@ -80,6 +53,23 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
       window.history.replaceState({}, '', url.pathname);
     }
   }, []);
+
+  const checkConnectionStatus = async () => {
+    try {
+      const response = await fetch('/api/google-drive/status');
+      const data = await response.json();
+
+      setIsConfigured(data.configured);
+      setIsConnected(data.connected);
+
+      if (data.needsReconnect) {
+        setError('Google Drive session expired. Please reconnect.');
+      }
+    } catch {
+      setIsConfigured(false);
+      setIsConnected(false);
+    }
+  };
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -102,49 +92,16 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
     }
   };
 
-  const handleDisconnect = () => {
-    setTokens(null);
-    localStorage.removeItem('gdrive_tokens');
-    setUploadResult(null);
-    setError(null);
-  };
-
-  const refreshTokenIfNeeded = useCallback(async (): Promise<string | null> => {
-    if (!tokens) return null;
-
-    // Check if token is expired or will expire in next 5 minutes
-    if (tokens.expiry_date && tokens.expiry_date < Date.now() + 5 * 60 * 1000) {
-      if (tokens.refresh_token) {
-        try {
-          const response = await fetch('/api/google-drive/refresh', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken: tokens.refresh_token }),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const newTokens = {
-              ...tokens,
-              access_token: data.accessToken,
-              expiry_date: data.expiryDate,
-            };
-            setTokens(newTokens);
-            localStorage.setItem('gdrive_tokens', JSON.stringify(newTokens));
-            return data.accessToken;
-          }
-        } catch (e) {
-          console.error('Token refresh failed:', e);
-        }
-      }
-      // Token expired and refresh failed
-      handleDisconnect();
-      setError('Google Drive session expired. Please reconnect.');
-      return null;
+  const handleDisconnect = async () => {
+    try {
+      await fetch('/api/google-drive/disconnect', { method: 'POST' });
+      setIsConnected(false);
+      setUploadResult(null);
+      setError(null);
+    } catch {
+      setError('Failed to disconnect');
     }
-
-    return tokens.access_token;
-  }, [tokens]);
+  };
 
   const handleUpload = async () => {
     setIsUploading(true);
@@ -153,12 +110,6 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
     setUploadProgress('Preparing upload...');
 
     try {
-      const accessToken = await refreshTokenIfNeeded();
-      if (!accessToken) {
-        setIsUploading(false);
-        return;
-      }
-
       const filesToUpload = files.map((file) => ({
         name: file.name,
         mimeType: 'video/mp4',
@@ -171,8 +122,6 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accessToken,
-          refreshToken: tokens?.refresh_token,
           files: filesToUpload,
           createFolder,
           folderName: createFolder
@@ -194,7 +143,7 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
         onComplete?.(result.totalUploaded, result.totalFailed);
       } else {
         if (response.status === 401) {
-          handleDisconnect();
+          setIsConnected(false);
           setError('Google Drive authorization expired. Please reconnect.');
         } else {
           setError(result.error || 'Upload failed');
@@ -226,14 +175,14 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
             <path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.07 0 3.76-.02 3.76-.047 0-.02-1.692-3.001-3.76-6.574l-3.76-6.62h-3.79zm-4.76 0l-3.76 6.62c-2.068 3.573-3.76 6.554-3.76 6.574 0 .027 1.69.047 3.76.047h3.76l3.76-6.574c2.068-3.619 3.764-6.6 3.774-6.62.01-.027-1.66-.047-3.743-.047h-3.79zm4.76 13.194l-1.88 3.287-1.88 3.287h7.52l-1.88-3.287-1.88-3.287z" />
           </svg>
           <span className="text-gray-300 text-sm font-medium">Google Drive</span>
-          {tokens && (
+          {isConnected && (
             <span className="text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
               Connected
             </span>
           )}
         </div>
 
-        {!tokens ? (
+        {!isConnected ? (
           <button
             onClick={handleConnect}
             disabled={isConnecting}

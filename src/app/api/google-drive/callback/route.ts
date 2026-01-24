@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getTokensFromCode } from '@/lib/googleDrive';
+import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
+  const { userId: clerkId } = await auth();
 
-  if (!userId) {
+  if (!clerkId) {
     return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
   if (state) {
     try {
       const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
-      if (stateData.userId !== userId) {
+      if (stateData.userId !== clerkId) {
         return NextResponse.redirect(
           new URL('/dashboard?gdrive_error=invalid_state', request.url)
         );
@@ -44,17 +45,22 @@ export async function GET(request: NextRequest) {
   try {
     const tokens = await getTokensFromCode(code);
 
-    // Encode tokens for URL (will be stored in localStorage on client)
-    const tokenData = Buffer.from(
-      JSON.stringify({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expiry_date: tokens.expiry_date,
-      })
-    ).toString('base64');
+    // Save tokens to database
+    await prisma.user.update({
+      where: { clerkId },
+      data: {
+        googleDriveAccessToken: tokens.access_token,
+        googleDriveRefreshToken: tokens.refresh_token,
+        googleDriveTokenExpiry: tokens.expiry_date
+          ? new Date(tokens.expiry_date)
+          : null,
+      },
+    });
+
+    console.log(`[Google Drive] Tokens saved for user ${clerkId}`);
 
     return NextResponse.redirect(
-      new URL(`/dashboard?gdrive_tokens=${tokenData}`, request.url)
+      new URL('/dashboard?gdrive_connected=true', request.url)
     );
   } catch (error) {
     console.error('[Google Drive] Token exchange error:', error);

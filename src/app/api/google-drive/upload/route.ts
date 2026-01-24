@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { prisma } from '@/lib/db';
 import {
   bulkUploadToDrive,
   createDriveFolder,
@@ -8,41 +9,75 @@ import {
 } from '@/lib/googleDrive';
 
 interface UploadRequest {
-  accessToken: string;
-  refreshToken?: string;
   files: BulkUploadFile[];
   createFolder?: boolean;
   folderName?: string;
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
+  const { userId: clerkId } = await auth();
 
-  if (!userId) {
+  if (!clerkId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const body: UploadRequest = await request.json();
-    const { files, createFolder, folderName, refreshToken } = body;
-    let { accessToken } = body;
+    const { files, createFolder, folderName } = body;
 
-    if (!accessToken || !files || files.length === 0) {
+    if (!files || files.length === 0) {
       return NextResponse.json(
-        { error: 'Missing required fields: accessToken and files' },
+        { error: 'Missing required field: files' },
         { status: 400 }
       );
     }
 
-    // Try to refresh token if we have a refresh token
-    if (refreshToken) {
+    // Get tokens from database
+    const user = await prisma.user.findUnique({
+      where: { clerkId },
+      select: {
+        googleDriveAccessToken: true,
+        googleDriveRefreshToken: true,
+        googleDriveTokenExpiry: true,
+      },
+    });
+
+    if (!user || !user.googleDriveAccessToken) {
+      return NextResponse.json(
+        { error: 'Google Drive not connected. Please connect first.' },
+        { status: 401 }
+      );
+    }
+
+    let accessToken = user.googleDriveAccessToken;
+
+    // Check if token needs refresh
+    const tokenExpiry = user.googleDriveTokenExpiry;
+    const isExpired = tokenExpiry && tokenExpiry < new Date(Date.now() + 5 * 60 * 1000);
+
+    if (isExpired && user.googleDriveRefreshToken) {
       try {
-        const newCredentials = await refreshAccessToken(refreshToken);
+        const newCredentials = await refreshAccessToken(user.googleDriveRefreshToken);
         if (newCredentials.access_token) {
           accessToken = newCredentials.access_token;
+
+          // Update tokens in database
+          await prisma.user.update({
+            where: { clerkId },
+            data: {
+              googleDriveAccessToken: newCredentials.access_token,
+              googleDriveTokenExpiry: newCredentials.expiry_date
+                ? new Date(newCredentials.expiry_date)
+                : null,
+            },
+          });
         }
       } catch (refreshError) {
-        console.log('[Google Drive] Token refresh failed, using existing token:', refreshError);
+        console.error('[Google Drive] Token refresh failed:', refreshError);
+        return NextResponse.json(
+          { error: 'Google Drive authorization expired. Please reconnect.' },
+          { status: 401 }
+        );
       }
     }
 
@@ -59,7 +94,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[Google Drive] Starting bulk upload of ${files.length} files for user ${userId}`);
+    console.log(`[Google Drive] Starting bulk upload of ${files.length} files for user ${clerkId}`);
 
     // Perform bulk upload with concurrency limit of 3
     const result = await bulkUploadToDrive(accessToken, files, folderId, 3);
