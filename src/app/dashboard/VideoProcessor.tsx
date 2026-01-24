@@ -20,7 +20,7 @@ interface VideoProcessorProps {
 export default function VideoProcessor({
   userId,
   canProcess,
-  videosRemaining,
+  videosRemaining: initialVideosRemaining,
   hasWatermark,
 }: VideoProcessorProps) {
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
@@ -31,6 +31,7 @@ export default function VideoProcessor({
   const [lastConfig, setLastConfig] = useState<ProcessingConfig | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [isDownloading, setIsDownloading] = useState(false)
+  const [videosRemaining, setVideosRemaining] = useState(initialVideosRemaining)
 
   const handleUploadComplete = (files: UploadedFile[]) => {
     const maxFiles = Math.min(files.length, videosRemaining)
@@ -190,8 +191,8 @@ export default function VideoProcessor({
 
     setIsProcessing(false)
     setProcessingStatus('')
-    // Refresh the page to update usage
-    window.location.reload()
+    // Update videos remaining count locally (no page reload to preserve queue)
+    setVideosRemaining(prev => Math.max(0, prev - pendingVideos.length))
   }
 
   const handleDownloadAll = () => {
@@ -247,8 +248,10 @@ export default function VideoProcessor({
   const hasVideosToProcess = pendingVideos.length > 0
   const hasCompletedVideos = completedVideos.length > 0
   const allComplete = videoQueue.length > 0 && pendingVideos.length === 0 && !isProcessing
+  const canUploadMore = videosRemaining > 0
 
-  if (!canProcess) {
+  // Only show limit reached if no videos in queue at all
+  if (!canProcess && videoQueue.length === 0) {
     return (
       <div className="bg-gray-800 rounded-xl p-8 text-center">
         <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -270,7 +273,7 @@ export default function VideoProcessor({
 
   return (
     <div className="space-y-6">
-      {!isProcessing && (
+      {!isProcessing && canUploadMore && (
         <VideoUploader
           onUploadComplete={handleUploadComplete}
           disabled={isProcessing}
