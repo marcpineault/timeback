@@ -22,9 +22,9 @@ model User {
   videos          Video[]
 
   // Google Drive integration
-  googleAccessToken  String?
-  googleRefreshToken String?
-  googleTokenExpiry  DateTime?
+  googleDriveAccessToken  String?
+  googleDriveRefreshToken String?
+  googleDriveTokenExpiry  DateTime?
   googleDriveConnected Boolean @default(false)
 }
 

@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import JSZip from 'jszip'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
 import VideoPreview from '@/components/VideoPreview'
+import VideoTrimmer from '@/components/VideoTrimmer'
+import VideoSplitter from '@/components/VideoSplitter'
+import GoogleDriveUpload from '@/components/GoogleDriveUpload'
 
 interface VideoProcessorProps {
   userId: string
@@ -23,61 +26,11 @@ export default function VideoProcessor({
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewVideo, setPreviewVideo] = useState<QueuedVideo | null>(null)
+  const [trimmerVideo, setTrimmerVideo] = useState<QueuedVideo | null>(null)
+  const [splitterVideo, setSplitterVideo] = useState<QueuedVideo | null>(null)
   const [lastConfig, setLastConfig] = useState<ProcessingConfig | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [isDownloading, setIsDownloading] = useState(false)
-  const [isDriveConnected, setIsDriveConnected] = useState(false)
-  const [isUploadingToDrive, setIsUploadingToDrive] = useState(false)
-  const [driveUploadStatus, setDriveUploadStatus] = useState<string>('')
-
-  // Check Google Drive connection status
-  useEffect(() => {
-    const checkDriveStatus = async () => {
-      try {
-        const response = await fetch('/api/drive/status')
-        if (response.ok) {
-          const data = await response.json()
-          setIsDriveConnected(data.connected)
-        }
-      } catch (error) {
-        console.error('Failed to check Drive status:', error)
-      }
-    }
-    checkDriveStatus()
-  }, [])
-
-  // Handle uploading all videos to Google Drive
-  const handleUploadToDrive = async () => {
-    const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
-    if (completedVideos.length === 0) return
-
-    setIsUploadingToDrive(true)
-    setDriveUploadStatus(`Uploading 0/${completedVideos.length}...`)
-
-    try {
-      for (let i = 0; i < completedVideos.length; i++) {
-        const video = completedVideos[i]
-        setDriveUploadStatus(`Uploading ${i + 1}/${completedVideos.length}...`)
-
-        await fetch('/api/drive/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoUrl: video.downloadUrl,
-            fileName: video.outputFilename || `${video.file.originalName.replace(/\.[^/.]+$/, '')}_processed.mp4`,
-          }),
-        })
-      }
-      setDriveUploadStatus('Uploaded to Drive!')
-      setTimeout(() => setDriveUploadStatus(''), 3000)
-    } catch (error) {
-      console.error('Failed to upload to Drive:', error)
-      setDriveUploadStatus('Upload failed')
-      setTimeout(() => setDriveUploadStatus(''), 3000)
-    } finally {
-      setIsUploadingToDrive(false)
-    }
-  }
 
   const handleUploadComplete = (files: UploadedFile[]) => {
     const maxFiles = Math.min(files.length, videosRemaining)
@@ -102,6 +55,51 @@ export default function VideoProcessor({
 
   const handleClosePreview = () => {
     setPreviewVideo(null)
+  }
+
+  const handleOpenTrimmer = (video: QueuedVideo) => {
+    setTrimmerVideo(video)
+  }
+
+  const handleCloseTrimmer = () => {
+    setTrimmerVideo(null)
+  }
+
+  const handleTrimComplete = (filename: string) => {
+    // Update the video in queue if needed (URL might change)
+    setVideoQueue(prev =>
+      prev.map(v => v.outputFilename === filename ? { ...v } : v)
+    )
+    setTrimmerVideo(null)
+  }
+
+  const handleOpenSplitter = (video: QueuedVideo) => {
+    setSplitterVideo(video)
+  }
+
+  const handleCloseSplitter = () => {
+    setSplitterVideo(null)
+  }
+
+  const handleSplitComplete = (parts: { partNumber: number; filename: string; downloadUrl: string }[]) => {
+    // Remove the original video and add the split parts
+    if (splitterVideo) {
+      setVideoQueue(prev => {
+        const filtered = prev.filter(v => v.file.fileId !== splitterVideo.file.fileId)
+        const newVideos: QueuedVideo[] = parts.map(part => ({
+          file: {
+            ...splitterVideo.file,
+            fileId: `${splitterVideo.file.fileId}_part${part.partNumber}`,
+            originalName: `${splitterVideo.file.originalName.replace(/\.[^/.]+$/, '')} (Part ${part.partNumber}).mp4`,
+          },
+          status: 'complete' as const,
+          downloadUrl: part.downloadUrl,
+          outputFilename: part.filename,
+        }))
+        return [...filtered, ...newVideos]
+      })
+    }
+    setSplitterVideo(null)
   }
 
   const handleRetry = async (fileId: string) => {
@@ -285,6 +283,8 @@ export default function VideoProcessor({
         onClear={handleClearQueue}
         onPreview={handlePreviewVideo}
         onRetry={lastConfig ? handleRetry : undefined}
+        onTrim={handleOpenTrimmer}
+        onSplit={handleOpenSplitter}
       />
 
       {hasVideosToProcess && !isProcessing && (
@@ -313,105 +313,122 @@ export default function VideoProcessor({
 
       {allComplete && hasCompletedVideos && (
         <div className="bg-gray-800 rounded-xl p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-white font-medium text-sm sm:text-base">All videos processed!</p>
+                  <p className="text-gray-400 text-xs sm:text-sm">{completedVideos.length} video(s) ready for review</p>
+                </div>
               </div>
-              <div>
-                <p className="text-white font-medium text-sm sm:text-base">All videos processed!</p>
-                <p className="text-gray-400 text-xs sm:text-sm">
-                  {completedVideos.length} video(s) ready
-                  {driveUploadStatus && <span className="ml-2 text-green-400">{driveUploadStatus}</span>}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 sm:gap-3">
-              <button
-                onClick={handleDownloadAsZip}
-                disabled={isDownloading}
-                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                {isDownloading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span className="hidden sm:inline">Creating ZIP...</span>
-                    <span className="sm:hidden">ZIP...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span className="hidden sm:inline">Download as ZIP</span>
-                    <span className="sm:hidden">ZIP</span>
-                  </>
-                )}
-              </button>
-              {/* Google Drive Upload Button */}
-              {isDriveConnected ? (
+              <div className="flex flex-wrap gap-2 sm:gap-3">
                 <button
-                  onClick={handleUploadToDrive}
-                  disabled={isUploadingToDrive}
-                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  onClick={handleDownloadAsZip}
+                  disabled={isDownloading}
+                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  {isUploadingToDrive ? (
+                  {isDownloading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span className="hidden sm:inline">{driveUploadStatus}</span>
-                      <span className="sm:hidden">Uploading...</span>
+                      <span className="hidden sm:inline">Creating ZIP...</span>
+                      <span className="sm:hidden">ZIP...</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2L2 19.5h20L12 2zm0 4l6.5 11.5h-13L12 6z"/>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
-                      <span className="hidden sm:inline">Save to Drive</span>
-                      <span className="sm:hidden">Drive</span>
+                      <span className="hidden sm:inline">Download as ZIP</span>
+                      <span className="sm:hidden">ZIP</span>
                     </>
                   )}
                 </button>
-              ) : (
-                <a
-                  href="/api/auth/google"
-                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                <button
+                  onClick={handleDownloadAll}
+                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2L2 19.5h20L12 2zm0 4l6.5 11.5h-13L12 6z"/>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  <span className="hidden sm:inline">Connect Drive</span>
-                  <span className="sm:hidden">Drive</span>
-                </a>
-              )}
-              <button
-                onClick={handleDownloadAll}
-                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span className="hidden sm:inline">Individual</span>
-                <span className="sm:hidden">Each</span>
-              </button>
-              <button
-                onClick={handleClearQueue}
-                className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Process More
-              </button>
+                  <span className="hidden sm:inline">Individual</span>
+                  <span className="sm:hidden">Each</span>
+                </button>
+                <button
+                  onClick={handleClearQueue}
+                  className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Process More
+                </button>
+              </div>
+            </div>
+            {/* Review tip */}
+            <div className="flex items-start gap-2 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
+              <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-gray-300">
+                <span className="font-medium">Tip:</span> Use the{' '}
+                <span className="inline-flex items-center gap-1 text-purple-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                  </svg>
+                  trim
+                </span>{' '}
+                button to cut the start or end, or the{' '}
+                <span className="inline-flex items-center gap-1 text-orange-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  split
+                </span>{' '}
+                button to divide your video into multiple parts.
+              </p>
             </div>
           </div>
+
+          {/* Google Drive Bulk Upload */}
+          <GoogleDriveUpload
+            files={completedVideos.map((v) => ({
+              name: v.outputFilename || `video_${v.file.fileId}.mp4`,
+              url: v.downloadUrl!,
+            }))}
+          />
         </div>
       )}
 
       {/* Video Preview Modal */}
-      {previewVideo && previewVideo.file.previewUrl && (
+      {previewVideo && (previewVideo.file.previewUrl || previewVideo.downloadUrl) && (
         <VideoPreview
-          videoUrl={previewVideo.file.previewUrl}
+          videoUrl={previewVideo.downloadUrl || previewVideo.file.previewUrl!}
           videoName={previewVideo.file.originalName}
           onClose={handleClosePreview}
+        />
+      )}
+
+      {/* Video Trimmer Modal */}
+      {trimmerVideo && trimmerVideo.downloadUrl && trimmerVideo.outputFilename && (
+        <VideoTrimmer
+          videoUrl={trimmerVideo.downloadUrl}
+          videoName={trimmerVideo.file.originalName}
+          filename={trimmerVideo.outputFilename}
+          onClose={handleCloseTrimmer}
+          onTrimComplete={handleTrimComplete}
+        />
+      )}
+
+      {/* Video Splitter Modal */}
+      {splitterVideo && splitterVideo.downloadUrl && splitterVideo.outputFilename && (
+        <VideoSplitter
+          videoUrl={splitterVideo.downloadUrl}
+          videoName={splitterVideo.file.originalName}
+          filename={splitterVideo.outputFilename}
+          onClose={handleCloseSplitter}
+          onSplitComplete={handleSplitComplete}
         />
       )}
     </div>

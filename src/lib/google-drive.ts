@@ -40,21 +40,21 @@ export async function getDriveClient(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      googleAccessToken: true,
-      googleRefreshToken: true,
-      googleTokenExpiry: true,
+      googleDriveAccessToken: true,
+      googleDriveRefreshToken: true,
+      googleDriveTokenExpiry: true,
     },
   });
 
-  if (!user?.googleAccessToken || !user?.googleRefreshToken) {
+  if (!user?.googleDriveAccessToken || !user?.googleDriveRefreshToken) {
     throw new Error('Google Drive not connected');
   }
 
   const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
-    access_token: user.googleAccessToken,
-    refresh_token: user.googleRefreshToken,
-    expiry_date: user.googleTokenExpiry?.getTime(),
+    access_token: user.googleDriveAccessToken,
+    refresh_token: user.googleDriveRefreshToken,
+    expiry_date: user.googleDriveTokenExpiry?.getTime(),
   });
 
   // Handle token refresh
@@ -62,8 +62,8 @@ export async function getDriveClient(userId: string) {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        googleAccessToken: tokens.access_token || user.googleAccessToken,
-        googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+        googleDriveAccessToken: tokens.access_token || user.googleDriveAccessToken,
+        googleDriveTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
       },
     });
   });
@@ -130,9 +130,9 @@ export async function saveGoogleTokens(
   await prisma.user.update({
     where: { id: userId },
     data: {
-      googleAccessToken: tokens.access_token || undefined,
-      googleRefreshToken: tokens.refresh_token || undefined,
-      googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+      googleDriveAccessToken: tokens.access_token || undefined,
+      googleDriveRefreshToken: tokens.refresh_token || undefined,
+      googleDriveTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
       googleDriveConnected: true,
     },
   });
@@ -143,9 +143,9 @@ export async function disconnectGoogleDrive(userId: string) {
   await prisma.user.update({
     where: { id: userId },
     data: {
-      googleAccessToken: null,
-      googleRefreshToken: null,
-      googleTokenExpiry: null,
+      googleDriveAccessToken: null,
+      googleDriveRefreshToken: null,
+      googleDriveTokenExpiry: null,
       googleDriveConnected: false,
     },
   });
