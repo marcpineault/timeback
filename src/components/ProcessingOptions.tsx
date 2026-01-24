@@ -13,6 +13,8 @@ interface ProcessingOptionsProps {
   videoCount?: number;
 }
 
+export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
+
 export interface ProcessingConfig {
   generateCaptions: boolean;
   headline: string;
@@ -26,7 +28,93 @@ export interface ProcessingConfig {
   colorGrade: 'none' | 'warm' | 'cool' | 'cinematic' | 'vibrant' | 'vintage';
   autoZoom: boolean;
   autoZoomIntensity: number;
+  aspectRatio: AspectRatioPreset;
 }
+
+// Processing presets for quick configuration
+type PresetKey = 'custom' | 'tiktok' | 'youtube-shorts' | 'instagram-reels' | 'youtube' | 'instagram-feed';
+
+interface Preset {
+  name: string;
+  icon: string;
+  config: Partial<ProcessingConfig>;
+}
+
+const PRESETS: Record<PresetKey, Preset> = {
+  custom: {
+    name: 'Custom',
+    icon: '⚙️',
+    config: {},
+  },
+  'tiktok': {
+    name: 'TikTok',
+    icon: '📱',
+    config: {
+      aspectRatio: '9:16',
+      generateCaptions: true,
+      captionStyle: 'animated',
+      normalizeAudio: true,
+      silenceThreshold: -30,
+      silenceDuration: 0.3,
+    },
+  },
+  'youtube-shorts': {
+    name: 'YouTube Shorts',
+    icon: '🎬',
+    config: {
+      aspectRatio: '9:16',
+      generateCaptions: true,
+      captionStyle: 'bold',
+      normalizeAudio: true,
+      silenceThreshold: -30,
+      silenceDuration: 0.4,
+    },
+  },
+  'instagram-reels': {
+    name: 'Instagram Reels',
+    icon: '📸',
+    config: {
+      aspectRatio: '9:16',
+      generateCaptions: true,
+      captionStyle: 'default',
+      normalizeAudio: true,
+      colorGrade: 'vibrant',
+      silenceThreshold: -30,
+      silenceDuration: 0.3,
+    },
+  },
+  'youtube': {
+    name: 'YouTube',
+    icon: '▶️',
+    config: {
+      aspectRatio: '16:9',
+      generateCaptions: true,
+      captionStyle: 'default',
+      normalizeAudio: true,
+      silenceThreshold: -35,
+      silenceDuration: 0.5,
+    },
+  },
+  'instagram-feed': {
+    name: 'Instagram Feed',
+    icon: '🖼️',
+    config: {
+      aspectRatio: '1:1',
+      generateCaptions: true,
+      captionStyle: 'bold',
+      normalizeAudio: true,
+      colorGrade: 'warm',
+    },
+  },
+};
+
+const ASPECT_RATIO_OPTIONS: { value: AspectRatioPreset; label: string; platforms: string }[] = [
+  { value: 'original', label: 'Original', platforms: 'Keep as-is' },
+  { value: '9:16', label: '9:16 Vertical', platforms: 'TikTok, Reels, Shorts' },
+  { value: '16:9', label: '16:9 Landscape', platforms: 'YouTube, Twitter' },
+  { value: '1:1', label: '1:1 Square', platforms: 'Instagram Feed' },
+  { value: '4:5', label: '4:5 Portrait', platforms: 'Instagram, Facebook' },
+];
 
 export default function ProcessingOptions({
   onProcess,
@@ -47,11 +135,21 @@ export default function ProcessingOptions({
     colorGrade: 'none',
     autoZoom: false,
     autoZoomIntensity: 5,
+    aspectRatio: 'original',
   });
+  const [activePreset, setActivePreset] = useState<PresetKey>('custom');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onProcess(config);
+  };
+
+  const applyPreset = (presetKey: PresetKey) => {
+    setActivePreset(presetKey);
+    if (presetKey !== 'custom') {
+      const preset = PRESETS[presetKey];
+      setConfig(prev => ({ ...prev, ...preset.config }));
+    }
   };
 
   if (!uploadedFile) return null;
@@ -70,6 +168,58 @@ export default function ProcessingOptions({
             {videoCount > 1 ? 'Same settings will apply to all videos' : 'Ready to process'}
           </p>
         </div>
+      </div>
+
+      {/* Quick Presets */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-medium text-white">Quick Presets</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {(Object.entries(PRESETS) as [PresetKey, Preset][]).map(([key, preset]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => applyPreset(key)}
+              className={`p-3 rounded-lg text-center transition-all ${
+                activePreset === key
+                  ? 'bg-blue-500 text-white ring-2 ring-blue-400'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <span className="text-xl block mb-1">{preset.icon}</span>
+              <span className="text-xs font-medium">{preset.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Aspect Ratio */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-medium text-white">Aspect Ratio</h3>
+        <div className="grid grid-cols-5 gap-2">
+          {ASPECT_RATIO_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                setConfig({ ...config, aspectRatio: option.value });
+                setActivePreset('custom');
+              }}
+              className={`p-2 rounded-lg text-center transition-all ${
+                config.aspectRatio === option.value
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <div className="text-xs font-medium">{option.label.split(' ')[0]}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5 truncate">{option.platforms.split(',')[0]}</div>
+            </button>
+          ))}
+        </div>
+        {config.aspectRatio !== 'original' && (
+          <p className="text-xs text-gray-500">
+            Video will be converted with blurred background padding (no cropping)
+          </p>
+        )}
       </div>
 
       {/* Silence Removal Settings */}

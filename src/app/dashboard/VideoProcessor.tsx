@@ -254,7 +254,7 @@ export default function VideoProcessor({
             </div>
           </div>
           <div className="mt-4 text-xs text-gray-500">
-            <p>Steps: Silence removal → Audio normalization → Transcription → Captions → Color grading → Final output</p>
+            <p>Steps: Silence removal → Audio normalization → Transcription → Captions → Color grading → Aspect ratio → Final output</p>
           </div>
         </div>
       )}
