@@ -41,6 +41,10 @@ model Video {
   errorMessage    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  // Indexes for query performance
+  @@index([userId])           // Speed up user's video listing
+  @@index([processedUrl])     // Speed up download ownership check
 }
 
 enum Plan {

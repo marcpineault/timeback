@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
-import fs from 'fs';
-import { createWriteStream } from 'fs';
+import fs from 'fs/promises';
+import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset } from '@/lib/ffmpeg';
+import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
 import { transcribeVideo, extractHook, identifyBRollMoments } from '@/lib/whisper';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
     const processedDir = process.env.PROCESSED_DIR || path.join(process.cwd(), 'processed');
 
     // Ensure directories exist
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    fs.mkdirSync(processedDir, { recursive: true });
+    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.mkdir(processedDir, { recursive: true });
 
     let inputPath = path.join(uploadsDir, filename);
     let downloadedFromS3 = false;
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify file exists (either local or downloaded from S3)
-    if (!fs.existsSync(inputPath)) {
+    if (!existsSync(inputPath)) {
       return NextResponse.json(
         { error: 'Video file not found' },
         { status: 404 }
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
     await removeSilence(currentInput, stepOutput, options);
     // Clean up intermediate file
     if (currentInput !== inputPath) {
-      try { fs.unlinkSync(currentInput); } catch {}
+      await fs.unlink(currentInput).catch(() => {})
     }
     currentInput = stepOutput;
 
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       await normalizeAudio(currentInput, stepOutput);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
-        try { fs.unlinkSync(currentInput); } catch {}
+        await fs.unlink(currentInput).catch(() => {})
       }
       currentInput = stepOutput;
     }
@@ -182,25 +182,29 @@ export async function POST(request: NextRequest) {
         await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
         // Clean up intermediate file
         if (currentInput !== inputPath) {
-          try { fs.unlinkSync(currentInput); } catch {}
+          await fs.unlink(currentInput).catch(() => {})
         }
         currentInput = stepOutput;
       }
 
       // Clean up SRT file
-      if (srtPath && fs.existsSync(srtPath)) {
-        fs.unlinkSync(srtPath);
+      if (srtPath && existsSync(srtPath)) {
+        await fs.unlink(srtPath).catch(() => {});
       }
     }
 
     // Step 3.2: Apply color grading if selected
-    if (colorGrade && colorGrade !== 'none') {
+    // Use combined filter if both colorGrade and headline are enabled (saves one FFmpeg pass)
+    const finalHeadline = useHookAsHeadline ? hookText : options.headline;
+    const canUseCombinedFilters = (colorGrade && colorGrade !== 'none') && finalHeadline && !autoZoom;
+
+    if (colorGrade && colorGrade !== 'none' && !canUseCombinedFilters) {
       console.log(`[Process] Step 3.2: Applying ${colorGrade} color grade...`);
       stepOutput = path.join(processedDir, `${baseName}_graded.mp4`);
       await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
-        try { fs.unlinkSync(currentInput); } catch {}
+        await fs.unlink(currentInput).catch(() => {})
       }
       currentInput = stepOutput;
     }
@@ -228,7 +232,7 @@ export async function POST(request: NextRequest) {
 
         // Clean up intermediate file
         if (currentInput !== inputPath) {
-          try { fs.unlinkSync(currentInput); } catch {}
+          await fs.unlink(currentInput).catch(() => {})
         }
         currentInput = stepOutput;
       }
@@ -242,20 +246,33 @@ export async function POST(request: NextRequest) {
       await applyAutoZoom(currentInput, stepOutput, transcriptionSegments, zoomIntensity);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
-        try { fs.unlinkSync(currentInput); } catch {}
+        await fs.unlink(currentInput).catch(() => {})
       }
       currentInput = stepOutput;
     }
 
     // Step 4: Add headline if provided or using hook
-    const finalHeadline = useHookAsHeadline ? hookText : options.headline;
-    if (finalHeadline) {
+    // If combined filters are used, apply color grade + headline in one pass
+    if (canUseCombinedFilters) {
+      console.log(`[Process] Step 4: Applying combined filters (color grade + headline) in single pass...`);
+      stepOutput = path.join(processedDir, `${baseName}_combined.mp4`);
+      await applyCombinedFilters(currentInput, stepOutput, {
+        colorGrade: colorGrade as ColorGradePreset,
+        headline: finalHeadline,
+        headlinePosition: options.headlinePosition,
+      });
+      // Clean up intermediate file
+      if (currentInput !== inputPath) {
+        await fs.unlink(currentInput).catch(() => {})
+      }
+      currentInput = stepOutput;
+    } else if (finalHeadline) {
       console.log(`[Process] Step 4: Adding headline: "${finalHeadline}"`);
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
       await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
-        try { fs.unlinkSync(currentInput); } catch {}
+        await fs.unlink(currentInput).catch(() => {})
       }
       currentInput = stepOutput;
     }
@@ -267,7 +284,7 @@ export async function POST(request: NextRequest) {
       await convertAspectRatio(currentInput, stepOutput, aspectRatio as AspectRatioPreset);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
-        try { fs.unlinkSync(currentInput); } catch {}
+        await fs.unlink(currentInput).catch(() => {})
       }
       currentInput = stepOutput;
     }
@@ -275,7 +292,7 @@ export async function POST(request: NextRequest) {
     // Rename to final output
     const finalOutput = path.join(processedDir, `${baseName}_processed.mp4`);
     if (currentInput !== finalOutput) {
-      fs.renameSync(currentInput, finalOutput);
+      await fs.rename(currentInput, finalOutput);
     }
 
     const outputFilename = path.basename(finalOutput);
@@ -297,8 +314,8 @@ export async function POST(request: NextRequest) {
 
     // Clean up the original uploaded file
     try {
-      if (fs.existsSync(inputPath)) {
-        fs.unlinkSync(inputPath);
+      if (existsSync(inputPath)) {
+        await fs.unlink(inputPath);
         console.log('[Process] Cleaned up local upload file');
       }
     } catch (cleanupErr) {

@@ -1,8 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
+import { createReadStream } from 'fs';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
+
+// Cleanup registry: Map of filepath -> scheduled deletion timestamp
+// Uses a single interval instead of unbounded setTimeouts to prevent memory leaks
+const cleanupRegistry = new Map<string, number>();
+let cleanupIntervalStarted = false;
+const CLEANUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
+const CLEANUP_CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
+
+function scheduleFileCleanup(filepath: string) {
+  cleanupRegistry.set(filepath, Date.now() + CLEANUP_DELAY_MS);
+
+  // Start the cleanup interval if not already running
+  if (!cleanupIntervalStarted) {
+    cleanupIntervalStarted = true;
+    setInterval(() => {
+      const now = Date.now();
+      const toDelete: string[] = [];
+
+      for (const [path, scheduledTime] of cleanupRegistry.entries()) {
+        if (now >= scheduledTime) {
+          toDelete.push(path);
+        }
+      }
+
+      for (const path of toDelete) {
+        cleanupRegistry.delete(path);
+        try {
+          if (fs.existsSync(path)) {
+            fs.unlinkSync(path);
+            console.log(`[Download] Cleaned up processed file: ${path}`);
+          }
+        } catch (err) {
+          console.error(`[Download] Failed to clean up file: ${path}`, err);
+        }
+      }
+    }, CLEANUP_CHECK_INTERVAL_MS);
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -30,10 +69,12 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Use exact match on processedUrl for O(1) indexed lookup instead of O(n) scan
+    const expectedUrl = `/api/download/${sanitizedFilename}`;
     const video = await prisma.video.findFirst({
       where: {
         userId: user.id,
-        processedUrl: { endsWith: sanitizedFilename },
+        processedUrl: expectedUrl,
       },
     });
 
@@ -64,22 +105,20 @@ export async function GET(
       );
     }
 
-    const fileBuffer = fs.readFileSync(filepath);
+    // Schedule file cleanup using the registry (avoids memory leaks from unbounded timers)
+    scheduleFileCleanup(filepath);
 
-    // Schedule file deletion after serving (give time for download to complete)
-    // Delete after 5 minutes to allow for retries
-    setTimeout(() => {
-      try {
-        if (fs.existsSync(filepath)) {
-          fs.unlinkSync(filepath);
-          console.log(`[Download] Cleaned up processed file: ${sanitizedFilename}`);
-        }
-      } catch (err) {
-        console.error(`[Download] Failed to clean up file: ${sanitizedFilename}`, err);
-      }
-    }, 5 * 60 * 1000); // 5 minutes
+    // Stream the file instead of loading entirely into memory (better for large videos)
+    const stream = createReadStream(filepath);
+    const webStream = new ReadableStream({
+      start(controller) {
+        stream.on('data', (chunk) => controller.enqueue(chunk));
+        stream.on('end', () => controller.close());
+        stream.on('error', (err) => controller.error(err));
+      },
+    });
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(webStream, {
       headers: {
         'Content-Type': 'video/mp4',
         'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,

@@ -281,7 +281,54 @@ export async function initChunkedUpload(
   }
 }
 
-// Upload a single chunk (max 5MB each to stay well under Railway's limit)
+// Upload a single chunk using binary FormData (no base64 overhead)
+export async function uploadChunkBinary(
+  formData: FormData
+): Promise<ChunkUploadResult> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const uploadId = formData.get('uploadId') as string;
+    const chunkIndex = parseInt(formData.get('chunkIndex') as string, 10);
+    const totalChunks = parseInt(formData.get('totalChunks') as string, 10);
+    const chunkFile = formData.get('chunk') as File;
+
+    if (!uploadId || !chunkFile || isNaN(chunkIndex) || isNaN(totalChunks)) {
+      return { success: false, error: 'Invalid chunk data' };
+    }
+
+    const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
+    const tempDir = path.join(uploadsDir, 'temp');
+    const chunkPath = path.join(tempDir, `${uploadId}.part`);
+    const metaPath = path.join(tempDir, `${uploadId}.meta`);
+
+    if (!existsSync(metaPath)) {
+      return { success: false, error: 'Upload session not found' };
+    }
+
+    // Read binary data directly from File (no base64 conversion)
+    const arrayBuffer = await chunkFile.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    await appendFile(chunkPath, buffer);
+
+    // Update metadata
+    const meta = JSON.parse(await (await import('fs/promises')).readFile(metaPath, 'utf-8'));
+    meta.receivedBytes += buffer.length;
+    await writeFile(metaPath, JSON.stringify(meta));
+
+    const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+
+    return { success: true, progress };
+  } catch (error) {
+    console.error('Chunk upload error:', error);
+    return { success: false, error: 'Failed to upload chunk' };
+  }
+}
+
+// Legacy base64 chunk upload (kept for backwards compatibility)
 export async function uploadChunk(
   uploadId: string,
   chunkIndex: number,
