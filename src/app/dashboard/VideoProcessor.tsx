@@ -245,66 +245,69 @@ export default function VideoProcessor({
       )}
 
       {isProcessing && (
-        <div className="bg-gray-800 rounded-xl p-6">
-          <div className="flex items-center gap-4">
-            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-            <div>
-              <p className="text-white font-medium">Processing videos...</p>
-              <p className="text-gray-400 text-sm">{processingStatus || 'This may take a few minutes'}</p>
+        <div className="bg-gray-800 rounded-xl p-4 sm:p-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="animate-spin h-6 w-6 sm:h-8 sm:w-8 border-4 border-blue-500 border-t-transparent rounded-full flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-white font-medium text-sm sm:text-base">Processing videos...</p>
+              <p className="text-gray-400 text-xs sm:text-sm truncate">{processingStatus || 'This may take a few minutes'}</p>
             </div>
           </div>
-          <div className="mt-4 text-xs text-gray-500">
-            <p>Steps: Silence removal → Audio normalization → Transcription → Captions → Color grading → Aspect ratio → Final output</p>
+          <div className="mt-3 sm:mt-4 text-xs text-gray-500 overflow-x-auto">
+            <p className="whitespace-nowrap sm:whitespace-normal">Silence removal → Audio → Transcription → Captions → Final output</p>
           </div>
         </div>
       )}
 
       {allComplete && hasCompletedVideos && (
-        <div className="bg-gray-800 rounded-xl p-6">
-          <div className="flex items-center justify-between">
+        <div className="bg-gray-800 rounded-xl p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <div>
-                <p className="text-white font-medium">All videos processed!</p>
-                <p className="text-gray-400 text-sm">{completedVideos.length} video(s) ready</p>
+                <p className="text-white font-medium text-sm sm:text-base">All videos processed!</p>
+                <p className="text-gray-400 text-xs sm:text-sm">{completedVideos.length} video(s) ready</p>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <button
                 onClick={handleDownloadAsZip}
                 disabled={isDownloading}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
                 {isDownloading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Creating ZIP...
+                    <span className="hidden sm:inline">Creating ZIP...</span>
+                    <span className="sm:hidden">ZIP...</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download as ZIP
+                    <span className="hidden sm:inline">Download as ZIP</span>
+                    <span className="sm:hidden">ZIP</span>
                   </>
                 )}
               </button>
               <button
                 onClick={handleDownloadAll}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Individual
+                <span className="hidden sm:inline">Individual</span>
+                <span className="sm:hidden">Each</span>
               </button>
               <button
                 onClick={handleClearQueue}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+                className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Process More
               </button>
