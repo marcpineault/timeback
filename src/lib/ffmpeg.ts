@@ -596,6 +596,113 @@ export async function normalizeAudio(
  */
 export type ColorGradePreset = 'none' | 'warm' | 'cool' | 'cinematic' | 'vibrant' | 'vintage';
 
+/**
+ * Aspect ratio presets for different platforms
+ */
+export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
+
+export interface AspectRatioInfo {
+  name: string;
+  ratio: number; // width/height
+  platforms: string[];
+}
+
+export const ASPECT_RATIOS: Record<AspectRatioPreset, AspectRatioInfo> = {
+  'original': { name: 'Original', ratio: 0, platforms: ['Keep original'] },
+  '9:16': { name: 'Vertical', ratio: 9/16, platforms: ['TikTok', 'Reels', 'Shorts'] },
+  '16:9': { name: 'Landscape', ratio: 16/9, platforms: ['YouTube', 'Twitter'] },
+  '1:1': { name: 'Square', ratio: 1, platforms: ['Instagram Feed'] },
+  '4:5': { name: 'Portrait', ratio: 4/5, platforms: ['Instagram', 'Facebook'] },
+};
+
+/**
+ * Convert video to a different aspect ratio using blur background padding
+ * This preserves all content by adding blurred edges instead of cropping
+ */
+export async function convertAspectRatio(
+  inputPath: string,
+  outputPath: string,
+  targetRatio: AspectRatioPreset
+): Promise<string> {
+  if (targetRatio === 'original') {
+    console.log(`[Aspect] Keeping original aspect ratio`);
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
+  // Get video dimensions
+  const videoInfo = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return reject(err);
+      const video = metadata.streams.find(s => s.codec_type === 'video');
+      resolve({
+        width: video?.width || 1920,
+        height: video?.height || 1080,
+      });
+    });
+  });
+
+  const currentRatio = videoInfo.width / videoInfo.height;
+  const targetRatioValue = ASPECT_RATIOS[targetRatio].ratio;
+
+  console.log(`[Aspect] Converting from ${currentRatio.toFixed(2)} to ${targetRatioValue.toFixed(2)} (${targetRatio})`);
+
+  // Calculate target dimensions (keep the larger dimension, adjust the other)
+  let targetWidth: number;
+  let targetHeight: number;
+
+  if (targetRatioValue > currentRatio) {
+    // Target is wider - keep height, add width
+    targetHeight = videoInfo.height;
+    targetWidth = Math.round(targetHeight * targetRatioValue);
+  } else {
+    // Target is taller - keep width, add height
+    targetWidth = videoInfo.width;
+    targetHeight = Math.round(targetWidth / targetRatioValue);
+  }
+
+  // Ensure dimensions are even (required for most codecs)
+  targetWidth = targetWidth + (targetWidth % 2);
+  targetHeight = targetHeight + (targetHeight % 2);
+
+  console.log(`[Aspect] Original: ${videoInfo.width}x${videoInfo.height}, Target: ${targetWidth}x${targetHeight}`);
+
+  // Build filter for blur background padding
+  // This creates a blurred, scaled-up version of the video as background
+  // Then overlays the original centered on top
+  const filterComplex = [
+    // Create blurred background - scale to fill, apply heavy blur
+    `[0:v]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=increase,crop=${targetWidth}:${targetHeight},boxblur=20:5[bg]`,
+    // Scale original to fit within target (with letterbox/pillarbox)
+    `[0:v]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease[fg]`,
+    // Overlay centered original on blurred background
+    `[bg][fg]overlay=(W-w)/2:(H-h)/2[out]`
+  ].join(';');
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .complexFilter(filterComplex, 'out')
+      .outputOptions([
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '1',
+        '-max_muxing_queue_size', '512',
+        '-c:a', 'copy',
+      ])
+      .output(outputPath)
+      .on('end', () => {
+        console.log(`[Aspect] Conversion complete!`);
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error(`[Aspect] Conversion error:`, err);
+        reject(err);
+      })
+      .run();
+  });
+}
+
 const colorGradeFilters: Record<ColorGradePreset, string> = {
   none: '',
   warm: 'colorbalance=rs=0.15:gs=0.05:bs=-0.1:rm=0.1:gm=0.05:bm=-0.05',

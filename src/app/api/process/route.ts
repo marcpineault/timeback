@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset } from '@/lib/ffmpeg';
+import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset } from '@/lib/ffmpeg';
 import { transcribeVideo, extractHook, identifyBRollMoments } from '@/lib/whisper';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       colorGrade,
       autoZoom,
       autoZoomIntensity,
+      aspectRatio,
       userId: bodyUserId,
     } = body;
 
@@ -252,6 +253,18 @@ export async function POST(request: NextRequest) {
       console.log(`[Process] Step 4: Adding headline: "${finalHeadline}"`);
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
       await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition);
+      // Clean up intermediate file
+      if (currentInput !== inputPath) {
+        try { fs.unlinkSync(currentInput); } catch {}
+      }
+      currentInput = stepOutput;
+    }
+
+    // Step 5: Convert aspect ratio if specified
+    if (aspectRatio && aspectRatio !== 'original') {
+      console.log(`[Process] Step 5: Converting aspect ratio to ${aspectRatio}...`);
+      stepOutput = path.join(processedDir, `${baseName}_aspect.mp4`);
+      await convertAspectRatio(currentInput, stepOutput, aspectRatio as AspectRatioPreset);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
         try { fs.unlinkSync(currentInput); } catch {}
