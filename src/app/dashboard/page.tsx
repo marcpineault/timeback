@@ -3,6 +3,7 @@ import { UserButton } from '@clerk/nextjs'
 import { getOrCreateUser, getUserUsage } from '@/lib/user'
 import { PLANS } from '@/lib/plans'
 import VideoProcessor from './VideoProcessor'
+import DriveSettings from '@/components/DriveSettings'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -50,7 +51,8 @@ export default async function DashboardPage() {
       <header className="border-b border-gray-800">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-white">TimeBack</Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <DriveSettings />
             <Link
               href="/pricing"
               className="text-gray-400 hover:text-white transition-colors text-sm"

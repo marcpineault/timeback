@@ -25,6 +25,7 @@ model User {
   googleDriveAccessToken  String?
   googleDriveRefreshToken String?
   googleDriveTokenExpiry  DateTime?
+  googleDriveConnected Boolean @default(false)
 }
 
 model Video {
