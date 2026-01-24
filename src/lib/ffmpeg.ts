@@ -201,7 +201,7 @@ export async function removeSilence(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '1',
+        '-threads', '2',
         '-max_muxing_queue_size', '512',  // Limit muxing buffer
         '-bufsize', '1M',  // Limit rate control buffer
         '-c:a', 'aac',
@@ -280,7 +280,7 @@ export async function burnCaptions(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '1',
+        '-threads', '2',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -354,7 +354,7 @@ export async function addHeadline(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '1',
+        '-threads', '2',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -405,7 +405,7 @@ export async function imageToVideoClip(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '1',
+        '-threads', '2',
         '-t', String(duration),
         '-pix_fmt', 'yuv420p',
         '-r', '30',
@@ -538,7 +538,7 @@ export async function insertBRollCutaways(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '1',
+        '-threads', '2',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -686,7 +686,7 @@ export async function convertAspectRatio(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '1',
+        '-threads', '2',
         '-max_muxing_queue_size', '512',
         '-c:a', 'copy',
       ])
@@ -736,7 +736,7 @@ export async function applyColorGrade(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
-        '-threads', '1',
+        '-threads', '2',
         '-c:a', 'copy',
       ])
       .output(outputPath)
