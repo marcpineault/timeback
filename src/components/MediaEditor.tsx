@@ -64,6 +64,10 @@ export default function MediaEditor({
   const [dragging, setDragging] = useState<'start' | 'end' | 'playhead' | null>(null);
   const [draggingSplitIndex, setDraggingSplitIndex] = useState<number | null>(null);
 
+  // Remove section drag state (for click-drag to select sections)
+  const [removeDragStart, setRemoveDragStart] = useState<number | null>(null);
+  const [removeDragCurrent, setRemoveDragCurrent] = useState<number | null>(null);
+
   // Preview state
   const [previewingSegment, setPreviewingSegment] = useState<{ start: number; end: number } | null>(null);
 
@@ -137,6 +141,66 @@ export default function MediaEditor({
     setRemoveMarkStart(null);
   }, []);
 
+  // Quick cut - instantly mark a section around current position
+  const handleQuickCut = useCallback((centerTime: number, halfDuration: number = 0.5) => {
+    const cutStart = Math.max(0, centerTime - halfDuration);
+    const cutEnd = Math.min(duration, centerTime + halfDuration);
+
+    if (cutEnd - cutStart < 0.1) return; // Too short
+
+    const newSection: RemoveSection = { start: cutStart, end: cutEnd };
+
+    setSectionsToRemove(prev => {
+      const updated = [...prev, newSection].sort((a, b) => a.start - b.start);
+
+      // Merge overlapping sections
+      const merged: RemoveSection[] = [];
+      for (const section of updated) {
+        if (merged.length === 0) {
+          merged.push({ ...section });
+        } else {
+          const last = merged[merged.length - 1];
+          if (section.start <= last.end + 0.1) {
+            last.end = Math.max(last.end, section.end);
+          } else {
+            merged.push({ ...section });
+          }
+        }
+      }
+      return merged;
+    });
+  }, [duration]);
+
+  // Add remove section from drag
+  const handleAddRemoveSection = useCallback((startTime: number, endTime: number) => {
+    if (endTime - startTime < 0.1) return; // Too short
+
+    const newSection: RemoveSection = {
+      start: Math.min(startTime, endTime),
+      end: Math.max(startTime, endTime),
+    };
+
+    setSectionsToRemove(prev => {
+      const updated = [...prev, newSection].sort((a, b) => a.start - b.start);
+
+      // Merge overlapping sections
+      const merged: RemoveSection[] = [];
+      for (const section of updated) {
+        if (merged.length === 0) {
+          merged.push({ ...section });
+        } else {
+          const last = merged[merged.length - 1];
+          if (section.start <= last.end + 0.1) {
+            last.end = Math.max(last.end, section.end);
+          } else {
+            merged.push({ ...section });
+          }
+        }
+      }
+      return merged;
+    });
+  }, []);
+
   // Keyboard and escape handling
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -191,6 +255,18 @@ export default function MediaEditor({
         e.preventDefault();
         handleMarkRemoveEnd();
       }
+
+      // X for quick cut - instantly mark 1 second around current position (when in remove or all mode)
+      if (e.code === 'KeyX' && (mode === 'remove' || mode === 'all') && e.target === document.body) {
+        e.preventDefault();
+        handleQuickCut(currentTime, 0.5);
+      }
+
+      // Delete/Backspace to remove last cut section
+      if ((e.code === 'Delete' || e.code === 'Backspace') && (mode === 'remove' || mode === 'all') && e.target === document.body) {
+        e.preventDefault();
+        setSectionsToRemove(prev => prev.slice(0, -1));
+      }
     };
 
     document.addEventListener('keydown', handleEscape);
@@ -202,7 +278,7 @@ export default function MediaEditor({
       document.removeEventListener('keydown', handleKeyboard);
       document.body.style.overflow = 'unset';
     };
-  }, [onClose, isProcessing, mode, currentTime, handlePlayPause, seekRelative, handleAddSplitPoint, handleMarkRemoveStart, handleMarkRemoveEnd]);
+  }, [onClose, isProcessing, mode, currentTime, handlePlayPause, seekRelative, handleAddSplitPoint, handleMarkRemoveStart, handleMarkRemoveEnd, handleQuickCut]);
 
   // Video event handlers
   useEffect(() => {
@@ -259,12 +335,27 @@ export default function MediaEditor({
   }, [duration]);
 
   const handleTimelineClick = (e: React.MouseEvent) => {
-    if (dragging || draggingSplitIndex !== null) return;
+    if (dragging || draggingSplitIndex !== null || removeDragStart !== null) return;
     const time = getPositionFromEvent(e);
     if (videoRef.current) {
       videoRef.current.currentTime = time;
       setCurrentTime(time);
     }
+  };
+
+  // Handle timeline mouse down for remove section drag
+  const handleTimelineMouseDownForRemove = (e: React.MouseEvent) => {
+    if (mode !== 'remove' && mode !== 'all') return;
+    if (dragging || draggingSplitIndex !== null) return;
+
+    // Check if clicking on an existing control (not empty timeline area)
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-timeline-control]')) return;
+
+    const time = getPositionFromEvent(e);
+    setRemoveDragStart(time);
+    setRemoveDragCurrent(time);
+    e.preventDefault();
   };
 
   const handleTimelineMouseDown = (e: React.MouseEvent, type: 'start' | 'end' | 'playhead') => {
@@ -310,14 +401,29 @@ export default function MediaEditor({
           return newPoints.sort((a, b) => a - b);
         });
       }
+
+      // Handle remove section drag
+      if (removeDragStart !== null) {
+        setRemoveDragCurrent(time);
+      }
     };
 
     const handleMouseUp = () => {
+      // Finish remove section drag
+      if (removeDragStart !== null && removeDragCurrent !== null) {
+        const dragDistance = Math.abs(removeDragCurrent - removeDragStart);
+        if (dragDistance >= 0.1) {
+          handleAddRemoveSection(removeDragStart, removeDragCurrent);
+        }
+        setRemoveDragStart(null);
+        setRemoveDragCurrent(null);
+      }
+
       setDragging(null);
       setDraggingSplitIndex(null);
     };
 
-    if (dragging || draggingSplitIndex !== null) {
+    if (dragging || draggingSplitIndex !== null || removeDragStart !== null) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }
@@ -326,7 +432,7 @@ export default function MediaEditor({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, draggingSplitIndex, startTime, endTime, duration, getPositionFromEvent]);
+  }, [dragging, draggingSplitIndex, startTime, endTime, duration, getPositionFromEvent, removeDragStart, removeDragCurrent, handleAddRemoveSection]);
 
   const handleRemoveSplitPoint = (index: number) => {
     setSplitPoints(prev => prev.filter((_, i) => i !== index));
@@ -650,35 +756,47 @@ export default function MediaEditor({
                 )}
                 {showRemoveControls && (
                   <div className="flex items-center gap-2">
+                    {/* Quick Cut button */}
+                    <button
+                      onClick={() => handleQuickCut(currentTime, 0.5)}
+                      className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors flex items-center gap-1"
+                      title="Mark 1 second cut around playhead (X)"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                      </svg>
+                      Quick Cut (X)
+                    </button>
+
+                    <span className="text-gray-500 text-xs">or drag on timeline</span>
+
                     {removeMarkStart === null ? (
                       <button
                         onClick={handleMarkRemoveStart}
-                        className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors flex items-center gap-1"
+                        className="px-2 py-1 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors flex items-center gap-1"
+                        title="Manual: Press R to start, E to end"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
-                        </svg>
-                        Mark Cut Start (R)
+                        R/E Manual
                       </button>
                     ) : (
-                      <button
-                        onClick={handleMarkRemoveEnd}
-                        disabled={currentTime <= removeMarkStart}
-                        className="px-2 py-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors flex items-center gap-1 animate-pulse"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Mark Cut End (E)
-                      </button>
-                    )}
-                    {removeMarkStart !== null && (
-                      <button
-                        onClick={() => setRemoveMarkStart(null)}
-                        className="px-2 py-1 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      <>
+                        <button
+                          onClick={handleMarkRemoveEnd}
+                          disabled={currentTime <= removeMarkStart}
+                          className="px-2 py-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors flex items-center gap-1 animate-pulse"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          End Cut (E)
+                        </button>
+                        <button
+                          onClick={() => setRemoveMarkStart(null)}
+                          className="px-2 py-1 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -692,6 +810,7 @@ export default function MediaEditor({
               ref={timelineRef}
               className="relative h-16 bg-gray-700 rounded-lg cursor-pointer overflow-hidden"
               onClick={handleTimelineClick}
+              onMouseDown={handleTimelineMouseDownForRemove}
             >
               {/* Trim region overlay (dimmed areas outside selection) */}
               {showTrimControls && trimEnabled && (
@@ -711,6 +830,7 @@ export default function MediaEditor({
               {showRemoveControls && sectionsToRemove.map((section, index) => (
                 <div
                   key={`remove-${index}`}
+                  data-timeline-control="true"
                   className="absolute top-0 bottom-0 bg-red-500/40 border-x-2 border-red-500 z-[7] group cursor-pointer"
                   style={{
                     left: `${(section.start / duration) * 100}%`,
@@ -752,11 +872,28 @@ export default function MediaEditor({
                   className="absolute top-0 bottom-0 bg-red-500/20 border-l-2 border-red-500 border-dashed z-[7] animate-pulse"
                   style={{
                     left: `${(removeMarkStart / duration) * 100}%`,
-                    width: `${((currentTime - removeMarkStart) / duration) * 100}%`,
+                    width: `${(Math.max(0, (currentTime - removeMarkStart)) / duration) * 100}%`,
                   }}
                 >
                   <div className="absolute top-1 left-1 text-[10px] text-red-400 font-medium">
                     Press E to end cut
+                  </div>
+                </div>
+              )}
+
+              {/* Drag selection preview for remove sections */}
+              {showRemoveControls && removeDragStart !== null && removeDragCurrent !== null && (
+                <div
+                  className="absolute top-0 bottom-0 bg-red-500/30 border-2 border-red-500 border-dashed z-[8]"
+                  style={{
+                    left: `${(Math.min(removeDragStart, removeDragCurrent) / duration) * 100}%`,
+                    width: `${(Math.abs(removeDragCurrent - removeDragStart) / duration) * 100}%`,
+                  }}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded">
+                      {formatTime(Math.abs(removeDragCurrent - removeDragStart))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -793,6 +930,7 @@ export default function MediaEditor({
                 <>
                   {/* Start handle */}
                   <div
+                    data-timeline-control="true"
                     className={`absolute top-0 bottom-0 w-4 cursor-ew-resize flex items-center justify-center z-10 transition-colors ${
                       trimEnabled ? 'bg-blue-500 hover:bg-blue-400' : 'bg-gray-500 hover:bg-gray-400'
                     }`}
@@ -804,6 +942,7 @@ export default function MediaEditor({
 
                   {/* End handle */}
                   <div
+                    data-timeline-control="true"
                     className={`absolute top-0 bottom-0 w-4 cursor-ew-resize flex items-center justify-center z-10 transition-colors ${
                       trimEnabled ? 'bg-blue-500 hover:bg-blue-400' : 'bg-gray-500 hover:bg-gray-400'
                     }`}
@@ -819,6 +958,7 @@ export default function MediaEditor({
               {showSplitControls && splitPoints.map((point, index) => (
                 <div
                   key={index}
+                  data-timeline-control="true"
                   className="absolute top-0 bottom-0 w-4 cursor-ew-resize z-[15] group"
                   style={{ left: `calc(${(point / duration) * 100}% - 8px)` }}
                   onMouseDown={(e) => handleSplitPointMouseDown(e, index)}
@@ -852,6 +992,7 @@ export default function MediaEditor({
 
               {/* Playhead */}
               <div
+                data-timeline-control="true"
                 className="absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-20"
                 style={{ left: `calc(${currentPercent}% - 2px)` }}
                 onMouseDown={(e) => handleTimelineMouseDown(e, 'playhead')}
@@ -866,7 +1007,13 @@ export default function MediaEditor({
               <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">←</kbd><kbd className="px-1 py-0.5 bg-gray-700 rounded">→</kbd> Seek</span>
               {showTrimControls && <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">I</kbd> In <kbd className="px-1 py-0.5 bg-gray-700 rounded">O</kbd> Out</span>}
               {showSplitControls && <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">S</kbd> Split</span>}
-              {showRemoveControls && <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">R</kbd> Start Cut <kbd className="px-1 py-0.5 bg-gray-700 rounded">E</kbd> End Cut</span>}
+              {showRemoveControls && (
+                <>
+                  <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">X</kbd> Quick Cut</span>
+                  <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">Del</kbd> Undo Last</span>
+                  <span className="text-gray-600">Drag on timeline to select</span>
+                </>
+              )}
             </div>
           </div>
 
