@@ -326,10 +326,17 @@ export default function MediaEditor({
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms}`;
   };
 
-  const getPositionFromEvent = useCallback((e: React.MouseEvent | MouseEvent) => {
+  const getPositionFromEvent = useCallback((e: React.MouseEvent | MouseEvent | React.TouchEvent | TouchEvent) => {
     if (!timelineRef.current) return 0;
     const rect = timelineRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    // Handle both mouse and touch events
+    let clientX: number;
+    if ('touches' in e) {
+      clientX = e.touches[0]?.clientX ?? e.changedTouches[0]?.clientX ?? rect.left;
+    } else {
+      clientX = e.clientX;
+    }
+    const x = clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
     return percentage * duration;
   }, [duration]);
@@ -343,8 +350,8 @@ export default function MediaEditor({
     }
   };
 
-  // Handle timeline mouse down for remove section drag
-  const handleTimelineMouseDownForRemove = (e: React.MouseEvent) => {
+  // Handle timeline mouse/touch down for remove section drag
+  const handleTimelinePointerDownForRemove = (e: React.MouseEvent | React.TouchEvent) => {
     if (mode !== 'remove' && mode !== 'all') return;
     if (dragging || draggingSplitIndex !== null) return;
 
@@ -358,21 +365,21 @@ export default function MediaEditor({
     e.preventDefault();
   };
 
-  const handleTimelineMouseDown = (e: React.MouseEvent, type: 'start' | 'end' | 'playhead') => {
+  const handleTimelinePointerDown = (e: React.MouseEvent | React.TouchEvent, type: 'start' | 'end' | 'playhead') => {
     e.preventDefault();
     e.stopPropagation();
     setDragging(type);
   };
 
-  const handleSplitPointMouseDown = (e: React.MouseEvent, index: number) => {
+  const handleSplitPointPointerDown = (e: React.MouseEvent | React.TouchEvent, index: number) => {
     e.preventDefault();
     e.stopPropagation();
     setDraggingSplitIndex(index);
   };
 
-  // Handle drag movements
+  // Handle drag movements (mouse and touch)
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
       const time = getPositionFromEvent(e);
 
       if (dragging) {
@@ -408,7 +415,7 @@ export default function MediaEditor({
       }
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       // Finish remove section drag
       if (removeDragStart !== null && removeDragCurrent !== null) {
         const dragDistance = Math.abs(removeDragCurrent - removeDragStart);
@@ -424,13 +431,21 @@ export default function MediaEditor({
     };
 
     if (dragging || draggingSplitIndex !== null || removeDragStart !== null) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      // Mouse events
+      window.addEventListener('mousemove', handlePointerMove);
+      window.addEventListener('mouseup', handlePointerUp);
+      // Touch events
+      window.addEventListener('touchmove', handlePointerMove, { passive: false });
+      window.addEventListener('touchend', handlePointerUp);
+      window.addEventListener('touchcancel', handlePointerUp);
     }
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+      window.removeEventListener('touchcancel', handlePointerUp);
     };
   }, [dragging, draggingSplitIndex, startTime, endTime, duration, getPositionFromEvent, removeDragStart, removeDragCurrent, handleAddRemoveSection]);
 
@@ -644,17 +659,17 @@ export default function MediaEditor({
               <div className="flex items-center gap-1 bg-gray-700/50 rounded-lg p-1">
                 <button
                   onClick={() => setMode('all')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  className={`px-2 sm:px-3 py-2 sm:py-1.5 text-xs font-medium rounded-md transition-colors active:scale-95 ${
                     mode === 'all'
                       ? 'bg-indigo-500 text-white'
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  All Tools
+                  All
                 </button>
                 <button
                   onClick={() => setMode('trim')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  className={`px-2 sm:px-3 py-2 sm:py-1.5 text-xs font-medium rounded-md transition-colors active:scale-95 ${
                     mode === 'trim'
                       ? 'bg-blue-500 text-white'
                       : 'text-gray-400 hover:text-white'
@@ -664,7 +679,7 @@ export default function MediaEditor({
                 </button>
                 <button
                   onClick={() => setMode('split')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  className={`px-2 sm:px-3 py-2 sm:py-1.5 text-xs font-medium rounded-md transition-colors active:scale-95 ${
                     mode === 'split'
                       ? 'bg-orange-500 text-white'
                       : 'text-gray-400 hover:text-white'
@@ -674,13 +689,13 @@ export default function MediaEditor({
                 </button>
                 <button
                   onClick={() => setMode('remove')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  className={`px-2 sm:px-3 py-2 sm:py-1.5 text-xs font-medium rounded-md transition-colors active:scale-95 ${
                     mode === 'remove'
                       ? 'bg-red-500 text-white'
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  Remove
+                  Cut
                 </button>
               </div>
             </div>
@@ -808,9 +823,10 @@ export default function MediaEditor({
             {/* Timeline */}
             <div
               ref={timelineRef}
-              className="relative h-16 bg-gray-700 rounded-lg cursor-pointer overflow-hidden"
+              className="relative h-16 bg-gray-700 rounded-lg cursor-pointer overflow-hidden touch-none"
               onClick={handleTimelineClick}
-              onMouseDown={handleTimelineMouseDownForRemove}
+              onMouseDown={handleTimelinePointerDownForRemove}
+              onTouchStart={handleTimelinePointerDownForRemove}
             >
               {/* Trim region overlay (dimmed areas outside selection) */}
               {showTrimControls && trimEnabled && (
@@ -856,10 +872,10 @@ export default function MediaEditor({
                       e.stopPropagation();
                       handleRemoveSection(index);
                     }}
-                    className="absolute -top-2 right-1 w-5 h-5 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    className="absolute -top-3 right-0 w-7 h-7 sm:w-5 sm:h-5 bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-10"
                     title="Remove this cut mark"
                   >
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 sm:w-3 sm:h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -931,11 +947,12 @@ export default function MediaEditor({
                   {/* Start handle */}
                   <div
                     data-timeline-control="true"
-                    className={`absolute top-0 bottom-0 w-4 cursor-ew-resize flex items-center justify-center z-10 transition-colors ${
-                      trimEnabled ? 'bg-blue-500 hover:bg-blue-400' : 'bg-gray-500 hover:bg-gray-400'
+                    className={`absolute top-0 bottom-0 w-6 sm:w-4 cursor-ew-resize flex items-center justify-center z-10 transition-colors ${
+                      trimEnabled ? 'bg-blue-500 hover:bg-blue-400 active:bg-blue-300' : 'bg-gray-500 hover:bg-gray-400 active:bg-gray-300'
                     }`}
-                    style={{ left: `calc(${startPercent}% - 8px)` }}
-                    onMouseDown={(e) => handleTimelineMouseDown(e, 'start')}
+                    style={{ left: `calc(${startPercent}% - 12px)` }}
+                    onMouseDown={(e) => handleTimelinePointerDown(e, 'start')}
+                    onTouchStart={(e) => handleTimelinePointerDown(e, 'start')}
                   >
                     <div className="w-0.5 h-8 bg-white/70 rounded" />
                   </div>
@@ -943,11 +960,12 @@ export default function MediaEditor({
                   {/* End handle */}
                   <div
                     data-timeline-control="true"
-                    className={`absolute top-0 bottom-0 w-4 cursor-ew-resize flex items-center justify-center z-10 transition-colors ${
-                      trimEnabled ? 'bg-blue-500 hover:bg-blue-400' : 'bg-gray-500 hover:bg-gray-400'
+                    className={`absolute top-0 bottom-0 w-6 sm:w-4 cursor-ew-resize flex items-center justify-center z-10 transition-colors ${
+                      trimEnabled ? 'bg-blue-500 hover:bg-blue-400 active:bg-blue-300' : 'bg-gray-500 hover:bg-gray-400 active:bg-gray-300'
                     }`}
-                    style={{ left: `calc(${endPercent}% - 8px)` }}
-                    onMouseDown={(e) => handleTimelineMouseDown(e, 'end')}
+                    style={{ left: `calc(${endPercent}% - 12px)` }}
+                    onMouseDown={(e) => handleTimelinePointerDown(e, 'end')}
+                    onTouchStart={(e) => handleTimelinePointerDown(e, 'end')}
                   >
                     <div className="w-0.5 h-8 bg-white/70 rounded" />
                   </div>
@@ -959,15 +977,16 @@ export default function MediaEditor({
                 <div
                   key={index}
                   data-timeline-control="true"
-                  className="absolute top-0 bottom-0 w-4 cursor-ew-resize z-[15] group"
-                  style={{ left: `calc(${(point / duration) * 100}% - 8px)` }}
-                  onMouseDown={(e) => handleSplitPointMouseDown(e, index)}
+                  className="absolute top-0 bottom-0 w-6 sm:w-4 cursor-ew-resize z-[15] group"
+                  style={{ left: `calc(${(point / duration) * 100}% - 12px)` }}
+                  onMouseDown={(e) => handleSplitPointPointerDown(e, index)}
+                  onTouchStart={(e) => handleSplitPointPointerDown(e, index)}
                 >
                   {/* Split line */}
                   <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-orange-500 -translate-x-1/2" />
                   {/* Handle */}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 sm:w-5 sm:h-5 bg-orange-500 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 active:scale-95 transition-transform">
+                    <svg className="w-3 h-3 sm:w-2.5 sm:h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                     </svg>
                   </div>
@@ -981,9 +1000,9 @@ export default function MediaEditor({
                       e.stopPropagation();
                       handleRemoveSplitPoint(index);
                     }}
-                    className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute left-1/2 -bottom-6 sm:-bottom-5 -translate-x-1/2 w-6 h-6 sm:w-4 sm:h-4 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 sm:w-2 sm:h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -995,14 +1014,119 @@ export default function MediaEditor({
                 data-timeline-control="true"
                 className="absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-20"
                 style={{ left: `calc(${currentPercent}% - 2px)` }}
-                onMouseDown={(e) => handleTimelineMouseDown(e, 'playhead')}
+                onMouseDown={(e) => handleTimelinePointerDown(e, 'playhead')}
+                onTouchStart={(e) => handleTimelinePointerDown(e, 'playhead')}
               >
-                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow" />
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-5 h-5 sm:w-3 sm:h-3 bg-white rounded-full shadow" />
               </div>
             </div>
 
-            {/* Keyboard shortcuts hint */}
-            <div className="flex items-center justify-center gap-4 mt-2 text-[10px] text-gray-500">
+            {/* Mobile control buttons */}
+            <div className="sm:hidden flex items-center justify-center gap-2 mt-3">
+              {/* Play/Pause */}
+              <button
+                onClick={handlePlayPause}
+                className="p-3 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 rounded-lg transition-colors"
+                title={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying ? (
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Seek back */}
+              <button
+                onClick={() => seekRelative(-5)}
+                className="p-3 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 rounded-lg transition-colors"
+                title="Back 5s"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
+                </svg>
+              </button>
+
+              {/* Seek forward */}
+              <button
+                onClick={() => seekRelative(5)}
+                className="p-3 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 rounded-lg transition-colors"
+                title="Forward 5s"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z" />
+                </svg>
+              </button>
+
+              {/* Trim In button */}
+              {showTrimControls && (
+                <button
+                  onClick={() => { setStartTime(currentTime); setTrimEnabled(true); }}
+                  className="p-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-400 rounded-lg transition-colors"
+                  title="Set start point"
+                >
+                  <span className="text-white text-xs font-bold">IN</span>
+                </button>
+              )}
+
+              {/* Trim Out button */}
+              {showTrimControls && (
+                <button
+                  onClick={() => { setEndTime(currentTime); setTrimEnabled(true); }}
+                  className="p-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-400 rounded-lg transition-colors"
+                  title="Set end point"
+                >
+                  <span className="text-white text-xs font-bold">OUT</span>
+                </button>
+              )}
+
+              {/* Add split point */}
+              {showSplitControls && (
+                <button
+                  onClick={handleAddSplitPoint}
+                  disabled={currentTime <= 0.5 || currentTime >= duration - 0.5}
+                  className="p-3 bg-orange-600 hover:bg-orange-500 active:bg-orange-400 disabled:bg-gray-600 disabled:opacity-50 rounded-lg transition-colors"
+                  title="Add split point"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Quick cut */}
+              {showRemoveControls && (
+                <button
+                  onClick={() => handleQuickCut(currentTime, 0.5)}
+                  className="p-3 bg-red-600 hover:bg-red-500 active:bg-red-400 rounded-lg transition-colors"
+                  title="Quick cut 1s"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Undo last cut */}
+              {showRemoveControls && sectionsToRemove.length > 0 && (
+                <button
+                  onClick={() => setSectionsToRemove(prev => prev.slice(0, -1))}
+                  className="p-3 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 rounded-lg transition-colors"
+                  title="Undo last cut"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Desktop keyboard shortcuts hint */}
+            <div className="hidden sm:flex items-center justify-center gap-4 mt-2 text-[10px] text-gray-500">
               <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">Space</kbd> Play/Pause</span>
               <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">←</kbd><kbd className="px-1 py-0.5 bg-gray-700 rounded">→</kbd> Seek</span>
               {showTrimControls && <span><kbd className="px-1 py-0.5 bg-gray-700 rounded">I</kbd> In <kbd className="px-1 py-0.5 bg-gray-700 rounded">O</kbd> Out</span>}
