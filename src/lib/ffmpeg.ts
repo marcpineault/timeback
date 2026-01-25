@@ -233,16 +233,19 @@ export async function burnCaptions(
   const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
 
   // Platform-specific caption styles optimized for safe zones
-  // For 1080x1920 (9:16): Avoid bottom 320px (buttons), right 150px (engagement icons), top 200px (username)
-  // Alignment=2 is bottom-center, MarginV is from bottom edge
-  // MarginV=440 places captions in lower third but ABOVE like/comment/share buttons
+  // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
+  // All margin values must be scaled to this coordinate system
+  // For 1080x1920 (9:16): Target captions in lower third, avoiding buttons and engagement icons
+  // Alignment=2 is bottom-center, MarginV is from bottom edge in PlayRes coordinates
   const styleMap: Record<string, string> = {
     // TikTok style - bold white text with black outline (classic TikTok look)
     // Clean, punchy, high contrast - works on any background
-    tiktok: 'Fontname=Arial,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=440,MarginL=60,MarginR=150',
+    // MarginV=66 ≈ 23% from bottom (safe zone above buttons), MarginL=21, MarginR=53 for horizontal padding
+    tiktok: 'Fontname=Arial,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=66,MarginL=21,MarginR=53',
     // Instagram style - white text on semi-transparent dark background box
     // Clean, modern, refined look with better readability on busy backgrounds
-    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=460,MarginL=80,MarginR=150',
+    // MarginV=69 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
+    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=69,MarginL=28,MarginR=53',
   };
 
   console.log(`[Captions] Burning captions from: ${srtPath}`);
