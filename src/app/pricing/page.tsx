@@ -49,6 +49,12 @@ export default async function PricingPage() {
         <div className="text-center mb-8 sm:mb-12">
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-3 sm:mb-4">Simple, Transparent Pricing</h1>
           <p className="text-gray-400 text-base sm:text-lg">Start free. Upgrade when you need more.</p>
+          <p className="text-green-400 text-sm sm:text-base mt-2 flex items-center justify-center gap-2">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            30-day money-back guarantee on all paid plans
+          </p>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8 max-w-5xl mx-auto">
