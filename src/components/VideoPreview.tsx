@@ -38,25 +38,23 @@ export default function VideoPreview({ videoUrl, videoName, onClose }: VideoPrev
     <div
       ref={modalRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm pt-safe"
     >
-      <div className="relative w-full max-w-4xl mx-4">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute -top-12 right-0 p-2 text-gray-400 hover:text-white transition-colors"
-          aria-label="Close preview"
-        >
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
+      <div className="relative w-full max-w-4xl mx-2 sm:mx-4 max-h-full overflow-hidden">
         {/* Video container */}
         <div className="bg-gray-900 rounded-xl overflow-hidden shadow-2xl">
-          {/* Video title */}
-          <div className="px-4 py-3 bg-gray-800 border-b border-gray-700">
-            <h3 className="text-white font-medium truncate">{videoName}</h3>
+          {/* Video title bar with close button */}
+          <div className="px-3 sm:px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between gap-3">
+            <h3 className="text-white font-medium truncate text-sm sm:text-base">{videoName}</h3>
+            <button
+              onClick={onClose}
+              className="p-2 -mr-2 text-gray-400 hover:text-white active:scale-95 transition-all flex-shrink-0"
+              aria-label="Close preview"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
           {/* Video player */}
@@ -66,6 +64,7 @@ export default function VideoPreview({ videoUrl, videoName, onClose }: VideoPrev
               src={videoUrl}
               controls
               autoPlay
+              playsInline
               className="w-full h-full"
               controlsList="nodownload"
             >
@@ -73,16 +72,17 @@ export default function VideoPreview({ videoUrl, videoName, onClose }: VideoPrev
             </video>
           </div>
 
-          {/* Footer with info */}
-          <div className="px-4 py-3 bg-gray-800 border-t border-gray-700 flex items-center justify-between">
-            <p className="text-sm text-gray-400">
-              Press <kbd className="px-2 py-0.5 bg-gray-700 rounded text-xs">Esc</kbd> or click outside to close
+          {/* Footer - simplified for mobile */}
+          <div className="px-3 sm:px-4 py-3 bg-gray-800 border-t border-gray-700 flex items-center justify-between gap-2">
+            <p className="hidden sm:block text-sm text-gray-400">
+              Press <kbd className="px-2 py-0.5 bg-gray-700 rounded text-xs">Esc</kbd> to close
             </p>
+            <p className="sm:hidden text-xs text-gray-500">Tap outside to close</p>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+              className="px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-sm rounded-lg transition-colors"
             >
-              Close Preview
+              Close
             </button>
           </div>
         </div>
