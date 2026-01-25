@@ -43,6 +43,10 @@ interface VideoUploaderProps {
 // Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
+// Limit concurrent uploads to avoid overwhelming mobile bandwidth
+// 2 concurrent uploads provides better throughput on limited connections
+const MAX_CONCURRENT_UPLOADS = 2;
+
 export default function VideoUploader({ onUploadComplete, disabled }: VideoUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
@@ -272,7 +276,53 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
   };
 
-  // Optimized batch S3 upload - gets all URLs upfront, uploads in parallel, confirms all at once
+  // Upload a single file to S3 using presigned URL (returns promise for concurrency control)
+  const uploadSingleFileToS3 = (
+    file: File,
+    index: number,
+    urlInfo: { url: string; key: string }
+  ): Promise<{ index: number; s3Key: string } | null> => {
+    return new Promise((resolve) => {
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
+      ));
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          setUploadingFiles(prev => prev.map((f, i) =>
+            i === index ? { ...f, progress } : f
+          ));
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ index, s3Key: urlInfo.key });
+        } else {
+          setUploadingFiles(prev => prev.map((f, i) =>
+            i === index ? { ...f, status: 'error' as const, error: `Upload failed: ${xhr.status}` } : f
+          ));
+          resolve(null);
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'error' as const, error: 'Network error' } : f
+        ));
+        resolve(null);
+      });
+
+      xhr.open('PUT', urlInfo.url);
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.send(file);
+    });
+  };
+
+  // Optimized batch S3 upload - gets all URLs upfront, uploads with limited concurrency, confirms all at once
   const uploadFilesToS3Batch = async (files: File[], initialState: UploadingFile[]): Promise<UploadedFile[]> => {
     // Step 1: Get all presigned URLs in a single request
     const fileInfos: FileInfo[] = files.map(f => ({
@@ -286,55 +336,26 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       throw new Error(batchUrlResult.error || 'Failed to get upload URLs');
     }
 
-    // Step 2: Upload all files in parallel with their presigned URLs
-    const uploadPromises = files.map((file, index) => {
-      const urlInfo = batchUrlResult.urls!.find(u => u.index === index);
-      if (!urlInfo) {
-        return Promise.resolve(null);
-      }
+    // Step 2: Upload files with limited concurrency (better for mobile bandwidth)
+    // Using a simple chunked approach: process MAX_CONCURRENT_UPLOADS files at a time
+    const allResults: ({ index: number; s3Key: string } | null)[] = [];
 
-      return new Promise<{ index: number; s3Key: string } | null>((resolve) => {
-        setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
-        ));
-
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setUploadingFiles(prev => prev.map((f, i) =>
-              i === index ? { ...f, progress } : f
-            ));
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve({ index, s3Key: urlInfo.key });
-          } else {
-            setUploadingFiles(prev => prev.map((f, i) =>
-              i === index ? { ...f, status: 'error' as const, error: `Upload failed: ${xhr.status}` } : f
-            ));
-            resolve(null);
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          setUploadingFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, status: 'error' as const, error: 'Network error' } : f
-          ));
-          resolve(null);
-        });
-
-        xhr.open('PUT', urlInfo.url);
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.send(file);
+    for (let i = 0; i < files.length; i += MAX_CONCURRENT_UPLOADS) {
+      const batch = files.slice(i, i + MAX_CONCURRENT_UPLOADS);
+      const batchPromises = batch.map((file, batchIndex) => {
+        const actualIndex = i + batchIndex;
+        const urlInfo = batchUrlResult.urls!.find(u => u.index === actualIndex);
+        if (!urlInfo) {
+          return Promise.resolve(null);
+        }
+        return uploadSingleFileToS3(file, actualIndex, urlInfo);
       });
-    });
 
-    const uploadResults = await Promise.all(uploadPromises);
-    const successfulUploads = uploadResults.filter((r): r is { index: number; s3Key: string } => r !== null);
+      const batchResults = await Promise.all(batchPromises);
+      allResults.push(...batchResults);
+    }
+
+    const successfulUploads = allResults.filter((r): r is { index: number; s3Key: string } => r !== null);
 
     if (successfulUploads.length === 0) {
       return [];
@@ -420,14 +441,22 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         setError(err instanceof Error ? err.message : 'Upload failed');
       }
     } else {
-      // Fallback: Upload files in parallel using individual methods
-      console.log('[Upload] Using fallback upload methods');
-      const uploadPromises = validFiles.map((file, i) =>
-        uploadSingleFile(file, i, initialState[i].previewUrl)
-      );
+      // Fallback: Upload files with limited concurrency (better for mobile)
+      console.log('[Upload] Using fallback upload methods with limited concurrency');
+      const allResults: (UploadedFile | null)[] = [];
 
-      const uploadResults = await Promise.all(uploadPromises);
-      results = uploadResults.filter((r): r is UploadedFile => r !== null);
+      for (let i = 0; i < validFiles.length; i += MAX_CONCURRENT_UPLOADS) {
+        const batch = validFiles.slice(i, i + MAX_CONCURRENT_UPLOADS);
+        const batchPromises = batch.map((file, batchIndex) => {
+          const actualIndex = i + batchIndex;
+          return uploadSingleFile(file, actualIndex, initialState[actualIndex].previewUrl);
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        allResults.push(...batchResults);
+      }
+
+      results = allResults.filter((r): r is UploadedFile => r !== null);
     }
 
     // Notify parent of completed uploads
