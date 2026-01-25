@@ -69,11 +69,17 @@ export default function MediaEditor({
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const [showSplitIndicator, setShowSplitIndicator] = useState(false);
 
-  // Generate video thumbnails
+  // Generate video thumbnails using a separate video element
   useEffect(() => {
-    if (!videoRef.current || duration === 0) return;
+    if (duration === 0 || thumbnails.length > 0) return;
 
-    const video = videoRef.current;
+    // Create a separate video element for thumbnail generation
+    const thumbVideo = document.createElement('video');
+    thumbVideo.src = videoUrl;
+    thumbVideo.crossOrigin = 'anonymous';
+    thumbVideo.muted = true;
+    thumbVideo.preload = 'metadata';
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -87,31 +93,46 @@ export default function MediaEditor({
     const interval = duration / numThumbs;
     const thumbs: string[] = [];
     let currentThumb = 0;
+    let isActive = true;
 
     const captureFrame = () => {
+      if (!isActive) return;
       if (currentThumb >= numThumbs) {
         setThumbnails(thumbs);
-        video.currentTime = 0;
+        thumbVideo.remove();
         return;
       }
 
-      video.currentTime = currentThumb * interval;
+      thumbVideo.currentTime = currentThumb * interval;
     };
 
     const handleSeeked = () => {
-      ctx.drawImage(video, 0, 0, thumbWidth, thumbHeight);
-      thumbs.push(canvas.toDataURL('image/jpeg', 0.5));
+      if (!isActive) return;
+      try {
+        ctx.drawImage(thumbVideo, 0, 0, thumbWidth, thumbHeight);
+        thumbs.push(canvas.toDataURL('image/jpeg', 0.5));
+      } catch {
+        // Ignore CORS or other errors, just skip this thumbnail
+      }
       currentThumb++;
       captureFrame();
     };
 
-    video.addEventListener('seeked', handleSeeked);
-    captureFrame();
+    const handleCanPlay = () => {
+      captureFrame();
+    };
+
+    thumbVideo.addEventListener('seeked', handleSeeked);
+    thumbVideo.addEventListener('canplay', handleCanPlay, { once: true });
+    thumbVideo.load();
 
     return () => {
-      video.removeEventListener('seeked', handleSeeked);
+      isActive = false;
+      thumbVideo.removeEventListener('seeked', handleSeeked);
+      thumbVideo.removeEventListener('canplay', handleCanPlay);
+      thumbVideo.remove();
     };
-  }, [duration]);
+  }, [duration, videoUrl, thumbnails.length]);
 
   // Video event handlers
   useEffect(() => {
