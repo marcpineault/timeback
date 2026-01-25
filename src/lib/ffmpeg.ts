@@ -12,7 +12,7 @@ export interface ProcessingOptions {
   silenceDuration?: number; // minimum silence duration in seconds, default 0.5
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
-  captionStyle?: 'tiktok' | 'instagram';
+  captionStyle?: 'instagram';
 }
 
 /**
@@ -232,16 +232,12 @@ export async function burnCaptions(
   // Check if this is an animated ASS file
   const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
 
-  // Platform-specific caption styles optimized for safe zones
+  // Caption styles optimized for safe zones
   // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
   // All margin values must be scaled to this coordinate system
   // For 1080x1920 (9:16): Target captions in lower third, avoiding buttons and engagement icons
   // Alignment=2 is bottom-center, MarginV is from bottom edge in PlayRes coordinates
   const styleMap: Record<string, string> = {
-    // TikTok style - bold white text with black outline (classic TikTok look)
-    // Clean, punchy, high contrast - works on any background
-    // MarginV=66 ≈ 23% from bottom (safe zone above buttons), MarginL=21, MarginR=53 for horizontal padding
-    tiktok: 'Fontname=Arial,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=0,Alignment=2,MarginV=66,MarginL=21,MarginR=53',
     // Instagram style - white text on semi-transparent dark background box
     // Clean, modern, refined look with better readability on busy backgrounds
     // MarginV=69 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
@@ -270,7 +266,7 @@ export async function burnCaptions(
   if (isAnimated) {
     filterString = `ass='${escapedPath}'`;
   } else {
-    const subtitleStyle = styleMap[style] || styleMap.tiktok;
+    const subtitleStyle = styleMap[style] || styleMap.instagram;
     filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
   }
   console.log(`[Captions] Filter: ${filterString}`);
@@ -318,7 +314,7 @@ export async function addHeadline(
   outputPath: string,
   headline: string,
   position: 'top' | 'center' | 'bottom' = 'top',
-  captionStyle: string = 'tiktok'
+  captionStyle: string = 'instagram'
 ): Promise<string> {
   // Y positions optimized for safe zones (1080x1920)
   // Top: y=220 puts headline below username area but in upper third (above speaker's head)
@@ -350,15 +346,10 @@ export async function addHeadline(
   // x position slightly left of center to avoid right-side engagement buttons
   let filterString: string;
 
-  if (captionStyle === 'instagram') {
-    // Instagram style - clean white on subtle dark background box
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
-  } else {
-    // TikTok style - bold white text with clean black outline
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:borderw=2:bordercolor=black:enable='between(t,0,5)'`;
-  }
+  // Instagram style - clean white on subtle dark background box
+  filterString = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
 
-  console.log(`[Headline] Adding headline: "${headline}" at ${position} (style: ${captionStyle})`);
+  console.log(`[Headline] Adding headline: "${headline}" at ${position}`);
 
 
   return new Promise((resolve, reject) => {
@@ -622,7 +613,7 @@ export interface AspectRatioInfo {
 
 export const ASPECT_RATIOS: Record<AspectRatioPreset, AspectRatioInfo> = {
   'original': { name: 'Original', ratio: 0, platforms: ['Keep original'] },
-  '9:16': { name: 'Vertical', ratio: 9/16, platforms: ['TikTok', 'Reels', 'Shorts'] },
+  '9:16': { name: 'Vertical', ratio: 9/16, platforms: ['Reels', 'Shorts'] },
   '16:9': { name: 'Landscape', ratio: 16/9, platforms: ['YouTube', 'Twitter'] },
   '1:1': { name: 'Square', ratio: 1, platforms: ['Instagram Feed'] },
   '4:5': { name: 'Portrait', ratio: 4/5, platforms: ['Instagram', 'Facebook'] },
@@ -781,17 +772,9 @@ export async function applyCombinedFilters(
     }
 
     const position = options.headlinePosition || 'top';
-    const captionStyle = options.captionStyle || 'tiktok';
 
-    // Platform-native headline styles - clean and simple, slightly left of center
-    let headlineFilter: string;
-    if (captionStyle === 'instagram') {
-      // Instagram style - clean white on subtle dark background box
-      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
-    } else {
-      // TikTok style - bold white text with clean black outline
-      headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=30:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:borderw=2:bordercolor=black:enable='between(t,0,5)'`;
-    }
+    // Instagram style - clean white on subtle dark background box
+    const headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
     filters.push(headlineFilter);
   }
 

@@ -19,7 +19,7 @@ export interface ProcessingConfig {
   generateCaptions: boolean;
   headline: string;
   headlinePosition: 'top' | 'center' | 'bottom';
-  captionStyle: 'tiktok' | 'instagram';
+  captionStyle: 'instagram';
   silenceThreshold: number;
   silenceDuration: number;
   useHookAsHeadline: boolean;
@@ -41,7 +41,7 @@ export interface ProcessingConfig {
 }
 
 // Processing presets for quick configuration
-type PresetKey = 'custom' | 'tiktok' | 'youtube-shorts' | 'instagram-reels' | 'youtube' | 'instagram-feed';
+type PresetKey = 'custom' | 'youtube-shorts' | 'instagram-reels' | 'youtube' | 'instagram-feed';
 
 interface Preset {
   name: string;
@@ -55,25 +55,13 @@ const PRESETS: Record<PresetKey, Preset> = {
     icon: '⚙️',
     config: {},
   },
-  'tiktok': {
-    name: 'TikTok',
-    icon: '📱',
-    config: {
-      aspectRatio: '9:16',
-      generateCaptions: true,
-      captionStyle: 'tiktok',
-      normalizeAudio: true,
-      silenceThreshold: -30,
-      silenceDuration: 0.3,
-    },
-  },
   'youtube-shorts': {
     name: 'YouTube Shorts',
     icon: '🎬',
     config: {
       aspectRatio: '9:16',
       generateCaptions: true,
-      captionStyle: 'tiktok',
+      captionStyle: 'instagram',
       normalizeAudio: true,
       silenceThreshold: -30,
       silenceDuration: 0.4,
@@ -97,7 +85,7 @@ const PRESETS: Record<PresetKey, Preset> = {
     config: {
       aspectRatio: '16:9',
       generateCaptions: true,
-      captionStyle: 'tiktok',
+      captionStyle: 'instagram',
       normalizeAudio: true,
       silenceThreshold: -35,
       silenceDuration: 0.5,
@@ -117,7 +105,7 @@ const PRESETS: Record<PresetKey, Preset> = {
 
 const ASPECT_RATIO_OPTIONS: { value: AspectRatioPreset; label: string; platforms: string }[] = [
   { value: 'original', label: 'Original', platforms: 'Keep as-is' },
-  { value: '9:16', label: '9:16 Vertical', platforms: 'TikTok, Reels, Shorts' },
+  { value: '9:16', label: '9:16 Vertical', platforms: 'Reels, Shorts' },
   { value: '16:9', label: '16:9 Landscape', platforms: 'YouTube, Twitter' },
   { value: '1:1', label: '1:1 Square', platforms: 'Instagram Feed' },
   { value: '4:5', label: '4:5 Portrait', platforms: 'Instagram, Facebook' },
@@ -133,7 +121,7 @@ export default function ProcessingOptions({
     generateCaptions: true,
     headline: '',
     headlinePosition: 'top',
-    captionStyle: 'tiktok',
+    captionStyle: 'instagram',
     silenceThreshold: -30,
     silenceDuration: 0.5,
     useHookAsHeadline: false,
@@ -269,17 +257,9 @@ export default function ProcessingOptions({
         </div>
 
         {config.generateCaptions && (
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Caption Style</label>
-            <select
-              value={config.captionStyle}
-              onChange={(e) => setConfig({ ...config, captionStyle: e.target.value as ProcessingConfig['captionStyle'] })}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
-            >
-              <option value="tiktok">TikTok / YouTube - Bold white with outline</option>
-              <option value="instagram">Instagram - White on dark background</option>
-            </select>
-          </div>
+          <p className="text-xs text-gray-500">
+            Clean white text on dark background - optimized for readability
+          </p>
         )}
       </div>
 

@@ -154,7 +154,7 @@ function formatAssTime(seconds: number): string {
 }
 
 /**
- * Split text into short chunks for TikTok-style captions
+ * Split text into short chunks for short-form video captions
  * Max ~6 words per caption (fits nicely on 2 lines of ~3 words each)
  */
 function splitIntoShortCaptions(
@@ -189,7 +189,7 @@ function splitIntoShortCaptions(
 
 /**
  * Generate SRT file from transcription segments
- * Splits long segments into shorter TikTok-style captions (max 2 lines)
+ * Splits long segments into shorter captions (max 2 lines)
  */
 export function generateSrt(
   segments: TranscriptionSegment[],
@@ -216,7 +216,7 @@ export function generateSrt(
 
 /**
  * Group words into lines for display
- * TikTok style: max 3-4 words per line for easy reading
+ * Short-form style: max 3-4 words per line for easy reading
  */
 function groupWordsIntoLines(
   words: TranscriptionWord[],
