@@ -35,9 +35,9 @@ export default async function LandingPage() {
           {/* Trust badge */}
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm mb-6">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
             </svg>
-            <span>Trusted by 10,000+ creators</span>
+            <span>AI-powered video editing</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
@@ -61,7 +61,13 @@ export default async function LandingPage() {
               <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              No credit card required - 3 free videos/month
+              No credit card required - 5 free videos/month
+            </p>
+            <p className="text-gray-500 text-sm flex items-center gap-2">
+              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              30-day money-back guarantee
             </p>
           </div>
         </div>
@@ -101,25 +107,45 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Social Proof - Stats */}
+      {/* Features Strip */}
       <section className="py-12 px-4 bg-gray-800/30 border-y border-gray-800">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">10K+</div>
-              <div className="text-gray-400 text-sm">Active Users</div>
+              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="text-white font-semibold mb-1">Lightning Fast</div>
+              <div className="text-gray-400 text-sm">Process videos in minutes</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">500K+</div>
-              <div className="text-gray-400 text-sm">Videos Processed</div>
+              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="text-white font-semibold mb-1">Accurate Detection</div>
+              <div className="text-gray-400 text-sm">AI-powered precision</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">2M+</div>
-              <div className="text-gray-400 text-sm">Hours Saved</div>
+              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                </svg>
+              </div>
+              <div className="text-white font-semibold mb-1">Easy to Use</div>
+              <div className="text-gray-400 text-sm">No editing skills needed</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">4.9/5</div>
-              <div className="text-gray-400 text-sm">User Rating</div>
+              <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div className="text-white font-semibold mb-1">Secure & Private</div>
+              <div className="text-gray-400 text-sm">Your videos stay yours</div>
             </div>
           </div>
         </div>
@@ -190,11 +216,8 @@ export default async function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              Loved by Creators
+              What People Are Saying
             </h2>
-            <p className="text-gray-400 text-lg">
-              See what our users are saying
-            </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
@@ -206,15 +229,14 @@ export default async function LandingPage() {
                 ))}
               </div>
               <p className="text-gray-300 mb-4">
-                &ldquo;TimeBack cut my editing time from 4 hours to 30 minutes. It&apos;s like having a professional editor on demand.&rdquo;
+                &ldquo;Super easy to use. I just upload my video and it removes all the awkward pauses automatically. Saves me so much time!&rdquo;
               </p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-                  M
+                  A
                 </div>
                 <div>
-                  <div className="text-white font-medium">Mike Chen</div>
-                  <div className="text-gray-500 text-sm">YouTube Creator, 500K subs</div>
+                  <div className="text-white font-medium">Alain</div>
                 </div>
               </div>
             </div>
@@ -228,15 +250,14 @@ export default async function LandingPage() {
                 ))}
               </div>
               <p className="text-gray-300 mb-4">
-                &ldquo;As a course creator, I record hours of content. TimeBack makes my videos so much more engaging.&rdquo;
+                &ldquo;Finally a tool that does exactly what it promises. The silence detection is spot on and the interface is clean.&rdquo;
               </p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-semibold">
-                  S
+                  M
                 </div>
                 <div>
-                  <div className="text-white font-medium">Sarah Johnson</div>
-                  <div className="text-gray-500 text-sm">Online Course Creator</div>
+                  <div className="text-white font-medium">Marc</div>
                 </div>
               </div>
             </div>
@@ -250,15 +271,14 @@ export default async function LandingPage() {
                 ))}
               </div>
               <p className="text-gray-300 mb-4">
-                &ldquo;The best part? I can focus on creating content instead of spending hours in editing software.&rdquo;
+                &ldquo;Great for cleaning up recorded content. Makes my videos look way more professional without any editing skills.&rdquo;
               </p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white font-semibold">
-                  D
+                  P
                 </div>
                 <div>
-                  <div className="text-white font-medium">David Park</div>
-                  <div className="text-gray-500 text-sm">Podcast Host</div>
+                  <div className="text-white font-medium">Pablo</div>
                 </div>
               </div>
             </div>
@@ -330,7 +350,7 @@ export default async function LandingPage() {
                 Start Saving Time Today
               </h2>
               <p className="text-blue-100 text-lg mb-8 max-w-lg mx-auto">
-                Join 10,000+ creators who&apos;ve reclaimed hours of their week with TimeBack.
+                Stop wasting hours on manual editing. Let AI do the tedious work for you.
               </p>
               <Link
                 href="/sign-up"
@@ -339,7 +359,7 @@ export default async function LandingPage() {
                 Get Started Free
               </Link>
               <p className="text-blue-200 text-sm mt-4">
-                No credit card required
+                No credit card required · 30-day money-back guarantee
               </p>
             </div>
           </div>

@@ -2,12 +2,12 @@ export const PLANS = {
   FREE: {
     name: 'Free',
     price: 0,
-    videosPerMonth: 3,
+    videosPerMonth: 5,
     maxDuration: 5 * 60, // 5 minutes
     maxResolution: 720,
     watermark: true,
     features: [
-      '3 videos per month',
+      '5 videos per month',
       'Up to 5 min videos',
       '720p max resolution',
       'TimeBack watermark',
