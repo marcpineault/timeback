@@ -11,6 +11,8 @@ import { prisma } from '@/lib/db';
 import { canProcessVideo, incrementVideoCount } from '@/lib/user';
 import { cleanupOldFiles } from '@/lib/cleanup';
 import { isS3Configured, getS3ObjectStream, deleteS3Object } from '@/lib/s3';
+import { logger } from '@/lib/logger';
+import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   // Run cleanup of old files on each request
@@ -51,6 +53,13 @@ export async function POST(request: NextRequest) {
     const { userId: clerkUserId } = await auth();
     let dbUserId = bodyUserId;
 
+    // Rate limiting
+    const rateLimitId = getRateLimitIdentifier(clerkUserId, request);
+    const rateLimitResult = checkRateLimit(rateLimitId, 'process');
+    if (!rateLimitResult.allowed) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     if (clerkUserId) {
       const user = await prisma.user.findUnique({
         where: { clerkId: clerkUserId },
@@ -80,18 +89,35 @@ export async function POST(request: NextRequest) {
     let inputPath = path.join(uploadsDir, filename);
     let downloadedFromS3 = false;
 
-    // Debug logging
-    console.log('[Process] Received request:');
-    console.log('[Process] - fileId:', fileId);
-    console.log('[Process] - filename:', filename);
-    console.log('[Process] - s3Key:', s3Key || 'NOT PROVIDED');
+    // Create video record with PENDING status immediately
+    let videoRecord: { id: string } | null = null;
+    if (dbUserId) {
+      videoRecord = await prisma.video.create({
+        data: {
+          userId: dbUserId,
+          originalName: filename,
+          status: 'PENDING',
+        },
+      });
+      logger.info('Video record created', { videoId: videoRecord.id, status: 'PENDING' });
+    }
+
+    // Helper to update video status
+    const updateVideoStatus = async (status: 'PROCESSING' | 'COMPLETED' | 'FAILED', data?: { processedUrl?: string; errorMessage?: string }) => {
+      if (videoRecord) {
+        await prisma.video.update({
+          where: { id: videoRecord.id },
+          data: { status, ...data },
+        });
+        logger.info('Video status updated', { videoId: videoRecord.id, status });
+      }
+    };
+
+    logger.debug('Processing request received', { fileId, filename, s3Key: s3Key || 'NOT PROVIDED' });
 
     // If file is in S3, download it first
     if (s3Key && isS3Configured()) {
-      console.log('[Process] ========================================');
-      console.log('[Process] STORAGE: CLOUDFLARE R2');
-      console.log('[Process] S3 Key:', s3Key);
-      console.log('[Process] Downloading file from R2...');
+      logger.info('Downloading from Cloudflare R2', { s3Key });
       try {
         const s3Stream = await getS3ObjectStream(s3Key);
         const localPath = path.join(uploadsDir, filename);
@@ -100,30 +126,30 @@ export async function POST(request: NextRequest) {
 
         inputPath = localPath;
         downloadedFromS3 = true;
-        console.log('[Process] File downloaded from S3 successfully');
+        logger.info('File downloaded from S3 successfully');
       } catch (s3Error) {
-        console.error('[Process] Failed to download from S3:', s3Error);
+        logger.error('Failed to download from S3', { error: String(s3Error) });
+        await updateVideoStatus('FAILED', { errorMessage: 'Failed to download file from storage' });
         return NextResponse.json(
           { error: 'Failed to download file from storage' },
           { status: 500 }
         );
       }
-    }
-
-    // Log storage method if NOT using S3
-    if (!downloadedFromS3) {
-      console.log('[Process] ========================================');
-      console.log('[Process] STORAGE: LOCAL (Railway filesystem)');
-      console.log('[Process] File path:', inputPath);
+    } else if (!downloadedFromS3) {
+      logger.debug('Using local storage', { inputPath });
     }
 
     // Verify file exists (either local or downloaded from S3)
     if (!existsSync(inputPath)) {
+      await updateVideoStatus('FAILED', { errorMessage: 'Video file not found' });
       return NextResponse.json(
         { error: 'Video file not found' },
         { status: 404 }
       );
     }
+
+    // Update status to PROCESSING
+    await updateVideoStatus('PROCESSING');
 
     const baseName = path.basename(inputPath, path.extname(inputPath));
     let currentInput = inputPath;
@@ -138,7 +164,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Step 1: Remove silence FIRST
-    console.log('[Process] Step 1: Removing silence...');
+    logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     await removeSilence(currentInput, stepOutput, options);
     // Clean up intermediate file
@@ -149,7 +175,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1.5: Normalize audio levels if enabled
     if (shouldNormalizeAudio) {
-      console.log('[Process] Step 1.5: Normalizing audio levels...');
+      logger.info('Step 1.5: Normalizing audio levels');
       stepOutput = path.join(processedDir, `${baseName}_normalized.mp4`);
       await normalizeAudio(currentInput, stepOutput);
       // Clean up intermediate file
@@ -166,7 +192,7 @@ export async function POST(request: NextRequest) {
     let transcriptionWords: TranscriptionWord[] = [];
 
     if (generateCaptions || useHookAsHeadline || generateBRoll || speechCorrection) {
-      console.log('[Process] Step 2: Transcribing silence-removed video...');
+      logger.info('Step 2: Transcribing silence-removed video');
       // Use animated transcription (word-level timestamps) for animated caption style or speech correction
       // Use forSpeechCorrection to prompt Whisper to include filler words
       const transcription = await transcribeVideo(currentInput, processedDir, {
@@ -178,19 +204,18 @@ export async function POST(request: NextRequest) {
       transcriptionWords = transcription.words || [];
 
       if (speechCorrection) {
-        console.log(`[Process] Transcription for speech correction: ${transcriptionWords.length} words`);
-        console.log(`[Process] Sample words: ${transcriptionWords.slice(0, 30).map(w => w.word).join(' ')}`);
+        logger.debug('Transcription for speech correction', { wordCount: transcriptionWords.length });
       }
 
       // Extract hook if needed
       if (useHookAsHeadline) {
         hookText = extractHook(transcription.text);
-        console.log(`[Process] Extracted hook: "${hookText}"`);
+        logger.info('Extracted hook', { hookText });
       }
 
       // Step 2.5: Apply AI Speech Correction if enabled
       if (speechCorrection && transcriptionWords.length > 0) {
-        console.log('[Process] Step 2.5: Applying AI speech correction...');
+        logger.info('Step 2.5: Applying AI speech correction');
 
         // Parse speech correction config
         const correctionConfig: SpeechCorrectionConfig = speechCorrectionConfig ? {
@@ -209,7 +234,7 @@ export async function POST(request: NextRequest) {
           correctionConfig
         );
 
-        console.log(`[Process] Speech correction removed ${correctionResult.segmentsRemoved} mistakes (${correctionResult.timeRemoved.toFixed(2)}s)`);
+        logger.info('Speech correction complete', { segmentsRemoved: correctionResult.segmentsRemoved, timeRemoved: correctionResult.timeRemoved.toFixed(2) });
 
         // Clean up intermediate file
         if (currentInput !== inputPath) {
@@ -219,7 +244,7 @@ export async function POST(request: NextRequest) {
 
         // Re-transcribe the corrected video if we need captions (since timestamps changed)
         if (generateCaptions && correctionResult.segmentsRemoved > 0) {
-          console.log('[Process] Re-transcribing after speech correction for accurate captions...');
+          logger.info('Re-transcribing after speech correction for accurate captions');
           const newTranscription = await transcribeVideo(currentInput, processedDir, { animated: captionStyle === 'animated' });
           srtPath = newTranscription.srtPath;
           transcriptionSegments = newTranscription.segments;
@@ -228,7 +253,7 @@ export async function POST(request: NextRequest) {
 
       // Step 3: Burn captions if enabled
       if (generateCaptions) {
-        console.log('[Process] Step 3: Burning captions...');
+        logger.info('Step 3: Burning captions');
         stepOutput = path.join(processedDir, `${baseName}_captioned.mp4`);
         await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
         // Clean up intermediate file
@@ -250,7 +275,7 @@ export async function POST(request: NextRequest) {
     const canUseCombinedFilters = (colorGrade && colorGrade !== 'none') && finalHeadline && !autoZoom;
 
     if (colorGrade && colorGrade !== 'none' && !canUseCombinedFilters) {
-      console.log(`[Process] Step 3.2: Applying ${colorGrade} color grade...`);
+      logger.info('Step 3.2: Applying color grade', { colorGrade });
       stepOutput = path.join(processedDir, `${baseName}_graded.mp4`);
       await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
       // Clean up intermediate file
@@ -261,13 +286,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3.5: Generate and insert AI B-Roll if enabled
-    console.log(`[Process] B-Roll enabled: ${generateBRoll}, segments: ${transcriptionSegments.length}`);
+    logger.debug('B-Roll check', { enabled: generateBRoll, segmentCount: transcriptionSegments.length });
     if (generateBRoll && transcriptionSegments.length > 0) {
-      console.log('[Process] Step 3.5: Generating AI B-Roll animations...');
+      logger.info('Step 3.5: Generating AI B-Roll animations');
 
       // Identify key moments for B-roll
       const moments = await identifyBRollMoments(transcriptionSegments, 2);
-      console.log(`[Process] Identified ${moments.length} B-roll moments`);
+      logger.info('Identified B-roll moments', { count: moments.length });
 
       if (moments.length > 0) {
         // Create cutaways from identified moments - pass context for animation generation
@@ -291,7 +316,7 @@ export async function POST(request: NextRequest) {
 
     // Step 3.8: Apply auto-zoom on speech if enabled
     if (autoZoom && transcriptionSegments.length > 0) {
-      console.log(`[Process] Step 3.8: Applying auto-zoom on speech...`);
+      logger.info('Step 3.8: Applying auto-zoom on speech');
       const zoomIntensity = 1 + (autoZoomIntensity || 5) / 100; // Convert percentage to multiplier (e.g., 5% -> 1.05)
       stepOutput = path.join(processedDir, `${baseName}_zoomed.mp4`);
       await applyAutoZoom(currentInput, stepOutput, transcriptionSegments, zoomIntensity);
@@ -305,7 +330,7 @@ export async function POST(request: NextRequest) {
     // Step 4: Add headline if provided or using hook
     // If combined filters are used, apply color grade + headline in one pass
     if (canUseCombinedFilters) {
-      console.log(`[Process] Step 4: Applying combined filters (color grade + headline) in single pass...`);
+      logger.info('Step 4: Applying combined filters (color grade + headline)');
       stepOutput = path.join(processedDir, `${baseName}_combined.mp4`);
       await applyCombinedFilters(currentInput, stepOutput, {
         colorGrade: colorGrade as ColorGradePreset,
@@ -319,7 +344,7 @@ export async function POST(request: NextRequest) {
       }
       currentInput = stepOutput;
     } else if (finalHeadline) {
-      console.log(`[Process] Step 4: Adding headline: "${finalHeadline}"`);
+      logger.info('Step 4: Adding headline', { headline: finalHeadline });
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
       await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle);
       // Clean up intermediate file
@@ -331,7 +356,7 @@ export async function POST(request: NextRequest) {
 
     // Step 5: Convert aspect ratio if specified
     if (aspectRatio && aspectRatio !== 'original') {
-      console.log(`[Process] Step 5: Converting aspect ratio to ${aspectRatio}...`);
+      logger.info('Step 5: Converting aspect ratio', { aspectRatio });
       stepOutput = path.join(processedDir, `${baseName}_aspect.mp4`);
       await convertAspectRatio(currentInput, stepOutput, aspectRatio as AspectRatioPreset);
       // Clean up intermediate file
@@ -349,49 +374,71 @@ export async function POST(request: NextRequest) {
 
     const outputFilename = path.basename(finalOutput);
 
-    // Track usage if user is authenticated
+    // Track usage and update video record if user is authenticated
     if (dbUserId) {
       await incrementVideoCount(dbUserId);
 
-      // Create video record
-      await prisma.video.create({
-        data: {
-          userId: dbUserId,
-          originalName: filename,
-          processedUrl: `/api/download/${outputFilename}`,
-          status: 'COMPLETED',
-        },
-      });
+      // Update video record to COMPLETED with the processed URL
+      await updateVideoStatus('COMPLETED', { processedUrl: `/api/download/${outputFilename}` });
     }
 
     // Clean up the original uploaded file
     try {
       if (existsSync(inputPath)) {
         await fs.unlink(inputPath);
-        console.log('[Process] Cleaned up local upload file');
+        logger.debug('Cleaned up local upload file');
       }
     } catch (cleanupErr) {
-      console.error('[Process] Failed to clean up local file:', cleanupErr);
+      logger.warn('Failed to clean up local file', { error: String(cleanupErr) });
     }
 
     // Clean up S3 file if it was downloaded from there
     if (s3Key && downloadedFromS3 && isS3Configured()) {
       try {
         await deleteS3Object(s3Key);
-        console.log('[Process] Cleaned up S3 file');
+        logger.debug('Cleaned up S3 file');
       } catch (s3CleanupErr) {
-        console.error('[Process] Failed to clean up S3 file:', s3CleanupErr);
+        logger.warn('Failed to clean up S3 file', { error: String(s3CleanupErr) });
       }
     }
 
-    console.log('[Process] Complete!');
+    logger.info('Processing complete', { outputFilename });
     return NextResponse.json({
       success: true,
       outputFilename,
       downloadUrl: `/api/download/${outputFilename}`,
     });
   } catch (error) {
-    console.error('Processing error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Processing error', { error: errorMessage });
+
+    // Update video status to FAILED if we have a video record
+    // Need to access the videoRecord from the outer scope - it won't exist if error occurred before creation
+    // So we use a different approach - check if there's a pending video for this user
+    try {
+      const { userId: clerkUserId } = await auth();
+      if (clerkUserId) {
+        const user = await prisma.user.findUnique({
+          where: { clerkId: clerkUserId },
+        });
+        if (user) {
+          // Find and update any PROCESSING videos for this user to FAILED
+          await prisma.video.updateMany({
+            where: {
+              userId: user.id,
+              status: { in: ['PENDING', 'PROCESSING'] },
+            },
+            data: {
+              status: 'FAILED',
+              errorMessage: errorMessage,
+            },
+          });
+        }
+      }
+    } catch (dbError) {
+      logger.error('Failed to update video status on error', { error: String(dbError) });
+    }
+
     return NextResponse.json(
       { error: 'Failed to process video. Please try again.' },
       { status: 500 }

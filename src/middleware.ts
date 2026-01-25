@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/pricing',
   '/api/webhooks(.*)',
   '/api/upload', // Upload route handles its own auth after parsing body
+  '/api/health', // Health check endpoint for monitoring
 ])
 
 export default clerkMiddleware(async (auth, request) => {

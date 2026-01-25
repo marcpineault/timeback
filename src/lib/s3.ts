@@ -1,6 +1,7 @@
 import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomBytes } from 'crypto';
+import { logger } from './logger';
 
 // S3-compatible client singleton (works with AWS S3, Cloudflare R2, Backblaze B2, etc.)
 let s3Client: S3Client | null = null;
@@ -34,15 +35,17 @@ export function isS3Configured(): boolean {
   const hasAccessKey = !!(process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID);
   const hasSecretKey = !!(process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY);
   const hasBucket = !!(process.env.S3_BUCKET || process.env.AWS_S3_BUCKET);
+  const isConfigured = hasAccessKey && hasSecretKey && hasBucket;
 
-  console.log('[S3 Config] Checking S3 configuration...');
-  console.log('[S3 Config] S3_ENDPOINT:', process.env.S3_ENDPOINT ? 'SET' : 'NOT SET');
-  console.log('[S3 Config] S3_ACCESS_KEY_ID:', hasAccessKey ? 'SET' : 'NOT SET');
-  console.log('[S3 Config] S3_SECRET_ACCESS_KEY:', hasSecretKey ? 'SET' : 'NOT SET');
-  console.log('[S3 Config] S3_BUCKET:', process.env.S3_BUCKET || process.env.AWS_S3_BUCKET || 'NOT SET');
-  console.log('[S3 Config] Result:', hasAccessKey && hasSecretKey && hasBucket ? 'CONFIGURED' : 'NOT CONFIGURED');
+  logger.debug('S3 configuration check', {
+    hasEndpoint: !!process.env.S3_ENDPOINT,
+    hasAccessKey,
+    hasSecretKey,
+    hasBucket,
+    isConfigured,
+  });
 
-  return hasAccessKey && hasSecretKey && hasBucket;
+  return isConfigured;
 }
 
 export interface PresignedUploadUrl {
