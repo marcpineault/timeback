@@ -397,12 +397,46 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     return results;
   };
 
+  // Check if a file is a valid video (handles iOS MIME type inconsistencies)
+  const isValidVideoFile = (file: File): boolean => {
+    // Known valid MIME types
+    const validMimeTypes = [
+      'video/mp4',
+      'video/quicktime',
+      'video/webm',
+      'video/x-msvideo',
+      'video/x-m4v',
+      'video/3gpp',
+      'video/3gpp2',
+      'video/hevc',        // iOS HEVC videos
+      'video/x-matroska',  // MKV
+    ];
+
+    // Check MIME type first
+    if (file.type && validMimeTypes.includes(file.type)) {
+      return true;
+    }
+
+    // Fallback: Check file extension (iOS sometimes reports empty/wrong MIME types)
+    const validExtensions = ['.mp4', '.mov', '.webm', '.avi', '.m4v', '.3gp', '.mkv'];
+    const fileName = file.name.toLowerCase();
+    if (validExtensions.some(ext => fileName.endsWith(ext))) {
+      return true;
+    }
+
+    // Also accept any "video/*" MIME type
+    if (file.type && file.type.startsWith('video/')) {
+      return true;
+    }
+
+    return false;
+  };
+
   const uploadFiles = async (files: File[]) => {
     setError(null);
 
-    // Validate file types
-    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
-    const validFiles = files.filter(f => validTypes.includes(f.type));
+    // Validate file types (with iOS-friendly fallback to extension check)
+    const validFiles = files.filter(f => isValidVideoFile(f));
 
     if (validFiles.length === 0) {
       setError('No valid video files selected. Please upload MP4, MOV, WebM, or AVI files.');
@@ -512,7 +546,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       >
         <input
           type="file"
-          accept="video/mp4,video/quicktime,video/webm,video/x-msvideo"
+          accept="video/*,.mp4,.mov,.webm,.avi,.m4v"
           onChange={handleFileSelect}
           className="hidden"
           id="video-upload"

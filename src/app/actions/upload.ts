@@ -7,6 +7,42 @@ import { v4 as uuidv4 } from 'uuid';
 import { auth } from '@clerk/nextjs/server';
 import { createUploadUrl, isS3Configured } from '@/lib/s3';
 
+// Valid video MIME types - expanded for iOS compatibility
+// iOS can report various MIME types for videos from the photo album
+const VALID_VIDEO_TYPES = [
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+  'video/x-msvideo',
+  'video/x-m4v',
+  'video/3gpp',
+  'video/3gpp2',
+  'video/hevc',        // iOS HEVC videos
+  'video/x-matroska',  // MKV
+];
+
+const VALID_VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.avi', '.m4v', '.3gp', '.mkv'];
+
+// Check if a content type or filename represents a valid video
+function isValidVideoType(contentType: string, filename?: string): boolean {
+  // Check MIME type
+  if (contentType && VALID_VIDEO_TYPES.includes(contentType)) {
+    return true;
+  }
+  // Accept any video/* MIME type
+  if (contentType && contentType.startsWith('video/')) {
+    return true;
+  }
+  // Fallback to extension check (iOS can report empty/wrong MIME types)
+  if (filename) {
+    const lowerName = filename.toLowerCase();
+    if (VALID_VIDEO_EXTENSIONS.some(ext => lowerName.endsWith(ext))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface UploadResult {
   success: boolean;
   fileId?: string;
@@ -91,8 +127,7 @@ export async function getS3UploadUrl(
       return { success: false, error: 'S3 is not configured' };
     }
 
-    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
-    if (!validTypes.includes(contentType)) {
+    if (!isValidVideoType(contentType, filename)) {
       return {
         success: false,
         error: 'Invalid file type. Please upload MP4, MOV, WebM, or AVI.'
@@ -167,14 +202,13 @@ export async function getBatchS3UploadUrls(
       return { success: false, error: 'S3 is not configured' };
     }
 
-    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
     const maxSize = 500 * 1024 * 1024;
 
     const urls: Array<{ url: string; key: string; index: number }> = [];
 
     // Generate all presigned URLs in parallel
     const urlPromises = files.map(async (file, index) => {
-      if (!validTypes.includes(file.contentType)) {
+      if (!isValidVideoType(file.contentType, file.filename)) {
         throw new Error(`Invalid file type for ${file.filename}`);
       }
       if (file.fileSize > maxSize) {
@@ -245,9 +279,8 @@ export async function initChunkedUpload(
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Validate file type
-    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
-    if (!validTypes.includes(mimeType)) {
+    // Validate file type (with iOS-friendly extension fallback)
+    if (!isValidVideoType(mimeType, originalName)) {
       return {
         success: false,
         error: 'Invalid file type. Please upload MP4, MOV, WebM, or AVI.'
@@ -448,8 +481,7 @@ export async function uploadVideo(formData: FormData): Promise<UploadResult> {
       };
     }
 
-    const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
-    if (!validTypes.includes(file.type)) {
+    if (!isValidVideoType(file.type, file.name)) {
       return {
         success: false,
         error: 'Invalid file type. Please upload MP4, MOV, WebM, or AVI.'
