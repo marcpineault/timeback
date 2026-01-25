@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-interface CutSection {
+interface Segment {
   id: string;
   start: number;
   end: number;
+  deleted: boolean;
 }
 
 interface MediaEditorProps {
@@ -32,13 +33,20 @@ export default function MediaEditor({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Cut sections state (sections to remove)
-  const [cutSections, setCutSections] = useState<CutSection[]>([]);
-  const [markingStart, setMarkingStart] = useState<number | null>(null);
+  // Segments state - video divided by split points
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
 
   // Timeline state
   const [thumbnails, setThumbnails] = useState<string[]>([]);
   const [isScrubbingTimeline, setIsScrubbingTimeline] = useState(false);
+
+  // Initialize with single segment when duration is known
+  useEffect(() => {
+    if (duration > 0 && segments.length === 0) {
+      setSegments([{ id: '0', start: 0, end: duration, deleted: false }]);
+    }
+  }, [duration, segments.length]);
 
   // Generate video thumbnails
   useEffect(() => {
@@ -149,11 +157,16 @@ export default function MediaEditor({
       if (e.code === 'Escape') {
         onClose();
       }
+      // Delete selected segment with Backspace/Delete
+      if ((e.code === 'Backspace' || e.code === 'Delete') && selectedSegmentId) {
+        e.preventDefault();
+        toggleSegmentDeleted(selectedSegmentId);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isProcessing, currentTime, duration, onClose]);
+  }, [isProcessing, currentTime, duration, onClose, selectedSegmentId]);
 
   const handlePlayPause = useCallback(() => {
     if (!videoRef.current) return;
@@ -171,27 +184,44 @@ export default function MediaEditor({
     setCurrentTime(clampedTime);
   }, [duration]);
 
-  const handleMarkSection = useCallback(() => {
-    if (markingStart === null) {
-      // Start marking a section to remove
-      setMarkingStart(currentTime);
-    } else {
-      // End marking - create the cut section
-      const start = Math.min(markingStart, currentTime);
-      const end = Math.max(markingStart, currentTime);
-      if (end - start >= 0.1) {
-        setCutSections(prev => [...prev, {
-          id: Date.now().toString(),
-          start,
-          end,
-        }].sort((a, b) => a.start - b.start));
-      }
-      setMarkingStart(null);
-    }
-  }, [currentTime, markingStart]);
+  // Split the video at current playhead position
+  const handleSplit = useCallback(() => {
+    if (duration === 0) return;
 
-  const removeCutSection = useCallback((id: string) => {
-    setCutSections(prev => prev.filter(s => s.id !== id));
+    // Don't split too close to start or end
+    if (currentTime < 0.5 || currentTime > duration - 0.5) return;
+
+    // Find which segment contains the current time
+    const segmentIndex = segments.findIndex(
+      s => currentTime >= s.start && currentTime < s.end
+    );
+    if (segmentIndex === -1) return;
+
+    const segment = segments[segmentIndex];
+
+    // Don't split if too close to existing split points
+    if (currentTime - segment.start < 0.5 || segment.end - currentTime < 0.5) return;
+
+    // Create two new segments from the split
+    const newSegments = [...segments];
+    newSegments.splice(segmentIndex, 1,
+      { id: `${Date.now()}-a`, start: segment.start, end: currentTime, deleted: segment.deleted },
+      { id: `${Date.now()}-b`, start: currentTime, end: segment.end, deleted: segment.deleted }
+    );
+    setSegments(newSegments);
+  }, [currentTime, duration, segments]);
+
+  // Toggle a segment as deleted/kept
+  const toggleSegmentDeleted = useCallback((segmentId: string) => {
+    setSegments(prev => prev.map(s =>
+      s.id === segmentId ? { ...s, deleted: !s.deleted } : s
+    ));
+  }, []);
+
+  // Select a segment when tapped
+  const handleSegmentClick = useCallback((segmentId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedSegmentId(prev => prev === segmentId ? null : segmentId);
   }, []);
 
   // Get time position from pointer event
@@ -218,6 +248,7 @@ export default function MediaEditor({
     const time = getTimeFromEvent(e);
     setIsScrubbingTimeline(true);
     seekTo(time);
+    setSelectedSegmentId(null); // Deselect when scrubbing
   }, [getTimeFromEvent, seekTo]);
 
   // Global pointer events for scrubbing
@@ -268,20 +299,24 @@ export default function MediaEditor({
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms}`;
   };
 
-  // Export - remove the marked sections
+  // Export - remove deleted segments
   const handleExport = async () => {
-    if (cutSections.length === 0) return;
+    const deletedSegments = segments.filter(s => s.deleted);
+    if (deletedSegments.length === 0) {
+      onClose();
+      return;
+    }
 
     setIsProcessing(true);
 
     try {
+      // Convert deleted segments to sections to remove
+      const sectionsToRemove = deletedSegments.map(s => ({ start: s.start, end: s.end }));
+
       const response = await fetch('/api/remove-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename,
-          sectionsToRemove: cutSections.map(s => ({ start: s.start, end: s.end }))
-        }),
+        body: JSON.stringify({ filename, sectionsToRemove }),
       });
 
       if (!response.ok) {
@@ -303,8 +338,11 @@ export default function MediaEditor({
     }
   };
 
-  const totalCutTime = cutSections.reduce((sum, s) => sum + (s.end - s.start), 0);
+  const deletedSegments = segments.filter(s => s.deleted);
+  const totalDeletedTime = deletedSegments.reduce((sum, s) => sum + (s.end - s.start), 0);
   const playheadPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const selectedSegment = segments.find(s => s.id === selectedSegmentId);
+  const hasChanges = deletedSegments.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -324,7 +362,7 @@ export default function MediaEditor({
 
         <button
           onClick={handleExport}
-          disabled={isProcessing || cutSections.length === 0}
+          disabled={isProcessing}
           className="px-4 py-2 bg-blue-500 hover:bg-blue-600 active:scale-95 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-all"
         >
           {isProcessing ? (
@@ -368,13 +406,6 @@ export default function MediaEditor({
           <span className="text-white text-sm font-mono">{formatTime(currentTime)}</span>
           <span className="text-gray-400 text-sm font-mono"> / {formatTime(duration)}</span>
         </div>
-
-        {/* Marking indicator */}
-        {markingStart !== null && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-red-500/80 backdrop-blur-sm rounded-full animate-pulse">
-            <span className="text-white text-xs">Marking from {formatTime(markingStart)}...</span>
-          </div>
-        )}
       </div>
 
       {/* Timeline Section */}
@@ -386,7 +417,7 @@ export default function MediaEditor({
           <span>{formatTime(duration)}</span>
         </div>
 
-        {/* Timeline with thumbnails */}
+        {/* Timeline with segments */}
         <div className="relative mx-4 mb-2 h-20 touch-none select-none">
           <div
             ref={timelineRef}
@@ -409,64 +440,70 @@ export default function MediaEditor({
               )}
             </div>
 
-            {/* Cut sections (red overlays) */}
-            {cutSections.map(section => (
-              <div
-                key={section.id}
-                className="absolute top-0 bottom-0 bg-red-500/50 border-x-2 border-red-500 z-10 group"
-                style={{
-                  left: `${(section.start / duration) * 100}%`,
-                  width: `${((section.end - section.start) / duration) * 100}%`,
-                }}
-              >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeCutSection(section.id);
-                  }}
-                  className="absolute -top-2 right-0 w-6 h-6 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center z-20"
-                >
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
+            {/* Segments overlay */}
+            {segments.map(segment => {
+              const leftPercent = (segment.start / duration) * 100;
+              const widthPercent = ((segment.end - segment.start) / duration) * 100;
+              const isSelected = segment.id === selectedSegmentId;
 
-            {/* Active marking region */}
-            {markingStart !== null && (
+              return (
+                <div
+                  key={segment.id}
+                  className={`absolute top-0 bottom-0 transition-all cursor-pointer ${
+                    segment.deleted
+                      ? 'bg-red-500/60'
+                      : isSelected
+                        ? 'bg-blue-500/30 ring-2 ring-blue-400 ring-inset'
+                        : 'bg-transparent hover:bg-white/10'
+                  }`}
+                  style={{
+                    left: `${leftPercent}%`,
+                    width: `${widthPercent}%`,
+                  }}
+                  onClick={(e) => handleSegmentClick(segment.id, e)}
+                >
+                  {/* Deleted X indicator */}
+                  {segment.deleted && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-red-600/80 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Split point lines */}
+            {segments.slice(1).map((segment, i) => (
               <div
-                className="absolute top-0 bottom-0 bg-red-500/30 border-l-2 border-red-500 border-dashed z-10 animate-pulse"
-                style={{
-                  left: `${(Math.min(markingStart, currentTime) / duration) * 100}%`,
-                  width: `${(Math.abs(currentTime - markingStart) / duration) * 100}%`,
-                }}
+                key={`split-${i}`}
+                className="absolute top-0 bottom-0 w-0.5 bg-white/80 z-20 pointer-events-none"
+                style={{ left: `${(segment.start / duration) * 100}%` }}
               />
-            )}
+            ))}
 
             {/* Playhead */}
             <div
-              className="absolute top-0 bottom-0 w-0.5 bg-white z-40 pointer-events-none"
+              className="absolute top-0 bottom-0 w-0.5 bg-yellow-400 z-30 pointer-events-none"
               style={{ left: `${playheadPercent}%` }}
             >
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-lg" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-yellow-400 rounded-full shadow-lg" />
             </div>
           </div>
         </div>
 
         {/* Status bar */}
         <div className="px-4 py-2 text-center">
-          {cutSections.length > 0 ? (
+          {hasChanges ? (
             <p className="text-xs text-gray-400">
-              Removing <span className="text-red-400 font-medium">{formatTime(totalCutTime)}</span> ({cutSections.length} section{cutSections.length !== 1 ? 's' : ''}) - Final: {formatTime(duration - totalCutTime)}
-            </p>
-          ) : markingStart === null ? (
-            <p className="text-xs text-gray-500">
-              Tap the button below to mark sections to remove
+              Removing <span className="text-red-400 font-medium">{formatTime(totalDeletedTime)}</span> ({deletedSegments.length} clip{deletedSegments.length !== 1 ? 's' : ''}) - Final: {formatTime(duration - totalDeletedTime)}
             </p>
           ) : (
             <p className="text-xs text-gray-500">
-              Scrub to the end of the section, then tap again
+              Split the video, then tap clips to delete them
             </p>
           )}
         </div>
@@ -474,32 +511,44 @@ export default function MediaEditor({
 
       {/* Bottom Toolbar */}
       <div className="bg-gray-900 border-t border-gray-800 pb-safe">
-        <div className="flex items-center justify-center gap-4 px-4 py-4">
+        <div className="flex items-center justify-center gap-3 px-4 py-4">
+          {/* Split button */}
           <button
-            onClick={handleMarkSection}
-            className={`flex flex-col items-center gap-1 px-8 py-3 rounded-xl transition-all active:scale-95 ${
-              markingStart !== null
-                ? 'bg-red-600 hover:bg-red-700 animate-pulse'
-                : 'bg-red-500 hover:bg-red-600'
-            }`}
+            onClick={handleSplit}
+            disabled={currentTime < 0.5 || currentTime > duration - 0.5}
+            className="flex flex-col items-center gap-1 px-6 py-3 bg-white/10 hover:bg-white/20 active:scale-95 disabled:opacity-30 disabled:active:scale-100 rounded-xl transition-all"
           >
-            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m0-8h.01" />
             </svg>
-            <span className="text-white text-sm font-medium">
-              {markingStart !== null ? 'End Mark' : 'Mark to Remove'}
-            </span>
+            <span className="text-white text-xs font-medium">Split</span>
           </button>
 
-          {markingStart !== null && (
+          {/* Delete/Restore button - only shows when segment selected */}
+          {selectedSegment && (
             <button
-              onClick={() => setMarkingStart(null)}
-              className="flex flex-col items-center gap-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 active:scale-95 rounded-xl transition-all"
+              onClick={() => toggleSegmentDeleted(selectedSegment.id)}
+              className={`flex flex-col items-center gap-1 px-6 py-3 rounded-xl transition-all active:scale-95 ${
+                selectedSegment.deleted
+                  ? 'bg-green-500 hover:bg-green-600'
+                  : 'bg-red-500 hover:bg-red-600'
+              }`}
             >
-              <svg className="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <span className="text-gray-300 text-sm font-medium">Cancel</span>
+              {selectedSegment.deleted ? (
+                <>
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                  <span className="text-white text-xs font-medium">Restore</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span className="text-white text-xs font-medium">Delete</span>
+                </>
+              )}
             </button>
           )}
         </div>
