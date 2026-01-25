@@ -2,14 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
-type EditorMode = 'trim' | 'split' | 'cut';
-
-interface SplitPart {
-  partNumber: number;
-  filename: string;
-  downloadUrl: string;
-}
-
 interface CutSection {
   id: string;
   start: number;
@@ -21,10 +13,7 @@ interface MediaEditorProps {
   videoName: string;
   filename: string;
   onClose: () => void;
-  onTrimComplete?: (filename: string) => void;
-  onSplitComplete?: (parts: SplitPart[]) => void;
-  onRemoveComplete?: (filename: string, stats: { sectionsRemoved: number; timeRemoved: number }) => void;
-  initialMode?: EditorMode;
+  onComplete?: (filename: string, stats: { sectionsRemoved: number; timeRemoved: number }) => void;
 }
 
 export default function MediaEditor({
@@ -32,48 +21,29 @@ export default function MediaEditor({
   videoName,
   filename,
   onClose,
-  onTrimComplete,
-  onSplitComplete,
-  onRemoveComplete,
-  initialMode = 'trim',
+  onComplete,
 }: MediaEditorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const timelineContainerRef = useRef<HTMLDivElement>(null);
 
   // Core state
-  const [mode, setMode] = useState<EditorMode>(initialMode);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Trim state
-  const [trimStart, setTrimStart] = useState(0);
-  const [trimEnd, setTrimEnd] = useState(0);
-
-  // Split state
-  const [splitPoints, setSplitPoints] = useState<number[]>([]);
-
   // Cut sections state (sections to remove)
   const [cutSections, setCutSections] = useState<CutSection[]>([]);
-  const [activeCutStart, setActiveCutStart] = useState<number | null>(null);
+  const [markingStart, setMarkingStart] = useState<number | null>(null);
 
   // Timeline state
   const [thumbnails, setThumbnails] = useState<string[]>([]);
-  const [isDragging, setIsDragging] = useState<'trim-start' | 'trim-end' | 'playhead' | 'split' | null>(null);
-  const [dragSplitIndex, setDragSplitIndex] = useState<number | null>(null);
   const [isScrubbingTimeline, setIsScrubbingTimeline] = useState(false);
 
-  // Long press for split
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const [showSplitIndicator, setShowSplitIndicator] = useState(false);
-
-  // Generate video thumbnails using a separate video element
+  // Generate video thumbnails
   useEffect(() => {
     if (duration === 0 || thumbnails.length > 0) return;
 
-    // Create a separate video element for thumbnail generation
     const thumbVideo = document.createElement('video');
     thumbVideo.src = videoUrl;
     thumbVideo.crossOrigin = 'anonymous';
@@ -102,7 +72,6 @@ export default function MediaEditor({
         thumbVideo.remove();
         return;
       }
-
       thumbVideo.currentTime = currentThumb * interval;
     };
 
@@ -112,15 +81,13 @@ export default function MediaEditor({
         ctx.drawImage(thumbVideo, 0, 0, thumbWidth, thumbHeight);
         thumbs.push(canvas.toDataURL('image/jpeg', 0.5));
       } catch {
-        // Ignore CORS or other errors, just skip this thumbnail
+        // Ignore CORS or other errors
       }
       currentThumb++;
       captureFrame();
     };
 
-    const handleCanPlay = () => {
-      captureFrame();
-    };
+    const handleCanPlay = () => captureFrame();
 
     thumbVideo.addEventListener('seeked', handleSeeked);
     thumbVideo.addEventListener('canplay', handleCanPlay, { once: true });
@@ -139,23 +106,13 @@ export default function MediaEditor({
     const video = videoRef.current;
     if (!video) return;
 
-    const handleLoadedMetadata = () => {
-      setDuration(video.duration);
-      setTrimEnd(video.duration);
-    };
-
+    const handleLoadedMetadata = () => setDuration(video.duration);
     const handleTimeUpdate = () => {
-      if (!isScrubbingTimeline) {
-        setCurrentTime(video.currentTime);
-      }
+      if (!isScrubbingTimeline) setCurrentTime(video.currentTime);
     };
-
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => {
-      video.currentTime = trimStart;
-      setIsPlaying(false);
-    };
+    const handleEnded = () => setIsPlaying(false);
 
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -170,7 +127,7 @@ export default function MediaEditor({
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [trimStart, isScrubbingTimeline]);
+  }, [isScrubbingTimeline]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -189,10 +146,6 @@ export default function MediaEditor({
         e.preventDefault();
         seekTo(Math.min(duration, currentTime + 1));
       }
-      if (e.code === 'KeyS' && mode === 'split') {
-        e.preventDefault();
-        handleSplit();
-      }
       if (e.code === 'Escape') {
         onClose();
       }
@@ -200,20 +153,16 @@ export default function MediaEditor({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isProcessing, currentTime, duration, mode]);
+  }, [isProcessing, currentTime, duration, onClose]);
 
   const handlePlayPause = useCallback(() => {
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
     } else {
-      // If at or past trim end, restart from trim start
-      if (videoRef.current.currentTime >= trimEnd) {
-        videoRef.current.currentTime = trimStart;
-      }
       videoRef.current.play();
     }
-  }, [isPlaying, trimStart, trimEnd]);
+  }, [isPlaying]);
 
   const seekTo = useCallback((time: number) => {
     if (!videoRef.current) return;
@@ -222,44 +171,30 @@ export default function MediaEditor({
     setCurrentTime(clampedTime);
   }, [duration]);
 
-  const handleSplit = useCallback(() => {
-    if (currentTime > 0.5 && currentTime < duration - 0.5) {
-      const nearby = splitPoints.some(p => Math.abs(p - currentTime) < 0.5);
-      if (!nearby) {
-        setSplitPoints(prev => [...prev, currentTime].sort((a, b) => a - b));
-        // Visual feedback
-        setShowSplitIndicator(true);
-        setTimeout(() => setShowSplitIndicator(false), 300);
-      }
-    }
-  }, [currentTime, duration, splitPoints]);
-
-  const handleCut = useCallback(() => {
-    if (activeCutStart === null) {
-      // Start new cut
-      setActiveCutStart(currentTime);
+  const handleMarkSection = useCallback(() => {
+    if (markingStart === null) {
+      // Start marking a section to remove
+      setMarkingStart(currentTime);
     } else {
-      // End cut
-      if (currentTime > activeCutStart) {
+      // End marking - create the cut section
+      const start = Math.min(markingStart, currentTime);
+      const end = Math.max(markingStart, currentTime);
+      if (end - start >= 0.1) {
         setCutSections(prev => [...prev, {
           id: Date.now().toString(),
-          start: activeCutStart,
-          end: currentTime,
+          start,
+          end,
         }].sort((a, b) => a.start - b.start));
       }
-      setActiveCutStart(null);
+      setMarkingStart(null);
     }
-  }, [currentTime, activeCutStart]);
+  }, [currentTime, markingStart]);
 
   const removeCutSection = useCallback((id: string) => {
     setCutSections(prev => prev.filter(s => s.id !== id));
   }, []);
 
-  const removeSplitPoint = useCallback((index: number) => {
-    setSplitPoints(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  // Get position from touch/mouse event
+  // Get time position from pointer event
   const getTimeFromEvent = useCallback((e: React.TouchEvent | React.MouseEvent | TouchEvent | MouseEvent) => {
     if (!timelineRef.current) return 0;
     const rect = timelineRef.current.getBoundingClientRect();
@@ -278,39 +213,19 @@ export default function MediaEditor({
     return percentage * duration;
   }, [duration]);
 
-  // Timeline touch/mouse handlers
+  // Timeline pointer handlers
   const handleTimelinePointerDown = useCallback((e: React.TouchEvent | React.MouseEvent) => {
     const time = getTimeFromEvent(e);
     setIsScrubbingTimeline(true);
     seekTo(time);
+  }, [getTimeFromEvent, seekTo]);
 
-    // Start long press timer for split mode
-    if (mode === 'split') {
-      longPressTimer.current = setTimeout(() => {
-        handleSplit();
-      }, 500);
-    }
-  }, [getTimeFromEvent, seekTo, mode, handleSplit]);
-
-  // Handle trim handle drag start
-  const handleTrimHandleStart = useCallback((handle: 'trim-start' | 'trim-end', e: React.TouchEvent | React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDragging(handle);
-  }, []);
-
-  // Handle split point drag start
-  const handleSplitDragStart = useCallback((index: number, e: React.TouchEvent | React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDragging('split');
-    setDragSplitIndex(index);
-  }, []);
-
-  // Global pointer events for dragging
+  // Global pointer events for scrubbing
   useEffect(() => {
-    if (!isDragging && !isScrubbingTimeline) return;
+    if (!isScrubbingTimeline) return;
 
     const handleMove = (e: TouchEvent | MouseEvent) => {
-      if (!timelineRef.current) return;
+      if (!timelineRef.current || !videoRef.current) return;
       const rect = timelineRef.current.getBoundingClientRect();
       let clientX: number;
       if ('touches' in e && e.touches.length > 0) {
@@ -325,33 +240,11 @@ export default function MediaEditor({
       const x = clientX - rect.left;
       const percentage = Math.max(0, Math.min(1, x / rect.width));
       const time = percentage * duration;
-
-      if (isDragging === 'trim-start') {
-        setTrimStart(Math.min(time, trimEnd - 0.5));
-      } else if (isDragging === 'trim-end') {
-        setTrimEnd(Math.max(time, trimStart + 0.5));
-      } else if (isDragging === 'split' && dragSplitIndex !== null) {
-        setSplitPoints(prev => {
-          const newPoints = [...prev];
-          newPoints[dragSplitIndex] = Math.max(0.5, Math.min(duration - 0.5, time));
-          return newPoints.sort((a, b) => a - b);
-        });
-      } else if (isScrubbingTimeline && videoRef.current) {
-        const clampedTime = Math.max(0, Math.min(duration, time));
-        videoRef.current.currentTime = clampedTime;
-        setCurrentTime(clampedTime);
-      }
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
     };
 
-    const handleUp = () => {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
-      setIsScrubbingTimeline(false);
-      setIsDragging(null);
-      setDragSplitIndex(null);
-    };
+    const handleUp = () => setIsScrubbingTimeline(false);
 
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
@@ -366,7 +259,7 @@ export default function MediaEditor({
       window.removeEventListener('touchend', handleUp);
       window.removeEventListener('touchcancel', handleUp);
     };
-  }, [isDragging, isScrubbingTimeline, trimStart, trimEnd, duration, dragSplitIndex]);
+  }, [isScrubbingTimeline, duration]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -375,69 +268,8 @@ export default function MediaEditor({
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms}`;
   };
 
-  // Calculate positions
-  const trimStartPercent = duration > 0 ? (trimStart / duration) * 100 : 0;
-  const trimEndPercent = duration > 0 ? (trimEnd / duration) * 100 : 100;
-  const playheadPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-
-  // API calls
-  const handleApplyTrim = async () => {
-    if (trimStart === 0 && trimEnd === duration) return;
-
-    setIsProcessing(true);
-
-    try {
-      const response = await fetch('/api/trim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, startTime: trimStart, endTime: trimEnd }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Trim failed');
-      }
-
-      const data = await response.json();
-      onTrimComplete?.(data.filename);
-      onClose();
-    } catch (error) {
-      console.error('Trim error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to trim video');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleApplySplit = async () => {
-    if (splitPoints.length === 0) return;
-
-    setIsProcessing(true);
-
-    try {
-      const response = await fetch('/api/split', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, splitPoints }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Split failed');
-      }
-
-      const data = await response.json();
-      onSplitComplete?.(data.parts);
-      onClose();
-    } catch (error) {
-      console.error('Split error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to split video');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleApplyCut = async () => {
+  // Export - remove the marked sections
+  const handleExport = async () => {
     if (cutSections.length === 0) return;
 
     setIsProcessing(true);
@@ -454,25 +286,25 @@ export default function MediaEditor({
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Cut failed');
+        throw new Error(data.error || 'Export failed');
       }
 
       const data = await response.json();
-      onRemoveComplete?.(data.filename, {
+      onComplete?.(data.filename, {
         sectionsRemoved: data.stats.sectionsRemoved,
         timeRemoved: data.stats.timeRemoved,
       });
       onClose();
     } catch (error) {
-      console.error('Cut error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to cut video');
+      console.error('Export error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to export video');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const totalCutTime = cutSections.reduce((sum, s) => sum + (s.end - s.start), 0);
-  const trimmedDuration = trimEnd - trimStart;
+  const playheadPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -491,18 +323,14 @@ export default function MediaEditor({
         <h1 className="text-white font-medium text-sm truncate max-w-[50%]">{videoName}</h1>
 
         <button
-          onClick={() => {
-            if (mode === 'trim') handleApplyTrim();
-            else if (mode === 'split') handleApplySplit();
-            else if (mode === 'cut') handleApplyCut();
-          }}
-          disabled={isProcessing || (mode === 'trim' && trimStart === 0 && trimEnd === duration) || (mode === 'split' && splitPoints.length === 0) || (mode === 'cut' && cutSections.length === 0)}
+          onClick={handleExport}
+          disabled={isProcessing || cutSections.length === 0}
           className="px-4 py-2 bg-blue-500 hover:bg-blue-600 active:scale-95 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-all"
         >
           {isProcessing ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
-            'Export'
+            'Done'
           )}
         </button>
       </div>
@@ -535,30 +363,16 @@ export default function MediaEditor({
           </div>
         </button>
 
-        {/* Split indicator */}
-        {showSplitIndicator && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="px-4 py-2 bg-orange-500 text-white rounded-lg font-medium animate-pulse">
-              Split Added!
-            </div>
-          </div>
-        )}
-
         {/* Current time badge */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/70 backdrop-blur-sm rounded-full">
           <span className="text-white text-sm font-mono">{formatTime(currentTime)}</span>
           <span className="text-gray-400 text-sm font-mono"> / {formatTime(duration)}</span>
         </div>
 
-        {/* Mode-specific info */}
-        {mode === 'trim' && (trimStart > 0 || trimEnd < duration) && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-blue-500/80 backdrop-blur-sm rounded-full">
-            <span className="text-white text-xs">Trimmed: {formatTime(trimmedDuration)}</span>
-          </div>
-        )}
-        {mode === 'cut' && activeCutStart !== null && (
+        {/* Marking indicator */}
+        {markingStart !== null && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-red-500/80 backdrop-blur-sm rounded-full animate-pulse">
-            <span className="text-white text-xs">Cutting from {formatTime(activeCutStart)}...</span>
+            <span className="text-white text-xs">Marking from {formatTime(markingStart)}...</span>
           </div>
         )}
       </div>
@@ -573,10 +387,7 @@ export default function MediaEditor({
         </div>
 
         {/* Timeline with thumbnails */}
-        <div
-          ref={timelineContainerRef}
-          className="relative mx-4 mb-2 h-20 touch-none select-none"
-        >
+        <div className="relative mx-4 mb-2 h-20 touch-none select-none">
           <div
             ref={timelineRef}
             className="relative h-full bg-gray-800 rounded-lg overflow-hidden cursor-pointer"
@@ -598,22 +409,8 @@ export default function MediaEditor({
               )}
             </div>
 
-            {/* Trim region overlay (grayed out areas) */}
-            {mode === 'trim' && (
-              <>
-                <div
-                  className="absolute top-0 bottom-0 left-0 bg-black/70 z-10"
-                  style={{ width: `${trimStartPercent}%` }}
-                />
-                <div
-                  className="absolute top-0 bottom-0 right-0 bg-black/70 z-10"
-                  style={{ width: `${100 - trimEndPercent}%` }}
-                />
-              </>
-            )}
-
             {/* Cut sections (red overlays) */}
-            {mode === 'cut' && cutSections.map(section => (
+            {cutSections.map(section => (
               <div
                 key={section.id}
                 className="absolute top-0 bottom-0 bg-red-500/50 border-x-2 border-red-500 z-10 group"
@@ -627,7 +424,7 @@ export default function MediaEditor({
                     e.stopPropagation();
                     removeCutSection(section.id);
                   }}
-                  className="absolute -top-2 right-0 w-6 h-6 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center opacity-100 z-20"
+                  className="absolute -top-2 right-0 w-6 h-6 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center z-20"
                 >
                   <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
@@ -636,91 +433,18 @@ export default function MediaEditor({
               </div>
             ))}
 
-            {/* Active cut region */}
-            {mode === 'cut' && activeCutStart !== null && (
+            {/* Active marking region */}
+            {markingStart !== null && (
               <div
                 className="absolute top-0 bottom-0 bg-red-500/30 border-l-2 border-red-500 border-dashed z-10 animate-pulse"
                 style={{
-                  left: `${(activeCutStart / duration) * 100}%`,
-                  width: `${((currentTime - activeCutStart) / duration) * 100}%`,
+                  left: `${(Math.min(markingStart, currentTime) / duration) * 100}%`,
+                  width: `${(Math.abs(currentTime - markingStart) / duration) * 100}%`,
                 }}
               />
             )}
 
-            {/* Split points */}
-            {mode === 'split' && splitPoints.map((point, index) => (
-              <div
-                key={index}
-                className="absolute top-0 bottom-0 z-20 group"
-                style={{ left: `${(point / duration) * 100}%` }}
-              >
-                <div
-                  className="absolute top-0 bottom-0 w-1 bg-orange-500 -translate-x-1/2 cursor-ew-resize"
-                  onMouseDown={(e) => handleSplitDragStart(index, e)}
-                  onTouchStart={(e) => handleSplitDragStart(index, e)}
-                />
-                <div
-                  className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center shadow-lg cursor-ew-resize active:scale-110 transition-transform"
-                  onMouseDown={(e) => handleSplitDragStart(index, e)}
-                  onTouchStart={(e) => handleSplitDragStart(index, e)}
-                >
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-                  </svg>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeSplitPoint(index);
-                  }}
-                  className="absolute -bottom-1 left-0 -translate-x-1/2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30"
-                >
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
-
-            {/* Trim handles */}
-            {mode === 'trim' && (
-              <>
-                {/* Start handle */}
-                <div
-                  className="absolute top-0 bottom-0 z-30 cursor-ew-resize"
-                  style={{ left: `calc(${trimStartPercent}% - 12px)` }}
-                  onMouseDown={(e) => handleTrimHandleStart('trim-start', e)}
-                  onTouchStart={(e) => handleTrimHandleStart('trim-start', e)}
-                >
-                  <div className="w-6 h-full bg-yellow-400 rounded-l-md flex items-center justify-center active:bg-yellow-300 transition-colors">
-                    <div className="w-1 h-8 bg-yellow-600 rounded-full" />
-                  </div>
-                </div>
-
-                {/* End handle */}
-                <div
-                  className="absolute top-0 bottom-0 z-30 cursor-ew-resize"
-                  style={{ left: `calc(${trimEndPercent}% - 12px)` }}
-                  onMouseDown={(e) => handleTrimHandleStart('trim-end', e)}
-                  onTouchStart={(e) => handleTrimHandleStart('trim-end', e)}
-                >
-                  <div className="w-6 h-full bg-yellow-400 rounded-r-md flex items-center justify-center active:bg-yellow-300 transition-colors">
-                    <div className="w-1 h-8 bg-yellow-600 rounded-full" />
-                  </div>
-                </div>
-
-                {/* Trim border */}
-                <div
-                  className="absolute top-0 bottom-0 border-y-4 border-yellow-400 pointer-events-none z-20"
-                  style={{
-                    left: `${trimStartPercent}%`,
-                    width: `${trimEndPercent - trimStartPercent}%`,
-                  }}
-                />
-              </>
-            )}
-
-            {/* Playhead (center indicator line) */}
+            {/* Playhead */}
             <div
               className="absolute top-0 bottom-0 w-0.5 bg-white z-40 pointer-events-none"
               style={{ left: `${playheadPercent}%` }}
@@ -730,118 +454,54 @@ export default function MediaEditor({
           </div>
         </div>
 
-        {/* Mode-specific status bar */}
+        {/* Status bar */}
         <div className="px-4 py-2 text-center">
-          {mode === 'trim' && (trimStart > 0 || trimEnd < duration) && (
+          {cutSections.length > 0 ? (
             <p className="text-xs text-gray-400">
-              Keeping <span className="text-blue-400 font-medium">{formatTime(trimmedDuration)}</span> of {formatTime(duration)}
+              Removing <span className="text-red-400 font-medium">{formatTime(totalCutTime)}</span> ({cutSections.length} section{cutSections.length !== 1 ? 's' : ''}) - Final: {formatTime(duration - totalCutTime)}
             </p>
-          )}
-          {mode === 'split' && splitPoints.length > 0 && (
-            <p className="text-xs text-gray-400">
-              <span className="text-orange-400 font-medium">{splitPoints.length + 1}</span> clips will be created
-            </p>
-          )}
-          {mode === 'cut' && cutSections.length > 0 && (
-            <p className="text-xs text-gray-400">
-              Removing <span className="text-red-400 font-medium">{formatTime(totalCutTime)}</span> • Final: {formatTime(duration - totalCutTime)}
-            </p>
-          )}
-          {((mode === 'trim' && trimStart === 0 && trimEnd === duration) ||
-            (mode === 'split' && splitPoints.length === 0) ||
-            (mode === 'cut' && cutSections.length === 0 && activeCutStart === null)) && (
+          ) : markingStart === null ? (
             <p className="text-xs text-gray-500">
-              {mode === 'trim' && 'Drag the yellow handles to trim'}
-              {mode === 'split' && 'Tap timeline or press the Split button'}
-              {mode === 'cut' && 'Tap Cut to mark start, tap again to mark end'}
+              Tap the button below to mark sections to remove
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500">
+              Scrub to the end of the section, then tap again
             </p>
           )}
         </div>
       </div>
 
-      {/* Bottom Toolbar - CapCut Style */}
+      {/* Bottom Toolbar */}
       <div className="bg-gray-900 border-t border-gray-800 pb-safe">
-        {/* Action buttons for current mode */}
-        <div className="flex items-center justify-center gap-4 px-4 py-3">
-          {mode === 'split' && (
-            <button
-              onClick={handleSplit}
-              disabled={currentTime <= 0.5 || currentTime >= duration - 0.5}
-              className="flex flex-col items-center gap-1 px-6 py-2 bg-orange-500 hover:bg-orange-600 active:scale-95 disabled:bg-gray-700 disabled:text-gray-500 rounded-xl transition-all"
-            >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="text-white text-xs font-medium">Split Here</span>
-            </button>
-          )}
-          {mode === 'cut' && (
-            <button
-              onClick={handleCut}
-              className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-all active:scale-95 ${
-                activeCutStart !== null
-                  ? 'bg-red-600 hover:bg-red-700 animate-pulse'
-                  : 'bg-red-500 hover:bg-red-600'
-              }`}
-            >
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
-              </svg>
-              <span className="text-white text-xs font-medium">
-                {activeCutStart !== null ? 'End Cut' : 'Start Cut'}
-              </span>
-            </button>
-          )}
-          {mode === 'cut' && activeCutStart !== null && (
-            <button
-              onClick={() => setActiveCutStart(null)}
-              className="flex flex-col items-center gap-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 active:scale-95 rounded-xl transition-all"
-            >
-              <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <span className="text-gray-300 text-xs font-medium">Cancel</span>
-            </button>
-          )}
-        </div>
-
-        {/* Mode selector tabs */}
-        <div className="flex items-center justify-around px-2 py-2 border-t border-gray-800">
+        <div className="flex items-center justify-center gap-4 px-4 py-4">
           <button
-            onClick={() => setMode('trim')}
-            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-xl transition-all active:scale-95 ${
-              mode === 'trim' ? 'bg-blue-500/20' : ''
+            onClick={handleMarkSection}
+            className={`flex flex-col items-center gap-1 px-8 py-3 rounded-xl transition-all active:scale-95 ${
+              markingStart !== null
+                ? 'bg-red-600 hover:bg-red-700 animate-pulse'
+                : 'bg-red-500 hover:bg-red-600'
             }`}
           >
-            <svg className={`w-6 h-6 ${mode === 'trim' ? 'text-blue-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-            </svg>
-            <span className={`text-xs font-medium ${mode === 'trim' ? 'text-blue-400' : 'text-gray-400'}`}>Trim</span>
-          </button>
-
-          <button
-            onClick={() => setMode('split')}
-            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-xl transition-all active:scale-95 ${
-              mode === 'split' ? 'bg-orange-500/20' : ''
-            }`}
-          >
-            <svg className={`w-6 h-6 ${mode === 'split' ? 'text-orange-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-            <span className={`text-xs font-medium ${mode === 'split' ? 'text-orange-400' : 'text-gray-400'}`}>Split</span>
-          </button>
-
-          <button
-            onClick={() => setMode('cut')}
-            className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-xl transition-all active:scale-95 ${
-              mode === 'cut' ? 'bg-red-500/20' : ''
-            }`}
-          >
-            <svg className={`w-6 h-6 ${mode === 'cut' ? 'text-red-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
             </svg>
-            <span className={`text-xs font-medium ${mode === 'cut' ? 'text-red-400' : 'text-gray-400'}`}>Cut</span>
+            <span className="text-white text-sm font-medium">
+              {markingStart !== null ? 'End Mark' : 'Mark to Remove'}
+            </span>
           </button>
+
+          {markingStart !== null && (
+            <button
+              onClick={() => setMarkingStart(null)}
+              className="flex flex-col items-center gap-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 active:scale-95 rounded-xl transition-all"
+            >
+              <svg className="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className="text-gray-300 text-sm font-medium">Cancel</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

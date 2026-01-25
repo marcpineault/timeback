@@ -64,36 +64,7 @@ export default function VideoProcessor({
     setEditorVideo(null)
   }
 
-  const handleTrimComplete = (filename: string) => {
-    // Update the video in queue if needed (URL might change)
-    setVideoQueue(prev =>
-      prev.map(v => v.outputFilename === filename ? { ...v } : v)
-    )
-    setEditorVideo(null)
-  }
-
-  const handleSplitComplete = (parts: { partNumber: number; filename: string; downloadUrl: string }[]) => {
-    // Remove the original video and add the split parts
-    if (editorVideo) {
-      setVideoQueue(prev => {
-        const filtered = prev.filter(v => v.file.fileId !== editorVideo.file.fileId)
-        const newVideos: QueuedVideo[] = parts.map(part => ({
-          file: {
-            ...editorVideo.file,
-            fileId: `${editorVideo.file.fileId}_part${part.partNumber}`,
-            originalName: `${editorVideo.file.originalName.replace(/\.[^/.]+$/, '')} (Part ${part.partNumber}).mp4`,
-          },
-          status: 'complete' as const,
-          downloadUrl: part.downloadUrl,
-          outputFilename: part.filename,
-        }))
-        return [...filtered, ...newVideos]
-      })
-    }
-    setEditorVideo(null)
-  }
-
-  const handleRemoveComplete = (filename: string, _stats: { sectionsRemoved: number; timeRemoved: number }) => {
+  const handleEditorComplete = (filename: string, _stats: { sectionsRemoved: number; timeRemoved: number }) => {
     // Update the video in queue with new filename (sections removed)
     if (editorVideo) {
       setVideoQueue(prev =>
@@ -388,7 +359,7 @@ export default function VideoProcessor({
                   </svg>
                   edit
                 </span>{' '}
-                button to trim the start/end or split into multiple parts - all in one tool.
+                button to cut out any unwanted sections from your video.
               </p>
             </div>
           </div>
@@ -412,16 +383,14 @@ export default function VideoProcessor({
         />
       )}
 
-      {/* Unified Media Editor Modal */}
+      {/* Video Editor Modal */}
       {editorVideo && editorVideo.downloadUrl && editorVideo.outputFilename && (
         <MediaEditor
           videoUrl={editorVideo.downloadUrl}
           videoName={editorVideo.file.originalName}
           filename={editorVideo.outputFilename}
           onClose={handleCloseEditor}
-          onTrimComplete={handleTrimComplete}
-          onSplitComplete={handleSplitComplete}
-          onRemoveComplete={handleRemoveComplete}
+          onComplete={handleEditorComplete}
         />
       )}
     </div>
