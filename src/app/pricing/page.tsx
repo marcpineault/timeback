@@ -20,22 +20,22 @@ export default async function PricingPage() {
       <header className="border-b border-gray-800">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-white">TimeBack</Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {userId ? (
               <Link
                 href="/dashboard"
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+                className="px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
               >
                 Dashboard
               </Link>
             ) : (
               <>
-                <Link href="/sign-in" className="text-gray-400 hover:text-white transition-colors">
+                <Link href="/sign-in" className="hidden sm:block text-gray-400 hover:text-white transition-colors">
                   Sign In
                 </Link>
                 <Link
                   href="/sign-up"
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+                  className="px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                 >
                   Get Started
                 </Link>
@@ -45,15 +45,15 @@ export default async function PricingPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4">Simple, Transparent Pricing</h1>
-          <p className="text-gray-400 text-lg">Start free. Upgrade when you need more.</p>
+      <div className="max-w-6xl mx-auto px-4 py-8 sm:py-16">
+        <div className="text-center mb-8 sm:mb-12">
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-3 sm:mb-4">Simple, Transparent Pricing</h1>
+          <p className="text-gray-400 text-base sm:text-lg">Start free. Upgrade when you need more.</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8 max-w-5xl mx-auto">
           {/* Free Plan */}
-          <div className={`bg-gray-800 rounded-xl p-6 border-2 ${currentPlan === 'FREE' ? 'border-blue-500' : 'border-transparent'}`}>
+          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'FREE' ? 'border-blue-500' : 'border-transparent'}`}>
             {currentPlan === 'FREE' && (
               <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
                 Current Plan
@@ -95,7 +95,7 @@ export default async function PricingPage() {
           </div>
 
           {/* Pro Plan */}
-          <div className={`bg-gray-800 rounded-xl p-6 border-2 ${currentPlan === 'PRO' ? 'border-blue-500' : 'border-blue-500/50'} relative`}>
+          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'PRO' ? 'border-blue-500' : 'border-blue-500/50'} relative sm:col-span-2 lg:col-span-1`}>
             <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
               Most Popular
             </span>
@@ -146,7 +146,7 @@ export default async function PricingPage() {
           </div>
 
           {/* Business Plan */}
-          <div className={`bg-gray-800 rounded-xl p-6 border-2 ${currentPlan === 'BUSINESS' ? 'border-blue-500' : 'border-transparent'}`}>
+          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'BUSINESS' ? 'border-blue-500' : 'border-transparent'}`}>
             {currentPlan === 'BUSINESS' && (
               <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
                 Current Plan
@@ -195,20 +195,20 @@ export default async function PricingPage() {
         </div>
 
         {/* FAQ */}
-        <div className="mt-20 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-white text-center mb-8">Frequently Asked Questions</h2>
-          <div className="space-y-4">
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">What happens when I reach my video limit?</h3>
-              <p className="text-gray-400">You can upgrade anytime to process more videos. Your processed videos remain available.</p>
+        <div className="mt-12 sm:mt-20 max-w-3xl mx-auto">
+          <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-6 sm:mb-8">Frequently Asked Questions</h2>
+          <div className="space-y-3 sm:space-y-4">
+            <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-2">What happens when I reach my video limit?</h3>
+              <p className="text-gray-400 text-sm sm:text-base">You can upgrade anytime to process more videos. Your processed videos remain available.</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">Can I cancel anytime?</h3>
-              <p className="text-gray-400">Yes, you can cancel your subscription anytime. Your plan stays active until the end of your billing period.</p>
+            <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-2">Can I cancel anytime?</h3>
+              <p className="text-gray-400 text-sm sm:text-base">Yes, you can cancel your subscription anytime. Your plan stays active until the end of your billing period.</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">What video formats are supported?</h3>
-              <p className="text-gray-400">We support MP4, MOV, AVI, MKV, and most common video formats.</p>
+            <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-2">What video formats are supported?</h3>
+              <p className="text-gray-400 text-sm sm:text-base">We support MP4, MOV, AVI, MKV, and most common video formats.</p>
             </div>
           </div>
         </div>
