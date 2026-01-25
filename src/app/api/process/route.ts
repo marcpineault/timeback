@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       silenceDuration: silenceDuration ?? 0.4,
       headline: headline || undefined,
       headlinePosition: headlinePosition || 'top',
-      captionStyle: captionStyle || 'tiktok',
+      captionStyle: captionStyle || 'instagram',
     };
 
     // Step 1: Remove silence FIRST
