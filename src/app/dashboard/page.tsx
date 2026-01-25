@@ -6,6 +6,14 @@ import VideoProcessor from './VideoProcessor'
 import DriveSettings from '@/components/DriveSettings'
 import Link from 'next/link'
 
+interface Video {
+  id: string
+  originalName: string
+  status: string
+  createdAt: Date
+  processedUrl: string | null
+}
+
 export default async function DashboardPage() {
   let user
   let usage
@@ -113,7 +121,7 @@ export default async function DashboardPage() {
 
             {/* Mobile card view */}
             <div className="sm:hidden space-y-3">
-              {usage.recentVideos.map((video) => (
+              {usage.recentVideos.map((video: Video) => (
                 <div key={video.id} className="bg-gray-800 rounded-xl p-4">
                   <div className="flex justify-between items-start mb-2">
                     <p className="text-white text-sm font-medium truncate flex-1 mr-2">{video.originalName}</p>
@@ -156,7 +164,7 @@ export default async function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {usage.recentVideos.map((video) => (
+                  {usage.recentVideos.map((video: Video) => (
                     <tr key={video.id}>
                       <td className="px-4 py-3 text-white">{video.originalName}</td>
                       <td className="px-4 py-3">

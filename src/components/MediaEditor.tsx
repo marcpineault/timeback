@@ -385,7 +385,6 @@ export default function MediaEditor({
     if (trimStart === 0 && trimEnd === duration) return;
 
     setIsProcessing(true);
-    setProcessingAction('trim');
 
     try {
       const response = await fetch('/api/trim', {
@@ -407,7 +406,6 @@ export default function MediaEditor({
       alert(error instanceof Error ? error.message : 'Failed to trim video');
     } finally {
       setIsProcessing(false);
-      setProcessingAction(null);
     }
   };
 
@@ -415,7 +413,6 @@ export default function MediaEditor({
     if (splitPoints.length === 0) return;
 
     setIsProcessing(true);
-    setProcessingAction('split');
 
     try {
       const response = await fetch('/api/split', {
@@ -437,7 +434,6 @@ export default function MediaEditor({
       alert(error instanceof Error ? error.message : 'Failed to split video');
     } finally {
       setIsProcessing(false);
-      setProcessingAction(null);
     }
   };
 
@@ -445,7 +441,6 @@ export default function MediaEditor({
     if (cutSections.length === 0) return;
 
     setIsProcessing(true);
-    setProcessingAction('cut');
 
     try {
       const response = await fetch('/api/remove-sections', {
@@ -473,7 +468,6 @@ export default function MediaEditor({
       alert(error instanceof Error ? error.message : 'Failed to cut video');
     } finally {
       setIsProcessing(false);
-      setProcessingAction(null);
     }
   };
 
