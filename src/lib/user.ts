@@ -1,7 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { prisma } from './db'
 import { PLANS, PlanType } from './plans'
-import { Video } from '@prisma/client'
 
 export async function getOrCreateUser() {
   const clerkUser = await currentUser()
@@ -90,6 +89,6 @@ export async function getUserUsage(userId: string) {
     planDetails: plan,
     videosUsed: 0,
     videosRemaining: 999999,
-    recentVideos: user.videos as Video[],
+    recentVideos: user.videos,
   }
 }
