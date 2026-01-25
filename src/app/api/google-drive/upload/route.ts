@@ -25,6 +25,15 @@ export async function POST(request: NextRequest) {
     const body: UploadRequest = await request.json();
     const { files, createFolder, folderName } = body;
 
+    // Get the base URL from the request to convert relative URLs to absolute
+    const baseUrl = request.nextUrl.origin;
+
+    // Convert relative URLs to absolute URLs
+    const filesWithAbsoluteUrls = files.map((file) => ({
+      ...file,
+      url: file.url.startsWith('/') ? `${baseUrl}${file.url}` : file.url,
+    }));
+
     if (!files || files.length === 0) {
       return NextResponse.json(
         { error: 'Missing required field: files' },
@@ -94,10 +103,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[Google Drive] Starting bulk upload of ${files.length} files for user ${clerkId}`);
+    console.log(`[Google Drive] Starting bulk upload of ${filesWithAbsoluteUrls.length} files for user ${clerkId}`);
 
     // Perform bulk upload with concurrency limit of 3
-    const result = await bulkUploadToDrive(accessToken, files, folderId, 3);
+    // Pass the baseUrl as trusted origin to allow same-origin requests
+    const result = await bulkUploadToDrive(accessToken, filesWithAbsoluteUrls, folderId, 3, baseUrl);
 
     console.log(
       `[Google Drive] Upload complete: ${result.successful.length} succeeded, ${result.failed.length} failed`

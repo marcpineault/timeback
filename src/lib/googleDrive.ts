@@ -129,8 +129,10 @@ export interface BulkUploadResult {
 /**
  * Validate URL to prevent SSRF attacks
  * Blocks access to internal networks, localhost, and cloud metadata endpoints
+ * @param url - The URL to validate
+ * @param trustedOrigin - Optional origin to trust (e.g., same-origin requests from the app itself)
  */
-function isUrlSafeForFetch(url: string): { safe: boolean; reason?: string } {
+function isUrlSafeForFetch(url: string, trustedOrigin?: string): { safe: boolean; reason?: string } {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname.toLowerCase();
@@ -139,6 +141,14 @@ function isUrlSafeForFetch(url: string): { safe: boolean; reason?: string } {
     // Only allow HTTP and HTTPS
     if (protocol !== 'http:' && protocol !== 'https:') {
       return { safe: false, reason: 'Only HTTP and HTTPS protocols are allowed' };
+    }
+
+    // Allow trusted origin (e.g., same-origin requests from the app itself)
+    if (trustedOrigin) {
+      const trustedUrl = new URL(trustedOrigin);
+      if (urlObj.origin === trustedUrl.origin) {
+        return { safe: true };
+      }
     }
 
     // Block localhost variations
@@ -212,12 +222,18 @@ function isUrlSafeForFetch(url: string): { safe: boolean; reason?: string } {
 /**
  * Bulk upload multiple files to Google Drive
  * Fetches files from URLs and uploads them in parallel (with concurrency limit)
+ * @param accessToken - Google Drive access token
+ * @param files - Array of files to upload
+ * @param folderId - Optional folder ID to upload files to
+ * @param concurrency - Number of concurrent uploads (default: 3)
+ * @param trustedOrigin - Optional origin to trust for same-origin requests
  */
 export async function bulkUploadToDrive(
   accessToken: string,
   files: BulkUploadFile[],
   folderId?: string,
-  concurrency: number = 3
+  concurrency: number = 3,
+  trustedOrigin?: string
 ): Promise<BulkUploadResult> {
   const successful: UploadResult[] = [];
   const failed: { name: string; error: string }[] = [];
@@ -229,7 +245,7 @@ export async function bulkUploadToDrive(
     const batchResults = await Promise.allSettled(
       batch.map(async (file) => {
         // SSRF protection: validate URL before fetching
-        const urlCheck = isUrlSafeForFetch(file.url);
+        const urlCheck = isUrlSafeForFetch(file.url, trustedOrigin);
         if (!urlCheck.safe) {
           throw new Error(`URL validation failed: ${urlCheck.reason}`);
         }
