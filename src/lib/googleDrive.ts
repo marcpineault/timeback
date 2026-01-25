@@ -25,6 +25,14 @@ export function isGoogleDriveConfigured(): boolean {
 }
 
 /**
+ * Get the redirect URI being used for OAuth
+ * Useful for debugging redirect_uri_mismatch errors
+ */
+export function getRedirectUri(): string {
+  return process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/google-drive/callback`;
+}
+
+/**
  * Generate OAuth2 authorization URL for Google Drive access
  */
 export function getAuthUrl(state?: string): string {

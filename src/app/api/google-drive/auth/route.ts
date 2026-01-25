@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getAuthUrl, isGoogleDriveConfigured } from '@/lib/googleDrive';
+import { getAuthUrl, isGoogleDriveConfigured, getRedirectUri } from '@/lib/googleDrive';
 
 export async function GET() {
   const { userId } = await auth();
@@ -20,8 +20,12 @@ export async function GET() {
     // Include userId in state for callback verification
     const state = Buffer.from(JSON.stringify({ userId })).toString('base64');
     const authUrl = getAuthUrl(state);
+    const redirectUri = getRedirectUri();
 
-    return NextResponse.json({ authUrl });
+    // Log the redirect URI for debugging OAuth issues
+    console.log('[Google Drive] OAuth redirect URI:', redirectUri);
+
+    return NextResponse.json({ authUrl, redirectUri });
   } catch (error) {
     console.error('[Google Drive] Auth error:', error);
     return NextResponse.json(
