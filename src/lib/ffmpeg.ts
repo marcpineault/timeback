@@ -238,8 +238,8 @@ export async function burnCaptions(
   const styleMap: Record<string, string> = {
     // Instagram style - white text on semi-transparent dark background box
     // Clean, modern, refined look with better readability on busy backgrounds
-    // MarginV=69 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
-    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=69,MarginL=28,MarginR=53',
+    // MarginV=85 ≈ 30% from bottom (moved up), MarginL=28, MarginR=53 for horizontal padding
+    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=85,MarginL=28,MarginR=53',
   };
 
   logger.debug(`[Captions] Burning captions from: ${srtPath}`);
@@ -345,7 +345,7 @@ export async function addHeadline(
   let filterString: string;
 
   // Instagram style - clean white on subtle dark background box
-  filterString = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
+  filterString = `drawtext=text='${escapedHeadline}':fontsize=38:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=16:enable='between(t,0,5)'`;
 
   logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
 
