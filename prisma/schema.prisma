@@ -51,6 +51,7 @@ enum Plan {
   FREE
   PRO
   BUSINESS
+  ENTERPRISE
 }
 
 enum VideoStatus {

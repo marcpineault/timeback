@@ -57,7 +57,7 @@ export default async function PricingPage() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8 max-w-5xl mx-auto">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-6xl mx-auto">
           {/* Free Plan */}
           <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'FREE' ? 'border-blue-500' : 'border-transparent'}`}>
             {currentPlan === 'FREE' && (
@@ -101,7 +101,7 @@ export default async function PricingPage() {
           </div>
 
           {/* Pro Plan */}
-          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'PRO' ? 'border-blue-500' : 'border-blue-500/50'} relative sm:col-span-2 lg:col-span-1`}>
+          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'PRO' ? 'border-blue-500' : 'border-blue-500/50'} relative`}>
             <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
               Most Popular
             </span>
@@ -197,6 +197,35 @@ export default async function PricingPage() {
                 Start Free Trial
               </Link>
             )}
+          </div>
+
+          {/* Enterprise Plan */}
+          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'ENTERPRISE' ? 'border-blue-500' : 'border-transparent'}`}>
+            {currentPlan === 'ENTERPRISE' && (
+              <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
+                Current Plan
+              </span>
+            )}
+            <h3 className="text-xl font-semibold text-white mb-2">{PLANS.ENTERPRISE.name}</h3>
+            <div className="mb-4">
+              <span className="text-4xl font-bold text-white">Custom</span>
+            </div>
+            <ul className="space-y-3 mb-6">
+              {PLANS.ENTERPRISE.features.map((feature, i) => (
+                <li key={i} className="flex items-center gap-2 text-gray-400">
+                  <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+            <a
+              href="mailto:support@timebackvideo.com"
+              className="block w-full text-center py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+            >
+              Contact Us
+            </a>
           </div>
         </div>
 
