@@ -315,11 +315,11 @@ export async function addHeadline(
   captionStyle: string = 'instagram'
 ): Promise<string> {
   // Y positions optimized for safe zones (1080x1920)
-  // Top: y=220 puts headline below username area but in upper third (above speaker's head)
+  // Top: y=380 puts headline well below username/profile area for reels (accounts for profile pic, name, follow button)
   // Center: middle of frame
   // Bottom: y=1400 is above the bottom safe zone
   const yPositions: Record<string, string> = {
-    top: 'y=220',
+    top: 'y=380',
     center: 'y=(h-text_h)/2',
     bottom: 'y=1400',
   };
