@@ -50,7 +50,7 @@ model Video {
 enum Plan {
   FREE
   PRO
-  BUSINESS
+  CREATOR
   ENTERPRISE
 }
 

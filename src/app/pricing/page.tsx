@@ -137,7 +137,7 @@ export default async function PricingPage() {
                     type="submit"
                     className="block w-full text-center py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
                   >
-                    {currentPlan === 'BUSINESS' ? 'Downgrade to Pro' : 'Upgrade to Pro'}
+                    {currentPlan === 'CREATOR' ? 'Downgrade to Pro' : 'Upgrade to Pro'}
                   </button>
                 </form>
               )
@@ -151,20 +151,20 @@ export default async function PricingPage() {
             )}
           </div>
 
-          {/* Business Plan */}
-          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'BUSINESS' ? 'border-blue-500' : 'border-transparent'}`}>
-            {currentPlan === 'BUSINESS' && (
+          {/* Creator Plan */}
+          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'CREATOR' ? 'border-blue-500' : 'border-transparent'}`}>
+            {currentPlan === 'CREATOR' && (
               <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
                 Current Plan
               </span>
             )}
-            <h3 className="text-xl font-semibold text-white mb-2">{PLANS.BUSINESS.name}</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">{PLANS.CREATOR.name}</h3>
             <div className="mb-4">
-              <span className="text-4xl font-bold text-white">${PLANS.BUSINESS.price}</span>
+              <span className="text-4xl font-bold text-white">${PLANS.CREATOR.price}</span>
               <span className="text-gray-400">/month</span>
             </div>
             <ul className="space-y-3 mb-6">
-              {PLANS.BUSINESS.features.map((feature, i) => (
+              {PLANS.CREATOR.features.map((feature, i) => (
                 <li key={i} className="flex items-center gap-2 text-gray-400">
                   <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -174,18 +174,18 @@ export default async function PricingPage() {
               ))}
             </ul>
             {userId ? (
-              currentPlan === 'BUSINESS' ? (
+              currentPlan === 'CREATOR' ? (
                 <span className="block w-full text-center py-3 bg-gray-700 text-gray-400 rounded-lg">
                   Current Plan
                 </span>
               ) : (
                 <form action="/api/checkout" method="POST">
-                  <input type="hidden" name="plan" value="BUSINESS" />
+                  <input type="hidden" name="plan" value="CREATOR" />
                   <button
                     type="submit"
                     className="block w-full text-center py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
                   >
-                    Upgrade to Business
+                    Upgrade to Creator
                   </button>
                 </form>
               )
