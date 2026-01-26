@@ -357,11 +357,10 @@ export async function addHeadline(
   // - Larger font (48px for better readability)
   // - Shadow effect for depth
   // - Smooth fade-in (0-0.5s) and fade-out (4.5-5s) using alpha expression
-  // - Semi-transparent background box with generous padding
   // - Centered with slight left offset for engagement buttons
   const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
 
-  const filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+  const filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
 
   logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
 
@@ -797,7 +796,7 @@ export async function applyCombinedFilters(
 
     // Enhanced headline styling with larger font, shadow, and fade animation
     const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
-    const headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    const headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
     filters.push(headlineFilter);
   }
 
