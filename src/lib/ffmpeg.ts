@@ -155,10 +155,7 @@ export async function removeSilence(
 
   const segments = getNonSilentSegments(silences, duration);
 
-  logger.debug(`[Silence Removal] Non-silent segments to keep:`);
-  segments.forEach((seg, i) => {
-    console.log(`  Segment ${i + 1}: ${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s (${(seg.end - seg.start).toFixed(2)}s)`);
-  });
+  logger.debug(`[Silence Removal] Non-silent segments to keep: ${segments.length}`);
 
   if (segments.length === 0) {
     throw new Error('No non-silent segments found in video');
@@ -288,7 +285,7 @@ export async function burnCaptions(
       .output(outputPath)
       .on('stderr', (line: string) => {
         if (line.includes('subtitle') || line.includes('Error') || line.includes('error')) {
-          console.log(`[Captions FFmpeg] ${line}`);
+          logger.debug(`[Captions FFmpeg] ${line}`);
         }
       })
       .on('end', () => {
@@ -787,7 +784,7 @@ export async function applyCombinedFilters(
   }
 
   const filterString = filters.join(',');
-  console.log(`[Combined] Applying ${filters.length} filters in single pass: ${filterString.substring(0, 100)}...`);
+  logger.debug(`[Combined] Applying ${filters.length} filters in single pass`);
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
@@ -803,7 +800,7 @@ export async function applyCombinedFilters(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Combined] Processing complete!`);
+        logger.debug(`[Combined] Processing complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {

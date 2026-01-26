@@ -99,9 +99,9 @@ export async function POST(req: Request) {
         // Check if this is a final failure (subscription will be canceled)
         // Stripe sends payment_failed events for each retry attempt
         // We downgrade after 3 failed attempts or when the subscription status changes
-        const subscription = invoice.subscription
-        if (subscription) {
-          const sub = await stripe.subscriptions.retrieve(subscription as string)
+        const subscriptionId = (invoice as { subscription?: string | null }).subscription
+        if (subscriptionId) {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId)
 
           // If subscription is past_due or unpaid after retries, downgrade user
           if (sub.status === 'past_due' || sub.status === 'unpaid' || sub.status === 'canceled') {
