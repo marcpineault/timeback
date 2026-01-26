@@ -23,6 +23,7 @@ export interface ProcessingConfig {
   silenceThreshold: number;
   silenceDuration: number;
   useHookAsHeadline: boolean;
+  generateAIHeadline: boolean;  // Use AI to generate engaging headline
   generateBRoll: boolean;
   normalizeAudio: boolean;
   colorGrade: 'none' | 'warm' | 'cool' | 'cinematic' | 'vibrant' | 'vintage';
@@ -125,6 +126,7 @@ export default function ProcessingOptions({
     silenceThreshold: -30,
     silenceDuration: 0.5,
     useHookAsHeadline: false,
+    generateAIHeadline: false,
     generateBRoll: false,
     normalizeAudio: true,
     colorGrade: 'none',
@@ -265,41 +267,101 @@ export default function ProcessingOptions({
 
       {/* Headline Settings */}
       <div className="space-y-3 sm:space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-base sm:text-lg font-medium text-white">Headline Overlay</h3>
-          <label className="flex items-center gap-2 cursor-pointer">
+        <h3 className="text-base sm:text-lg font-medium text-white">Headline Overlay</h3>
+
+        {/* Headline Mode Selection */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
             <input
-              type="checkbox"
-              checked={config.useHookAsHeadline}
-              onChange={(e) => setConfig({
+              type="radio"
+              name="headlineMode"
+              checked={!config.useHookAsHeadline && !config.generateAIHeadline && !config.headline}
+              onChange={() => setConfig({
                 ...config,
-                useHookAsHeadline: e.target.checked,
-                headline: e.target.checked ? '' : config.headline
+                useHookAsHeadline: false,
+                generateAIHeadline: false,
+                headline: ''
               })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
             />
-            <span className="text-gray-400">Use hook from video</span>
+            <div>
+              <span className="text-gray-300">No headline</span>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+            <input
+              type="radio"
+              name="headlineMode"
+              checked={config.generateAIHeadline}
+              onChange={() => setConfig({
+                ...config,
+                useHookAsHeadline: false,
+                generateAIHeadline: true,
+                headline: ''
+              })}
+              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-gray-300">AI-generated headline</span>
+              <p className="text-xs text-gray-500">Creates an engaging, scroll-stopping headline from your content</p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+            <input
+              type="radio"
+              name="headlineMode"
+              checked={config.useHookAsHeadline}
+              onChange={() => setConfig({
+                ...config,
+                useHookAsHeadline: true,
+                generateAIHeadline: false,
+                headline: ''
+              })}
+              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-gray-300">Use hook from video</span>
+              <p className="text-xs text-gray-500">Extracts the first sentence as the headline</p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+            <input
+              type="radio"
+              name="headlineMode"
+              checked={!config.useHookAsHeadline && !config.generateAIHeadline && config.headline !== ''}
+              onChange={() => setConfig({
+                ...config,
+                useHookAsHeadline: false,
+                generateAIHeadline: false,
+                headline: config.headline || ' '  // Set a space to trigger custom mode
+              })}
+              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-gray-300">Custom headline</span>
+            </div>
           </label>
         </div>
 
-        {config.useHookAsHeadline ? (
-          <p className="text-sm text-gray-500">
-            The first sentence from the video will be used as the headline with a background box.
-          </p>
-        ) : (
+        {/* Custom headline input */}
+        {!config.useHookAsHeadline && !config.generateAIHeadline && config.headline !== '' && (
           <div>
             <label className="block text-sm text-gray-400 mb-2">Headline Text</label>
             <input
               type="text"
-              value={config.headline}
-              onChange={(e) => setConfig({ ...config, headline: e.target.value })}
-              placeholder="Enter headline (optional)"
+              value={config.headline.trim()}
+              onChange={(e) => setConfig({ ...config, headline: e.target.value || ' ' })}
+              placeholder="Enter your headline"
               className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400"
             />
           </div>
         )}
 
-        {(config.headline || config.useHookAsHeadline) && (
+        {/* Position selector - show when any headline mode is active */}
+        {(config.headline || config.useHookAsHeadline || config.generateAIHeadline) && (
           <div>
             <label className="block text-sm text-gray-400 mb-2">Position</label>
             <div className="flex gap-2">

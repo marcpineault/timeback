@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
-import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord } from '@/lib/whisper';
+import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
 import { correctSpeechMistakes, SpeechCorrectionConfig, DEFAULT_SPEECH_CORRECTION_CONFIG } from '@/lib/speechCorrection';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       silenceDuration,
       generateCaptions,
       useHookAsHeadline,
+      generateAIHeadline: shouldGenerateAIHeadline,
       generateBRoll,
       normalizeAudio: shouldNormalizeAudio,
       colorGrade,
@@ -189,10 +190,11 @@ export async function POST(request: NextRequest) {
     // Step 2: Transcribe the SILENCE-REMOVED video (so timestamps match!)
     let srtPath: string | undefined;
     let hookText: string | undefined;
+    let aiHeadlineText: string | undefined;
     let transcriptionSegments: { start: number; end: number; text: string }[] = [];
     let transcriptionWords: TranscriptionWord[] = [];
 
-    if (generateCaptions || useHookAsHeadline || generateBRoll || speechCorrection) {
+    if (generateCaptions || useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll || speechCorrection) {
       logger.info('Step 2: Transcribing silence-removed video');
       // Use animated transcription (word-level timestamps) for animated caption style or speech correction
       // Use forSpeechCorrection to prompt Whisper to include filler words
@@ -208,10 +210,23 @@ export async function POST(request: NextRequest) {
         logger.debug('Transcription for speech correction', { wordCount: transcriptionWords.length });
       }
 
-      // Extract hook if needed
+      // Extract hook if needed (simple extraction)
       if (useHookAsHeadline) {
         hookText = extractHook(transcription.text);
         logger.info('Extracted hook', { hookText });
+      }
+
+      // Generate AI headline if enabled
+      if (shouldGenerateAIHeadline && transcriptionSegments.length > 0) {
+        logger.info('Generating AI headline from transcript');
+        try {
+          const aiResult = await generateAIHeadline(transcriptionSegments);
+          aiHeadlineText = aiResult.headline;
+          logger.info('AI headline generated', { headline: aiHeadlineText, confidence: aiResult.confidence });
+        } catch (aiError) {
+          logger.error('AI headline generation failed, falling back to hook extraction', { error: String(aiError) });
+          aiHeadlineText = extractHook(transcription.text);
+        }
       }
 
       // Step 2.5: Apply AI Speech Correction if enabled
@@ -272,7 +287,8 @@ export async function POST(request: NextRequest) {
 
     // Step 3.2: Apply color grading if selected
     // Use combined filter if both colorGrade and headline are enabled (saves one FFmpeg pass)
-    const finalHeadline = useHookAsHeadline ? hookText : options.headline;
+    // Priority: AI headline > Hook from video > Manual headline
+    const finalHeadline = shouldGenerateAIHeadline ? aiHeadlineText : (useHookAsHeadline ? hookText : options.headline);
     const canUseCombinedFilters = (colorGrade && colorGrade !== 'none') && finalHeadline && !autoZoom;
 
     if (colorGrade && colorGrade !== 'none' && !canUseCombinedFilters) {

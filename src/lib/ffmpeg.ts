@@ -304,7 +304,8 @@ export async function burnCaptions(
 }
 
 /**
- * Add headline text overlay to video with platform-native styling
+ * Add headline text overlay to video with enhanced styling
+ * Features: larger text, shadow effect, smooth fade-in/out animation
  * Positioned in safe zone: below top 200px, avoiding right 150px for engagement buttons
  */
 export async function addHeadline(
@@ -315,13 +316,13 @@ export async function addHeadline(
   captionStyle: string = 'instagram'
 ): Promise<string> {
   // Y positions optimized for safe zones (1080x1920)
-  // Top: y=380 puts headline well below username/profile area for reels (accounts for profile pic, name, follow button)
+  // Top: y=350 puts headline well below username/profile area for reels
   // Center: middle of frame
-  // Bottom: y=1400 is above the bottom safe zone
+  // Bottom: y=1350 is above the bottom safe zone
   const yPositions: Record<string, string> = {
-    top: 'y=380',
+    top: 'y=350',
     center: 'y=(h-text_h)/2',
-    bottom: 'y=1400',
+    bottom: 'y=1350',
   };
 
   // Escape special characters for FFmpeg drawtext filter
@@ -331,8 +332,8 @@ export async function addHeadline(
     .replace(/"/g, '\u201d')
     .replace(/:/g, '\\:');
 
-  // Split into two lines if longer than ~25 chars for cleaner look
-  if (escapedHeadline.length > 25) {
+  // Split into two lines if longer than ~30 chars for cleaner look
+  if (escapedHeadline.length > 30) {
     const words = escapedHeadline.split(' ');
     const midpoint = Math.ceil(words.length / 2);
     const line1 = words.slice(0, midpoint).join(' ');
@@ -340,12 +341,15 @@ export async function addHeadline(
     escapedHeadline = `${line1}\n${line2}`;
   }
 
-  // Platform-native headline styles - clean, simple, and readable
-  // x position slightly left of center to avoid right-side engagement buttons
-  let filterString: string;
+  // Enhanced headline styling with:
+  // - Larger font (48px for better readability)
+  // - Shadow effect for depth
+  // - Smooth fade-in (0-0.5s) and fade-out (4.5-5s) using alpha expression
+  // - Semi-transparent background box with generous padding
+  // - Centered with slight left offset for engagement buttons
+  const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
 
-  // Instagram style - clean white on subtle dark background box
-  filterString = `drawtext=text='${escapedHeadline}':fontsize=38:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=16:enable='between(t,0,5)'`;
+  const filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
 
   logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
 
@@ -745,13 +749,13 @@ export async function applyCombinedFilters(
     }
   }
 
-  // Add headline filter if specified (with platform-native styling, safe zone optimized)
+  // Add headline filter if specified (with enhanced styling, safe zone optimized)
   if (options.headline) {
     // Y positions optimized for safe zones (1080x1920)
     const yPositions: Record<string, string> = {
-      top: 'y=220',
+      top: 'y=350',
       center: 'y=(h-text_h)/2',
-      bottom: 'y=1400',
+      bottom: 'y=1350',
     };
 
     let escapedHeadline = options.headline
@@ -760,8 +764,8 @@ export async function applyCombinedFilters(
       .replace(/"/g, '\u201d')
       .replace(/:/g, '\\:');
 
-    // Split into two lines if longer than ~25 chars
-    if (escapedHeadline.length > 25) {
+    // Split into two lines if longer than ~30 chars
+    if (escapedHeadline.length > 30) {
       const words = escapedHeadline.split(' ');
       const midpoint = Math.ceil(words.length / 2);
       const line1 = words.slice(0, midpoint).join(' ');
@@ -771,8 +775,9 @@ export async function applyCombinedFilters(
 
     const position = options.headlinePosition || 'top';
 
-    // Instagram style - clean white on subtle dark background box
-    const headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
+    // Enhanced headline styling with larger font, shadow, and fade animation
+    const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
+    const headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
     filters.push(headlineFilter);
   }
 
