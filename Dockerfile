@@ -30,6 +30,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 # Dummy DATABASE_URL for prisma generate (not used for actual DB connection)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+# Skip Prisma engine checksum verification (helps with network issues in CI)
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
 # Build args for Next.js public env vars (required at build time)
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
