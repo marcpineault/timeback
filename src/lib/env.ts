@@ -22,7 +22,7 @@ const ENV_VARS: EnvVar[] = [
   { name: 'STRIPE_SECRET_KEY', required: false, description: 'Stripe secret key for payments' },
   { name: 'STRIPE_WEBHOOK_SECRET', required: false, description: 'Stripe webhook signing secret' },
   { name: 'STRIPE_PRO_PRICE_ID', required: false, description: 'Stripe Pro plan price ID' },
-  { name: 'STRIPE_BUSINESS_PRICE_ID', required: false, description: 'Stripe Business plan price ID' },
+  { name: 'STRIPE_CREATOR_PRICE_ID', required: false, description: 'Stripe Creator plan price ID' },
 
   // Storage (optional - defaults to local)
   { name: 'S3_BUCKET', required: false, description: 'S3/R2 bucket name' },

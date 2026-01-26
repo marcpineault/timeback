@@ -29,21 +29,21 @@ export const PLANS = {
       'Priority processing',
     ],
   },
-  BUSINESS: {
-    name: 'Business',
+  CREATOR: {
+    name: 'Creator',
     price: 49,
-    priceId: process.env.STRIPE_BUSINESS_PRICE_ID,
+    priceId: process.env.STRIPE_CREATOR_PRICE_ID,
     videosPerMonth: 100,
-    maxDuration: 30 * 60, // 30 minutes
-    maxResolution: 2160,
+    maxDuration: 5 * 60, // 5 minutes (short-form only)
+    maxResolution: 1080,
     watermark: false,
     features: [
       '100 videos per month',
-      'Up to 30 min videos',
-      '4K resolution',
+      'Up to 5 min videos',
+      '1080p resolution',
       'No watermark',
       'Priority processing',
-      'API access',
+      'Perfect for TikTok, Reels & Shorts',
     ],
   },
   ENTERPRISE: {

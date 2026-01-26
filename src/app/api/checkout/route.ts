@@ -16,9 +16,9 @@ export async function POST(req: Request) {
     // Parse form data from URL-encoded body
     const text = await req.text()
     const params = new URLSearchParams(text)
-    const plan = params.get('plan') as 'PRO' | 'BUSINESS'
+    const plan = params.get('plan') as 'PRO' | 'CREATOR'
 
-    if (!plan || !['PRO', 'BUSINESS'].includes(plan)) {
+    if (!plan || !['PRO', 'CREATOR'].includes(plan)) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }
 

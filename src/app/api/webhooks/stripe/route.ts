@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
         if (session.mode === 'subscription' && session.subscription) {
           const userId = session.metadata?.userId
-          const plan = session.metadata?.plan as 'PRO' | 'BUSINESS'
+          const plan = session.metadata?.plan as 'PRO' | 'CREATOR'
 
           if (userId && plan) {
             await prisma.user.update({
@@ -57,11 +57,11 @@ export async function POST(req: Request) {
             // Get price to determine plan
             const priceId = subscription.items.data[0]?.price.id
 
-            let plan: 'FREE' | 'PRO' | 'BUSINESS' = 'FREE'
+            let plan: 'FREE' | 'PRO' | 'CREATOR' = 'FREE'
             if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
               plan = 'PRO'
-            } else if (priceId === process.env.STRIPE_BUSINESS_PRICE_ID) {
-              plan = 'BUSINESS'
+            } else if (priceId === process.env.STRIPE_CREATOR_PRICE_ID) {
+              plan = 'CREATOR'
             }
 
             await prisma.user.update({

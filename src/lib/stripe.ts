@@ -8,5 +8,5 @@ export const stripe = stripeSecretKey
 
 export const STRIPE_PRICES = {
   PRO: process.env.STRIPE_PRO_PRICE_ID!,
-  BUSINESS: process.env.STRIPE_BUSINESS_PRICE_ID!,
+  CREATOR: process.env.STRIPE_CREATOR_PRICE_ID!,
 }
