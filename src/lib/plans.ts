@@ -18,12 +18,12 @@ export const PLANS = {
     price: 19,
     priceId: process.env.STRIPE_PRO_PRICE_ID,
     videosPerMonth: 30,
-    maxDuration: 30 * 60, // 30 minutes
+    maxDuration: 10 * 60, // 10 minutes
     maxResolution: 1080,
     watermark: false,
     features: [
       '30 videos per month',
-      'Up to 30 min videos',
+      'Up to 10 min videos',
       '1080p resolution',
       'No watermark',
       'Priority processing',
@@ -34,16 +34,35 @@ export const PLANS = {
     price: 49,
     priceId: process.env.STRIPE_BUSINESS_PRICE_ID,
     videosPerMonth: 100,
-    maxDuration: 60 * 60, // 60 minutes
+    maxDuration: 30 * 60, // 30 minutes
     maxResolution: 2160,
     watermark: false,
     features: [
       '100 videos per month',
-      'Up to 60 min videos',
+      'Up to 30 min videos',
       '4K resolution',
       'No watermark',
       'Priority processing',
       'API access',
+    ],
+  },
+  ENTERPRISE: {
+    name: 'Enterprise',
+    price: null, // Contact for pricing
+    priceId: null,
+    videosPerMonth: null, // Unlimited
+    maxDuration: null, // Unlimited
+    maxResolution: 2160,
+    watermark: false,
+    features: [
+      'Unlimited videos',
+      'Unlimited duration',
+      '4K resolution',
+      'No watermark',
+      'Priority processing',
+      'API access',
+      'Dedicated support',
+      'Custom integrations',
     ],
   },
 } as const
