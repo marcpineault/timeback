@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { logger } from './logger';
 
 const MAX_FILE_AGE_HOURS = 1; // Delete files older than 1 hour
 
@@ -28,14 +29,14 @@ export function cleanupOldFiles() {
 
           if (fileAge > maxAge) {
             fs.unlinkSync(filepath);
-            console.log(`[Cleanup] Deleted old file: ${filepath}`);
+            logger.debug('Deleted old file', { filepath });
           }
         } catch (err) {
-          console.error(`[Cleanup] Error checking file ${filepath}:`, err);
+          logger.warn('Error checking file during cleanup', { filepath, error: String(err) });
         }
       });
     } catch (err) {
-      console.error(`[Cleanup] Error reading directory ${dir}:`, err);
+      logger.warn('Error reading directory during cleanup', { dir, error: String(err) });
     }
   });
 }

@@ -1,6 +1,7 @@
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import fs from 'fs';
+import { logger } from './logger';
 
 export interface SilenceInterval {
   start: number;
@@ -27,7 +28,7 @@ export async function detectSilence(
     const silences: SilenceInterval[] = [];
     let currentSilenceStart: number | null = null;
 
-    console.log(`[Silence Detection] Starting with threshold=${threshold}dB, minDuration=${minDuration}s`);
+    logger.debug(`[Silence Detection] Starting with threshold=${threshold}dB, minDuration=${minDuration}s`);
 
     ffmpeg(inputPath)
       .audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`)
@@ -38,7 +39,7 @@ export async function detectSilence(
         const startMatch = line.match(/silence_start: ([\d.]+)/);
         if (startMatch) {
           currentSilenceStart = parseFloat(startMatch[1]);
-          console.log(`[Silence Detection] Found silence start at ${currentSilenceStart}s`);
+          logger.debug(`[Silence Detection] Found silence start at ${currentSilenceStart}s`);
         }
 
         // Parse silence_end
@@ -49,16 +50,16 @@ export async function detectSilence(
             start: currentSilenceStart,
             end: endTime,
           });
-          console.log(`[Silence Detection] Found silence end at ${endTime}s (duration: ${(endTime - currentSilenceStart).toFixed(2)}s)`);
+          logger.debug(`[Silence Detection] Found silence end at ${endTime}s (duration: ${(endTime - currentSilenceStart).toFixed(2)}s)`);
           currentSilenceStart = null;
         }
       })
       .on('end', () => {
-        console.log(`[Silence Detection] Complete. Found ${silences.length} silent intervals`);
+        logger.debug(`[Silence Detection] Complete. Found ${silences.length} silent intervals`);
         resolve(silences);
       })
       .on('error', (err) => {
-        console.error(`[Silence Detection] Error:`, err);
+        logger.error(`[Silence Detection] Error:`, err);
         reject(err);
       })
       .run();
@@ -129,7 +130,7 @@ export function getNonSilentSegments(
     segments = mergedSegments;
   }
 
-  console.log(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s)`);
+  logger.debug(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s)`);
 
   return segments;
 }
@@ -149,12 +150,12 @@ export async function removeSilence(
   const silences = await detectSilence(inputPath, threshold, minDuration);
   const duration = await getVideoDuration(inputPath);
 
-  console.log(`[Silence Removal] Video duration: ${duration.toFixed(2)}s`);
-  console.log(`[Silence Removal] Found ${silences.length} silent intervals`);
+  logger.debug(`[Silence Removal] Video duration: ${duration.toFixed(2)}s`);
+  logger.debug(`[Silence Removal] Found ${silences.length} silent intervals`);
 
   const segments = getNonSilentSegments(silences, duration);
 
-  console.log(`[Silence Removal] Non-silent segments to keep:`);
+  logger.debug(`[Silence Removal] Non-silent segments to keep:`);
   segments.forEach((seg, i) => {
     console.log(`  Segment ${i + 1}: ${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s (${(seg.end - seg.start).toFixed(2)}s)`);
   });
@@ -165,7 +166,7 @@ export async function removeSilence(
 
   // If no silences found, just copy the file
   if (silences.length === 0) {
-    console.log(`[Silence Removal] No silences found, copying original file`);
+    logger.debug(`[Silence Removal] No silences found, copying original file`);
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
@@ -189,7 +190,7 @@ export async function removeSilence(
     `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`,
   ].join(';');
 
-  console.log(`[Silence Removal] Processing ${segments.length} segments...`);
+  logger.debug(`[Silence Removal] Processing ${segments.length} segments...`);
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
@@ -209,11 +210,11 @@ export async function removeSilence(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Silence Removal] Complete!`);
+        logger.debug(`[Silence Removal] Complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Silence Removal] Error:`, err);
+        logger.error(`[Silence Removal] Error:`, err);
         reject(err);
       })
       .run();
@@ -244,13 +245,13 @@ export async function burnCaptions(
     instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=69,MarginL=28,MarginR=53',
   };
 
-  console.log(`[Captions] Burning captions from: ${srtPath}`);
-  console.log(`[Captions] Style: ${style}, Animated: ${isAnimated}`);
+  logger.debug(`[Captions] Burning captions from: ${srtPath}`);
+  logger.debug(`[Captions] Style: ${style}, Animated: ${isAnimated}`);
 
   // Read and log subtitle content for debugging
   const subContent = fs.readFileSync(srtPath, 'utf-8');
   const lineCount = subContent.split('\n').length;
-  console.log(`[Captions] Subtitle file has ${lineCount} lines`);
+  logger.debug(`[Captions] Subtitle file has ${lineCount} lines`);
 
   // Copy subtitle to a temp file with simple name to avoid FFmpeg path escaping issues
   const tempSubName = isAnimated ? 'temp_subs.ass' : 'temp_subs.srt';
@@ -269,7 +270,7 @@ export async function burnCaptions(
     const subtitleStyle = styleMap[style] || styleMap.instagram;
     filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
   }
-  console.log(`[Captions] Filter: ${filterString}`);
+  logger.debug(`[Captions] Filter: ${filterString}`);
 
   return new Promise((resolve, reject) => {
     const cmd = ffmpeg(inputPath)
@@ -291,12 +292,12 @@ export async function burnCaptions(
         }
       })
       .on('end', () => {
-        console.log(`[Captions] Complete!`);
+        logger.debug(`[Captions] Complete!`);
         try { fs.unlinkSync(tempSubPath); } catch {}
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Captions] Error:`, err);
+        logger.error(`[Captions] Error:`, err);
         try { fs.unlinkSync(tempSubPath); } catch {}
         reject(err);
       });
@@ -349,7 +350,7 @@ export async function addHeadline(
   // Instagram style - clean white on subtle dark background box
   filterString = `drawtext=text='${escapedHeadline}':fontsize=28:fontcolor=white:x=(w-text_w)/2-40:${yPositions[position]}:box=1:boxcolor=black@0.5:boxborderw=12:enable='between(t,0,5)'`;
 
-  console.log(`[Headline] Adding headline: "${headline}" at ${position}`);
+  logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
 
 
   return new Promise((resolve, reject) => {
@@ -367,11 +368,11 @@ export async function addHeadline(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Headline] Complete!`);
+        logger.debug(`[Headline] Complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Headline] Error:`, err);
+        logger.error(`[Headline] Error:`, err);
         reject(err);
       })
       .run();
@@ -394,7 +395,7 @@ export async function imageToVideoClip(
   videoWidth: number = 1080,
   videoHeight: number = 1920
 ): Promise<string> {
-  console.log(`[B-Roll] Converting image to ${duration}s video clip`);
+  logger.debug(`[B-Roll] Converting image to ${duration}s video clip`);
 
   return new Promise((resolve, reject) => {
     // Ken burns effect: slow zoom in
@@ -419,11 +420,11 @@ export async function imageToVideoClip(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[B-Roll] Video clip created: ${outputPath}`);
+        logger.debug(`[B-Roll] Video clip created: ${outputPath}`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[B-Roll] Error creating clip:`, err);
+        logger.error(`[B-Roll] Error creating clip:`, err);
         reject(err);
       })
       .run();
@@ -444,7 +445,7 @@ export async function insertBRollCutaways(
     return outputPath;
   }
 
-  console.log(`[B-Roll] Overlaying ${cutaways.length} animated B-roll clips`);
+  logger.debug(`[B-Roll] Overlaying ${cutaways.length} animated B-roll clips`);
 
   // Get video dimensions
   const videoInfo = await new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -524,7 +525,7 @@ export async function insertBRollCutaways(
   }
 
   const filterComplex = filterParts.join(';');
-  console.log(`[B-Roll] Filter complex: ${filterComplex.substring(0, 200)}...`);
+  logger.debug(`[B-Roll] Filter complex: ${filterComplex.substring(0, 200)}...`);
 
   return new Promise((resolve, reject) => {
     let cmd = ffmpeg(inputPath);
@@ -549,7 +550,7 @@ export async function insertBRollCutaways(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[B-Roll] Animated overlays added successfully`);
+        logger.debug(`[B-Roll] Animated overlays added successfully`);
         // Clean up animation files
         for (const animPath of animationPaths) {
           try { fs.unlinkSync(animPath); } catch {}
@@ -557,7 +558,7 @@ export async function insertBRollCutaways(
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[B-Roll] Error adding overlays:`, err);
+        logger.error(`[B-Roll] Error adding overlays:`, err);
         reject(err);
       })
       .run();
@@ -572,7 +573,7 @@ export async function normalizeAudio(
   inputPath: string,
   outputPath: string
 ): Promise<string> {
-  console.log(`[Audio] Normalizing audio levels...`);
+  logger.debug(`[Audio] Normalizing audio levels...`);
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
@@ -584,11 +585,11 @@ export async function normalizeAudio(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Audio] Normalization complete!`);
+        logger.debug(`[Audio] Normalization complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Audio] Normalization error:`, err);
+        logger.error(`[Audio] Normalization error:`, err);
         reject(err);
       })
       .run();
@@ -629,7 +630,7 @@ export async function convertAspectRatio(
   targetRatio: AspectRatioPreset
 ): Promise<string> {
   if (targetRatio === 'original') {
-    console.log(`[Aspect] Keeping original aspect ratio`);
+    logger.debug(`[Aspect] Keeping original aspect ratio`);
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
@@ -649,7 +650,7 @@ export async function convertAspectRatio(
   const currentRatio = videoInfo.width / videoInfo.height;
   const targetRatioValue = ASPECT_RATIOS[targetRatio].ratio;
 
-  console.log(`[Aspect] Converting from ${currentRatio.toFixed(2)} to ${targetRatioValue.toFixed(2)} (${targetRatio})`);
+  logger.debug(`[Aspect] Converting from ${currentRatio.toFixed(2)} to ${targetRatioValue.toFixed(2)} (${targetRatio})`);
 
   // Calculate target dimensions (keep the larger dimension, adjust the other)
   let targetWidth: number;
@@ -669,7 +670,7 @@ export async function convertAspectRatio(
   targetWidth = targetWidth + (targetWidth % 2);
   targetHeight = targetHeight + (targetHeight % 2);
 
-  console.log(`[Aspect] Original: ${videoInfo.width}x${videoInfo.height}, Target: ${targetWidth}x${targetHeight}`);
+  logger.debug(`[Aspect] Original: ${videoInfo.width}x${videoInfo.height}, Target: ${targetWidth}x${targetHeight}`);
 
   // Build filter for blur background padding
   // This creates a blurred, scaled-up version of the video as background
@@ -696,11 +697,11 @@ export async function convertAspectRatio(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Aspect] Conversion complete!`);
+        logger.debug(`[Aspect] Conversion complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Aspect] Conversion error:`, err);
+        logger.error(`[Aspect] Conversion error:`, err);
         reject(err);
       })
       .run();
@@ -780,7 +781,7 @@ export async function applyCombinedFilters(
 
   // If no filters to apply, just copy the file
   if (filters.length === 0) {
-    console.log('[Combined] No filters to apply, copying file');
+    logger.debug('[Combined] No filters to apply, copying file');
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
@@ -806,7 +807,7 @@ export async function applyCombinedFilters(
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Combined] Error:`, err);
+        logger.error(`[Combined] Error:`, err);
         reject(err);
       })
       .run();
@@ -822,12 +823,12 @@ export async function applyColorGrade(
   preset: ColorGradePreset
 ): Promise<string> {
   if (preset === 'none') {
-    console.log(`[Color] No color grading applied`);
+    logger.debug(`[Color] No color grading applied`);
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
 
-  console.log(`[Color] Applying ${preset} color grade...`);
+  logger.debug(`[Color] Applying ${preset} color grade...`);
   const filterString = colorGradeFilters[preset];
 
   return new Promise((resolve, reject) => {
@@ -842,11 +843,11 @@ export async function applyColorGrade(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Color] Color grading complete!`);
+        logger.debug(`[Color] Color grading complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Color] Color grading error:`, err);
+        logger.error(`[Color] Color grading error:`, err);
         reject(err);
       })
       .run();
@@ -864,12 +865,12 @@ export async function applyAutoZoom(
   zoomIntensity: number = 1.05
 ): Promise<string> {
   if (segments.length === 0) {
-    console.log(`[Zoom] No segments provided, skipping auto-zoom`);
+    logger.debug(`[Zoom] No segments provided, skipping auto-zoom`);
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
 
-  console.log(`[Zoom] Applying auto-zoom to ${segments.length} speech segments (intensity: ${zoomIntensity}x)...`);
+  logger.debug(`[Zoom] Applying auto-zoom to ${segments.length} speech segments (intensity: ${zoomIntensity}x)...`);
 
   // Get video info for dimensions
   const videoInfo = await new Promise<{ width: number; height: number; duration: number }>((resolve, reject) => {
@@ -920,13 +921,13 @@ export async function applyAutoZoom(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Zoom] Auto-zoom complete!`);
+        logger.debug(`[Zoom] Auto-zoom complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Zoom] Auto-zoom error:`, err);
+        logger.error(`[Zoom] Auto-zoom error:`, err);
         // Graceful fallback: just copy the file if zoom fails
-        console.log(`[Zoom] Falling back to original video without zoom`);
+        logger.debug(`[Zoom] Falling back to original video without zoom`);
         try {
           fs.copyFileSync(inputPath, outputPath);
           resolve(outputPath);
@@ -949,7 +950,7 @@ export async function trimVideo(
 ): Promise<string> {
   const duration = endTime - startTime;
 
-  console.log(`[Trim] Trimming video from ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s (duration: ${duration.toFixed(2)}s)`);
+  logger.debug(`[Trim] Trimming video from ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s (duration: ${duration.toFixed(2)}s)`);
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
@@ -968,11 +969,11 @@ export async function trimVideo(
       ])
       .output(outputPath)
       .on('end', () => {
-        console.log(`[Trim] Complete!`);
+        logger.debug(`[Trim] Complete!`);
         resolve(outputPath);
       })
       .on('error', (err) => {
-        console.error(`[Trim] Error:`, err);
+        logger.error(`[Trim] Error:`, err);
         reject(err);
       })
       .run();
@@ -1008,13 +1009,13 @@ export async function splitVideo(
     segments.push({ startTime, endTime, outputPath });
   }
 
-  console.log(`[Split] Splitting video into ${segments.length} parts`);
+  logger.debug(`[Split] Splitting video into ${segments.length} parts`);
 
   const outputPaths: string[] = [];
 
   for (const segment of segments) {
     const segmentDuration = segment.endTime - segment.startTime;
-    console.log(`[Split] Creating part: ${segment.startTime.toFixed(2)}s - ${segment.endTime.toFixed(2)}s`);
+    logger.debug(`[Split] Creating part: ${segment.startTime.toFixed(2)}s - ${segment.endTime.toFixed(2)}s`);
 
     await new Promise<void>((resolve, reject) => {
       ffmpeg(inputPath)
@@ -1033,19 +1034,19 @@ export async function splitVideo(
         ])
         .output(segment.outputPath)
         .on('end', () => {
-          console.log(`[Split] Part created: ${segment.outputPath}`);
+          logger.debug(`[Split] Part created: ${segment.outputPath}`);
           outputPaths.push(segment.outputPath);
           resolve();
         })
         .on('error', (err) => {
-          console.error(`[Split] Error:`, err);
+          logger.error(`[Split] Error:`, err);
           reject(err);
         })
         .run();
     });
   }
 
-  console.log(`[Split] Complete! Created ${outputPaths.length} parts`);
+  logger.debug(`[Split] Complete! Created ${outputPaths.length} parts`);
   return outputPaths;
 }
 

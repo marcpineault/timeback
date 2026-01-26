@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { auth } from '@clerk/nextjs/server';
+import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
+import { logger } from '@/lib/logger';
 
 // Route segment config for large file uploads (App Router)
 export const runtime = 'nodejs';
@@ -18,6 +20,13 @@ export async function POST(request: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limiting
+    const rateLimitId = getRateLimitIdentifier(userId, request);
+    const rateLimitResult = checkRateLimit(rateLimitId, 'upload');
+    if (!rateLimitResult.allowed) {
+      return rateLimitResponse(rateLimitResult);
     }
 
     // Get content type to determine how to parse
@@ -43,6 +52,16 @@ export async function POST(request: NextRequest) {
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
         { error: 'Invalid file type. Please upload MP4, MOV, WebM, or AVI.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size (max 500MB to match Next.js body limit)
+    const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB in bytes
+    if (file.size > MAX_FILE_SIZE) {
+      logger.warn('File size exceeds limit', { size: file.size, maxSize: MAX_FILE_SIZE });
+      return NextResponse.json(
+        { error: 'File size exceeds 500MB limit. Please upload a smaller video.' },
         { status: 400 }
       );
     }
@@ -77,7 +96,7 @@ export async function POST(request: NextRequest) {
       size: file.size,
     });
   } catch (error) {
-    console.error('Upload error:', error);
+    logger.error('Upload error', { error: String(error) });
     return NextResponse.json(
       { error: 'Failed to upload file. Please try again.' },
       { status: 500 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/db'
 import Stripe from 'stripe'
+import { logger } from '@/lib/logger'
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     )
   } catch (err) {
-    console.error('Webhook signature verification failed:', err)
+    logger.error('Webhook signature verification failed', { error: String(err) })
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
@@ -93,15 +94,50 @@ export async function POST(req: Request) {
         const invoice = event.data.object as Stripe.Invoice
         const customerId = invoice.customer as string
 
-        // Could send email notification here
-        console.log(`Payment failed for customer ${customerId}`)
+        logger.warn('Payment failed for customer', { customerId })
+
+        // Check if this is a final failure (subscription will be canceled)
+        // Stripe sends payment_failed events for each retry attempt
+        // We downgrade after 3 failed attempts or when the subscription status changes
+        const subscription = invoice.subscription
+        if (subscription) {
+          const sub = await stripe.subscriptions.retrieve(subscription as string)
+
+          // If subscription is past_due or unpaid after retries, downgrade user
+          if (sub.status === 'past_due' || sub.status === 'unpaid' || sub.status === 'canceled') {
+            logger.info('Downgrading user due to failed payment', { customerId, status: sub.status })
+
+            await prisma.user.updateMany({
+              where: { stripeCustomerId: customerId },
+              data: {
+                plan: 'FREE',
+                // Keep subscription ID for potential reactivation
+              },
+            })
+          }
+        }
+        break
+      }
+
+      case 'customer.subscription.paused': {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
+
+        logger.info('Subscription paused, downgrading user', { customerId })
+
+        await prisma.user.updateMany({
+          where: { stripeCustomerId: customerId },
+          data: {
+            plan: 'FREE',
+          },
+        })
         break
       }
     }
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('Webhook handler error:', error)
+    logger.error('Webhook handler error', { error: String(error) })
     return NextResponse.json(
       { error: 'Webhook handler failed' },
       { status: 500 }
