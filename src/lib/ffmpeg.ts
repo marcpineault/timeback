@@ -332,8 +332,8 @@ export async function addHeadline(
     .replace(/\s+/g, ' ')  // Normalize whitespace
     .trim()
     .replace(/\\/g, '\\\\')
-    .replace(/'/g, '\u2019')
-    .replace(/"/g, '\u201d')
+    .replace(/'/g, '')  // Remove single quotes
+    .replace(/"/g, '')  // Remove double quotes
     .replace(/:/g, '\\:');
 
   // Split into two lines if longer than ~30 chars for cleaner look
@@ -769,8 +769,8 @@ export async function applyCombinedFilters(
       .replace(/\s+/g, ' ')  // Normalize whitespace
       .trim()
       .replace(/\\/g, '\\\\')
-      .replace(/'/g, '\u2019')
-      .replace(/"/g, '\u201d')
+      .replace(/'/g, '')  // Remove single quotes
+      .replace(/"/g, '')  // Remove double quotes
       .replace(/:/g, '\\:');
 
     // Split into two lines if longer than ~30 chars
