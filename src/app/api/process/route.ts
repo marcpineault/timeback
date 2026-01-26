@@ -439,8 +439,18 @@ export async function POST(request: NextRequest) {
       currentInput = stepOutput;
     }
 
-    // Rename to final output
-    const finalOutput = path.join(processedDir, `${baseName}_processed.mp4`);
+    // Rename to final output - use headline as filename if available
+    let outputBaseName = baseName;
+    if (finalHeadline) {
+      // Sanitize headline for use as filename
+      outputBaseName = finalHeadline
+        .replace(/[^\w\s-]/g, '')  // Remove special characters
+        .replace(/\s+/g, '_')      // Replace spaces with underscores
+        .substring(0, 50)          // Limit length
+        .toLowerCase()
+        .trim();
+    }
+    const finalOutput = path.join(processedDir, `${outputBaseName}_processed.mp4`);
     if (currentInput !== finalOutput) {
       await fs.rename(currentInput, finalOutput);
     }
