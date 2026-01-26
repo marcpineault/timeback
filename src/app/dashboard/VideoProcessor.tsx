@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import JSZip from 'jszip'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
@@ -29,7 +28,6 @@ export default function VideoProcessor({
   const [editorVideo, setEditorVideo] = useState<QueuedVideo | null>(null)
   const [lastConfig, setLastConfig] = useState<ProcessingConfig | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
-  const [isDownloading, setIsDownloading] = useState(false)
   const [videosRemaining, setVideosRemaining] = useState(initialVideosRemaining)
 
   const handleUploadComplete = (files: UploadedFile[]) => {
@@ -188,40 +186,6 @@ export default function VideoProcessor({
     })
   }
 
-  const handleDownloadAsZip = async () => {
-    const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
-    if (completedVideos.length === 0) return
-
-    setIsDownloading(true)
-
-    try {
-      const zip = new JSZip()
-
-      // Fetch all videos and add to zip
-      for (const video of completedVideos) {
-        const response = await fetch(video.downloadUrl!)
-        const blob = await response.blob()
-        const filename = video.outputFilename || `video_${video.file.fileId}.mp4`
-        zip.file(filename, blob)
-      }
-
-      // Generate and download ZIP
-      const content = await zip.generateAsync({ type: 'blob' })
-      const url = URL.createObjectURL(content)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `timeback_videos_${Date.now()}.zip`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Failed to create ZIP:', err)
-    } finally {
-      setIsDownloading(false)
-    }
-  }
-
   const pendingVideos = videoQueue.filter(v => v.status === 'pending')
   const completedVideos = videoQueue.filter(v => v.status === 'complete')
   const hasVideosToProcess = pendingVideos.length > 0
@@ -307,45 +271,15 @@ export default function VideoProcessor({
                   <p className="text-gray-400 text-xs sm:text-sm">{completedVideos.length} video(s) ready for review</p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 sm:gap-3">
-                <button
-                  onClick={handleDownloadAsZip}
-                  disabled={isDownloading}
-                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  {isDownloading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span className="hidden sm:inline">Creating ZIP...</span>
-                      <span className="sm:hidden">ZIP...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      <span className="hidden sm:inline">Download as ZIP</span>
-                      <span className="sm:hidden">ZIP</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleDownloadAll}
-                  className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  <span className="hidden sm:inline">Individual</span>
-                  <span className="sm:hidden">Each</span>
-                </button>
-                <button
-                  onClick={handleClearQueue}
-                  className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  Process More
-                </button>
-              </div>
+              <button
+                onClick={handleDownloadAll}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download All
+              </button>
             </div>
             {/* Review tip */}
             <div className="flex items-start gap-2 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
