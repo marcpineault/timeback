@@ -105,7 +105,7 @@ export default async function DashboardPage() {
               style={{ width: `${Math.min(usagePercentage, 100)}%` }}
             />
           </div>
-          {usage.videosRemaining <= 0 && (
+          {usage.videosRemaining !== null && usage.videosRemaining <= 0 && (
             <p className="text-amber-400 text-sm mt-2">
               You&apos;ve reached your monthly limit. Upgrade to process more videos.
             </p>
@@ -115,8 +115,8 @@ export default async function DashboardPage() {
         {/* Video Processor */}
         <VideoProcessor
           userId={user.id}
-          canProcess={usage.videosRemaining > 0}
-          videosRemaining={usage.videosRemaining}
+          canProcess={usage.videosRemaining === null || usage.videosRemaining > 0}
+          videosRemaining={usage.videosRemaining ?? Infinity}
           hasWatermark={usage.planDetails.watermark}
         />
 
