@@ -19,13 +19,22 @@ function shouldLog(level: LogLevel): boolean {
   return LOG_LEVELS[level] >= LOG_LEVELS[currentLevel];
 }
 
-function formatMessage(level: LogLevel, message: string, context?: LogContext): string {
+function formatMessage(level: LogLevel, message: string, context?: LogContext | Error): string {
   const timestamp = new Date().toISOString();
-  const contextStr = context ? ` ${JSON.stringify(context)}` : '';
+  let contextStr = '';
+
+  if (context) {
+    if (context instanceof Error) {
+      contextStr = ` ${JSON.stringify({ error: context.message, stack: context.stack })}`;
+    } else {
+      contextStr = ` ${JSON.stringify(context)}`;
+    }
+  }
+
   return `[${timestamp}] [${level.toUpperCase()}] ${message}${contextStr}`;
 }
 
-function log(level: LogLevel, message: string, context?: LogContext): void {
+function log(level: LogLevel, message: string, context?: LogContext | Error): void {
   if (!shouldLog(level)) return;
 
   const formattedMessage = formatMessage(level, message, context);
@@ -43,8 +52,8 @@ function log(level: LogLevel, message: string, context?: LogContext): void {
 }
 
 export const logger = {
-  debug: (message: string, context?: LogContext) => log('debug', message, context),
-  info: (message: string, context?: LogContext) => log('info', message, context),
-  warn: (message: string, context?: LogContext) => log('warn', message, context),
-  error: (message: string, context?: LogContext) => log('error', message, context),
+  debug: (message: string, context?: LogContext | Error) => log('debug', message, context),
+  info: (message: string, context?: LogContext | Error) => log('info', message, context),
+  warn: (message: string, context?: LogContext | Error) => log('warn', message, context),
+  error: (message: string, context?: LogContext | Error) => log('error', message, context),
 };

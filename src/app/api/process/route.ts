@@ -90,26 +90,27 @@ export async function POST(request: NextRequest) {
     let downloadedFromS3 = false;
 
     // Create video record with PENDING status immediately
-    let videoRecord: { id: string } | null = null;
+    let videoRecordId: string | null = null;
     if (dbUserId) {
-      videoRecord = await prisma.video.create({
+      const record = await prisma.video.create({
         data: {
           userId: dbUserId,
           originalName: filename,
           status: 'PENDING',
         },
       });
-      logger.info('Video record created', { videoId: videoRecord.id, status: 'PENDING' });
+      videoRecordId = record.id;
+      logger.info('Video record created', { videoId: videoRecordId, status: 'PENDING' });
     }
 
     // Helper to update video status
     const updateVideoStatus = async (status: 'PROCESSING' | 'COMPLETED' | 'FAILED', data?: { processedUrl?: string; errorMessage?: string }) => {
-      if (videoRecord) {
+      if (videoRecordId) {
         await prisma.video.update({
-          where: { id: videoRecord.id },
+          where: { id: videoRecordId },
           data: { status, ...data },
         });
-        logger.info('Video status updated', { videoId: videoRecord.id, status });
+        logger.info('Video status updated', { videoId: videoRecordId, status });
       }
     };
 
