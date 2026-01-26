@@ -52,7 +52,9 @@ export default async function DashboardPage() {
     )
   }
 
-  const usagePercentage = (usage.videosUsed / usage.planDetails.videosPerMonth) * 100
+  const usagePercentage = usage.planDetails.videosPerMonth
+    ? (usage.videosUsed / usage.planDetails.videosPerMonth) * 100
+    : 0
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -83,7 +85,9 @@ export default async function DashboardPage() {
                 {PLANS[usage.plan as keyof typeof PLANS].name} Plan
               </h2>
               <p className="text-gray-400 text-sm">
-                {usage.videosUsed} of {usage.planDetails.videosPerMonth} videos used this month
+                {usage.planDetails.videosPerMonth
+                  ? `${usage.videosUsed} of ${usage.planDetails.videosPerMonth} videos used this month`
+                  : `${usage.videosUsed} videos used this month (unlimited)`}
               </p>
             </div>
             {usage.plan === 'FREE' && (
