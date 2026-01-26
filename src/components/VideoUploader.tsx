@@ -43,8 +43,8 @@ interface VideoUploaderProps {
 // Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
-// Concurrent uploads - 4 provides good balance between speed and bandwidth usage
-const MAX_CONCURRENT_UPLOADS = 4;
+// Concurrent uploads - high concurrency for fast batch uploads
+const MAX_CONCURRENT_UPLOADS = 30;
 
 export default function VideoUploader({ onUploadComplete, disabled }: VideoUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
