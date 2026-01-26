@@ -403,6 +403,7 @@ export async function generateBRollImage(
 
 /**
  * Extract the hook (first sentence) from transcription text
+ * Simple extraction - use generateAIHeadline for smarter hook detection
  */
 export function extractHook(text: string, maxLength: number = 60): string {
   // Try to find the first sentence
@@ -415,6 +416,102 @@ export function extractHook(text: string, maxLength: number = 60): string {
   }
 
   return hook;
+}
+
+export interface AIHeadlineResult {
+  headline: string;
+  hook: string;
+  confidence: number;
+}
+
+/**
+ * Generate an engaging headline using AI analysis of the transcript
+ * Also identifies the most attention-grabbing hook from the content
+ */
+export async function generateAIHeadline(
+  segments: TranscriptionSegment[],
+  options: {
+    style?: 'bold' | 'question' | 'statement' | 'curiosity';
+    maxLength?: number;
+  } = {}
+): Promise<AIHeadlineResult> {
+  const openai = getOpenAIClient();
+  const { style = 'curiosity', maxLength = 50 } = options;
+
+  // Combine segments into full transcript
+  const fullTranscript = segments.map(s => s.text).join(' ');
+
+  console.log(`[Headline] Generating AI headline for ${segments.length} segments`);
+
+  const styleInstructions: Record<string, string> = {
+    bold: 'Create a bold, impactful statement that makes a strong claim',
+    question: 'Create an intriguing question that makes viewers want to know the answer',
+    statement: 'Create a clear, direct statement that summarizes the key value',
+    curiosity: 'Create a curiosity-driven hook that teases the content without revealing everything',
+  };
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are an expert social media content strategist specializing in short-form video. Your task is to create scroll-stopping headlines for video content.
+
+Guidelines:
+- ${styleInstructions[style]}
+- Keep headlines under ${maxLength} characters
+- Use power words that trigger emotion or curiosity
+- Avoid clickbait that doesn't deliver
+- Make it relevant to the actual content
+- Use sentence case (capitalize first word and proper nouns only)
+
+You must return a JSON object with:
+1. "headline": The main headline text (max ${maxLength} chars)
+2. "hook": The most engaging sentence or phrase from the transcript that would hook viewers (max 60 chars)
+3. "confidence": How confident you are this headline will perform well (0.0-1.0)
+
+Example output: {"headline": "This changed how I think about money", "hook": "Nobody told me this until I was 30", "confidence": 0.85}`
+      },
+      {
+        role: 'user',
+        content: `Create an engaging headline and identify the best hook from this video transcript:\n\n${fullTranscript}`
+      }
+    ],
+    response_format: { type: 'json_object' }
+  });
+
+  try {
+    const content = response.choices[0].message.content || '{}';
+    console.log(`[Headline] AI response: ${content.substring(0, 150)}...`);
+    const parsed = JSON.parse(content);
+
+    // Ensure headline fits within maxLength
+    let headline = parsed.headline || extractHook(fullTranscript, maxLength);
+    if (headline.length > maxLength) {
+      headline = headline.substring(0, maxLength - 3).trim() + '...';
+    }
+
+    // Ensure hook fits within 60 chars
+    let hook = parsed.hook || extractHook(fullTranscript, 60);
+    if (hook.length > 60) {
+      hook = hook.substring(0, 57).trim() + '...';
+    }
+
+    return {
+      headline,
+      hook,
+      confidence: parsed.confidence || 0.5,
+    };
+  } catch (err) {
+    console.error('[Headline] Failed to parse AI response:', err);
+    // Fallback to simple extraction
+    const fallbackHook = extractHook(fullTranscript, 60);
+    return {
+      headline: fallbackHook,
+      hook: fallbackHook,
+      confidence: 0.3,
+    };
+  }
 }
 
 /**

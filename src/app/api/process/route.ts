@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
-import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord } from '@/lib/whisper';
+import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
 import { correctSpeechMistakes, SpeechCorrectionConfig, DEFAULT_SPEECH_CORRECTION_CONFIG } from '@/lib/speechCorrection';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       silenceDuration,
       generateCaptions,
       useHookAsHeadline,
+      generateAIHeadline: shouldGenerateAIHeadline,
       generateBRoll,
       normalizeAudio: shouldNormalizeAudio,
       colorGrade,
@@ -165,8 +166,8 @@ export async function POST(request: NextRequest) {
     };
 
     // Determine what features need transcription
-    const needsTranscription = generateCaptions || useHookAsHeadline || generateBRoll || speechCorrection;
-    const needsEarlyTranscription = useHookAsHeadline || generateBRoll; // These can use original video transcription
+    const needsTranscription = generateCaptions || useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll || speechCorrection;
+    const needsEarlyTranscription = useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll; // These can use original video transcription
 
     // OPTIMIZATION: Run silence removal and early transcription in parallel
     // Hook extraction and B-roll identification don't need exact timestamps from silence-removed video
@@ -214,6 +215,7 @@ export async function POST(request: NextRequest) {
     // Step 2: Transcribe the SILENCE-REMOVED video (only if needed for captions or speech correction)
     let srtPath: string | undefined;
     let hookText: string | undefined;
+    let aiHeadlineText: string | undefined;
     let transcriptionSegments: { start: number; end: number; text: string }[] = [];
     let transcriptionWords: TranscriptionWord[] = [];
 
@@ -222,6 +224,19 @@ export async function POST(request: NextRequest) {
       if (useHookAsHeadline && earlyTranscription) {
         hookText = extractHook(earlyTranscription.text);
         logger.info('Extracted hook from parallel transcription', { hookText });
+      }
+
+      // Generate AI headline from early transcription if available
+      if (shouldGenerateAIHeadline && earlyTranscription) {
+        logger.info('Generating AI headline from parallel transcription');
+        try {
+          const aiResult = await generateAIHeadline(earlyTranscription.segments);
+          aiHeadlineText = aiResult.headline;
+          logger.info('AI headline generated', { headline: aiHeadlineText, confidence: aiResult.confidence });
+        } catch (aiError) {
+          logger.error('AI headline generation failed, falling back to hook extraction', { error: String(aiError) });
+          aiHeadlineText = extractHook(earlyTranscription.text);
+        }
       }
 
       // For B-roll, use early transcription segments if available
@@ -250,6 +265,19 @@ export async function POST(request: NextRequest) {
         if (useHookAsHeadline && !hookText) {
           hookText = extractHook(transcription.text);
           logger.info('Extracted hook from silence-removed transcription', { hookText });
+        }
+
+        // Generate AI headline if not already done from early transcription
+        if (shouldGenerateAIHeadline && !aiHeadlineText) {
+          logger.info('Generating AI headline from silence-removed transcription');
+          try {
+            const aiResult = await generateAIHeadline(transcriptionSegments);
+            aiHeadlineText = aiResult.headline;
+            logger.info('AI headline generated', { headline: aiHeadlineText, confidence: aiResult.confidence });
+          } catch (aiError) {
+            logger.error('AI headline generation failed, falling back to hook extraction', { error: String(aiError) });
+            aiHeadlineText = extractHook(transcription.text);
+          }
         }
       }
 
@@ -296,7 +324,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Step 3: Burn captions if enabled
-      if (generateCaptions) {
+      if (generateCaptions && srtPath) {
         logger.info('Step 3: Burning captions');
         stepOutput = path.join(processedDir, `${baseName}_captioned.mp4`);
         await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
@@ -315,7 +343,8 @@ export async function POST(request: NextRequest) {
 
     // Step 3.2: Apply color grading if selected
     // Use combined filter if both colorGrade and headline are enabled (saves one FFmpeg pass)
-    const finalHeadline = useHookAsHeadline ? hookText : options.headline;
+    // Priority: AI headline > Hook from video > Manual headline
+    const finalHeadline = shouldGenerateAIHeadline ? aiHeadlineText : (useHookAsHeadline ? hookText : options.headline);
     const canUseCombinedFilters = (colorGrade && colorGrade !== 'none') && finalHeadline && !autoZoom;
 
     if (colorGrade && colorGrade !== 'none' && !canUseCombinedFilters) {
