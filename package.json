@@ -7,8 +7,7 @@
     "build": "prisma generate --schema=./prisma/schema.prisma && next build",
     "db:push": "prisma db push --schema=./prisma/schema.prisma",
     "start": "next start",
-    "lint": "eslint",
-    "upgrade:enterprise": "npx tsx scripts/upgrade-to-enterprise.ts"
+    "lint": "eslint"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",
