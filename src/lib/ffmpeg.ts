@@ -336,15 +336,6 @@ export async function addHeadline(
     .replace(/"/g, '')  // Remove double quotes
     .replace(/:/g, '\\:');
 
-  // Split into two lines if longer than ~30 chars for cleaner look
-  if (escapedHeadline.length > 30) {
-    const words = escapedHeadline.split(' ');
-    const midpoint = Math.ceil(words.length / 2);
-    const line1 = words.slice(0, midpoint).join(' ');
-    const line2 = words.slice(midpoint).join(' ');
-    escapedHeadline = `${line1}\n${line2}`;
-  }
-
   // Enhanced headline styling with:
   // - Larger font (48px for better readability)
   // - Shadow effect for depth
@@ -772,15 +763,6 @@ export async function applyCombinedFilters(
       .replace(/'/g, '')  // Remove single quotes
       .replace(/"/g, '')  // Remove double quotes
       .replace(/:/g, '\\:');
-
-    // Split into two lines if longer than ~30 chars
-    if (escapedHeadline.length > 30) {
-      const words = escapedHeadline.split(' ');
-      const midpoint = Math.ceil(words.length / 2);
-      const line1 = words.slice(0, midpoint).join(' ');
-      const line2 = words.slice(midpoint).join(' ');
-      escapedHeadline = `${line1}\n${line2}`;
-    }
 
     const position = options.headlinePosition || 'top';
 
