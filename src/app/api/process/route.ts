@@ -15,8 +15,8 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
-  // Run cleanup of old files on each request
-  cleanupOldFiles();
+  // Run cleanup of old files in background (non-blocking)
+  setImmediate(() => cleanupOldFiles());
 
   try {
     const body = await request.json();
@@ -164,7 +164,24 @@ export async function POST(request: NextRequest) {
       captionStyle: captionStyle || 'instagram',
     };
 
-    // Step 1: Remove silence FIRST
+    // Determine what features need transcription
+    const needsTranscription = generateCaptions || useHookAsHeadline || generateBRoll || speechCorrection;
+    const needsEarlyTranscription = useHookAsHeadline || generateBRoll; // These can use original video transcription
+
+    // OPTIMIZATION: Run silence removal and early transcription in parallel
+    // Hook extraction and B-roll identification don't need exact timestamps from silence-removed video
+    let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[] }> | null = null;
+
+    if (needsEarlyTranscription && !speechCorrection) {
+      // Start transcribing original video in parallel (for hook/B-roll detection)
+      logger.info('Starting parallel transcription of original video for hook/B-roll');
+      earlyTranscriptionPromise = transcribeVideo(inputPath, processedDir, {
+        animated: false, // Don't need word-level for hook/B-roll detection
+        forSpeechCorrection: false,
+      }).then(t => ({ text: t.text, segments: t.segments }));
+    }
+
+    // Step 1: Remove silence (runs in parallel with early transcription if applicable)
     logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     await removeSilence(currentInput, stepOutput, options);
@@ -186,32 +203,58 @@ export async function POST(request: NextRequest) {
       currentInput = stepOutput;
     }
 
-    // Step 2: Transcribe the SILENCE-REMOVED video (so timestamps match!)
+    // Get early transcription result if we started one
+    let earlyTranscription: { text: string; segments: { start: number; end: number; text: string }[] } | null = null;
+    if (earlyTranscriptionPromise) {
+      logger.info('Waiting for parallel transcription to complete');
+      earlyTranscription = await earlyTranscriptionPromise;
+      logger.info('Parallel transcription completed');
+    }
+
+    // Step 2: Transcribe the SILENCE-REMOVED video (only if needed for captions or speech correction)
     let srtPath: string | undefined;
     let hookText: string | undefined;
     let transcriptionSegments: { start: number; end: number; text: string }[] = [];
     let transcriptionWords: TranscriptionWord[] = [];
 
-    if (generateCaptions || useHookAsHeadline || generateBRoll || speechCorrection) {
-      logger.info('Step 2: Transcribing silence-removed video');
-      // Use animated transcription (word-level timestamps) for animated caption style or speech correction
-      // Use forSpeechCorrection to prompt Whisper to include filler words
-      const transcription = await transcribeVideo(currentInput, processedDir, {
-        animated: captionStyle === 'animated',
-        forSpeechCorrection: speechCorrection,
-      });
-      srtPath = transcription.srtPath;
-      transcriptionSegments = transcription.segments;
-      transcriptionWords = transcription.words || [];
+    if (needsTranscription) {
+      // Use early transcription for hook extraction if available
+      if (useHookAsHeadline && earlyTranscription) {
+        hookText = extractHook(earlyTranscription.text);
+        logger.info('Extracted hook from parallel transcription', { hookText });
+      }
+
+      // For B-roll, use early transcription segments if available
+      if (generateBRoll && earlyTranscription && !generateCaptions && !speechCorrection) {
+        transcriptionSegments = earlyTranscription.segments;
+        logger.info('Using parallel transcription for B-roll', { segmentCount: transcriptionSegments.length });
+      }
+
+      // Only transcribe silence-removed video if we need accurate timestamps for captions or speech correction
+      const needsSilenceRemovedTranscription = generateCaptions || speechCorrection ||
+        (generateBRoll && !earlyTranscription); // Fallback if no early transcription
+
+      if (needsSilenceRemovedTranscription) {
+        logger.info('Step 2: Transcribing silence-removed video for captions/speech correction');
+        // Use animated transcription (word-level timestamps) for animated caption style or speech correction
+        // Use forSpeechCorrection to prompt Whisper to include filler words
+        const transcription = await transcribeVideo(currentInput, processedDir, {
+          animated: captionStyle === 'animated',
+          forSpeechCorrection: speechCorrection,
+        });
+        srtPath = transcription.srtPath;
+        transcriptionSegments = transcription.segments;
+        transcriptionWords = transcription.words || [];
+
+        // Extract hook if not already done from early transcription
+        if (useHookAsHeadline && !hookText) {
+          hookText = extractHook(transcription.text);
+          logger.info('Extracted hook from silence-removed transcription', { hookText });
+        }
+      }
 
       if (speechCorrection) {
         logger.debug('Transcription for speech correction', { wordCount: transcriptionWords.length });
-      }
-
-      // Extract hook if needed
-      if (useHookAsHeadline) {
-        hookText = extractHook(transcription.text);
-        logger.info('Extracted hook', { hookText });
       }
 
       // Step 2.5: Apply AI Speech Correction if enabled

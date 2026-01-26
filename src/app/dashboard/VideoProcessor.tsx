@@ -145,26 +145,68 @@ export default function VideoProcessor({
     }
   }
 
+  // Process multiple videos concurrently with a limit
+  const MAX_CONCURRENT_PROCESSING = 3
+
   const handleProcess = async (config: ProcessingConfig) => {
     setIsProcessing(true)
     setLastConfig(config)
 
     const pendingVideos = videoQueue.filter(v => v.status === 'pending')
+    let completedCount = 0
 
-    for (let i = 0; i < pendingVideos.length; i++) {
-      const video = pendingVideos[i]
-      setProcessingStatus(`Processing ${i + 1}/${pendingVideos.length}: ${video.file.originalName}`)
-
-      setVideoQueue(prev =>
-        prev.map(v => v.file.fileId === video.file.fileId ? { ...v, status: 'processing' } : v)
+    // Mark all pending videos as processing
+    setVideoQueue(prev =>
+      prev.map(v => pendingVideos.some(p => p.file.fileId === v.file.fileId)
+        ? { ...v, status: 'processing' }
+        : v
       )
+    )
 
-      const result = await processVideo(video, config)
+    // Process videos in parallel with concurrency limit
+    const processWithConcurrency = async () => {
+      const queue = [...pendingVideos]
+      let activeCount = 0
 
-      setVideoQueue(prev =>
-        prev.map(v => v.file.fileId === video.file.fileId ? result : v)
-      )
+      const updateStatus = () => {
+        const remaining = pendingVideos.length - completedCount
+        if (activeCount > 1) {
+          setProcessingStatus(`Processing ${activeCount} videos concurrently (${completedCount}/${pendingVideos.length} complete)`)
+        } else if (remaining > 0) {
+          setProcessingStatus(`Processing ${completedCount + 1}/${pendingVideos.length}`)
+        }
+      }
+
+      const processNext = async (): Promise<void> => {
+        if (queue.length === 0) return
+
+        const video = queue.shift()!
+        activeCount++
+        updateStatus()
+
+        try {
+          const result = await processVideo(video, config)
+          setVideoQueue(prev =>
+            prev.map(v => v.file.fileId === video.file.fileId ? result : v)
+          )
+        } finally {
+          activeCount--
+          completedCount++
+          updateStatus()
+          // Process next video when this one finishes
+          await processNext()
+        }
+      }
+
+      // Start up to MAX_CONCURRENT_PROCESSING videos
+      const initialBatch = Math.min(MAX_CONCURRENT_PROCESSING, queue.length)
+      const workers = Array(initialBatch).fill(null).map(() => processNext())
+
+      // Wait for all to complete
+      await Promise.all(workers)
     }
+
+    await processWithConcurrency()
 
     setIsProcessing(false)
     setProcessingStatus('')
