@@ -344,7 +344,22 @@ export async function addHeadline(
   // - Centered with slight left offset for engagement buttons
   const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
 
-  const filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+  // Split into two lines if longer than ~35 chars, using two separate drawtext filters
+  let filterString: string;
+  if (escapedHeadline.length > 35) {
+    const words = escapedHeadline.split(' ');
+    const midpoint = Math.ceil(words.length / 2);
+    const line1 = words.slice(0, midpoint).join(' ');
+    const line2 = words.slice(midpoint).join(' ');
+
+    // Two drawtext filters with adjusted y positions (line spacing ~60px)
+    const baseY = yPositions[position].replace('y=', '');
+    const line1Filter = `drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    const line2Filter = `drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    filterString = `${line1Filter},${line2Filter}`;
+  } else {
+    filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+  }
 
   logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
 
@@ -768,8 +783,21 @@ export async function applyCombinedFilters(
 
     // Enhanced headline styling with larger font, shadow, and fade animation
     const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
-    const headlineFilter = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-    filters.push(headlineFilter);
+
+    // Split into two lines if longer than ~35 chars, using two separate drawtext filters
+    if (escapedHeadline.length > 35) {
+      const words = escapedHeadline.split(' ');
+      const midpoint = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, midpoint).join(' ');
+      const line2 = words.slice(midpoint).join(' ');
+
+      // Two drawtext filters with adjusted y positions (line spacing ~60px)
+      const baseY = yPositions[position].replace('y=', '');
+      filters.push(`drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      filters.push(`drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+    } else {
+      filters.push(`drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+    }
   }
 
   // If no filters to apply, just copy the file
