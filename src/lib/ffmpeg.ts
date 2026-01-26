@@ -326,17 +326,9 @@ export async function addHeadline(
   };
 
   // Sanitize and escape special characters for FFmpeg drawtext filter
-  // Remove problematic unicode characters that may appear as boxes:
-  // - Zero-width characters (U+200B-U+200D, U+FEFF)
-  // - Control characters (U+0000-U+001F, U+007F-U+009F)
-  // - Line breaks, carriage returns, tabs
-  // - Soft hyphens (U+00AD)
-  // - Other invisible/formatting characters
+  // Only keep basic ASCII printable characters and common accented letters
   let escapedHeadline = headline
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width chars
-    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')  // Control chars
-    .replace(/[\r\n\t]/g, ' ')  // Line breaks to spaces
-    .replace(/\u00AD/g, '')  // Soft hyphens
+    .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')  // Keep only printable ASCII + Latin-1 accented
     .replace(/\s+/g, ' ')  // Normalize whitespace
     .trim()
     .replace(/\\/g, '\\\\')
@@ -770,12 +762,9 @@ export async function applyCombinedFilters(
     };
 
     // Sanitize and escape special characters for FFmpeg drawtext filter
-    // Remove problematic unicode characters that may appear as boxes
+    // Only keep basic ASCII printable characters and common accented letters
     let escapedHeadline = options.headline
-      .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width chars
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')  // Control chars
-      .replace(/[\r\n\t]/g, ' ')  // Line breaks to spaces
-      .replace(/\u00AD/g, '')  // Soft hyphens
+      .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')  // Keep only printable ASCII + Latin-1 accented
       .replace(/\s+/g, ' ')  // Normalize whitespace
       .trim()
       .replace(/\\/g, '\\\\')
