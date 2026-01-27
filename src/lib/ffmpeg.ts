@@ -398,15 +398,15 @@ export async function addHeadline(
     // Use drawbox with rounded corners for background, then overlay text
 
     // Calculate box dimensions to properly contain text
-    // Box needs: top padding + line1 height + line spacing + line2 height + bottom padding
-    const boxWidth = 920;  // Wide enough for most headlines
+    // Use responsive width: 85% of video width, max 920px
+    const boxWidthExpr = `min(920\\,w*0.85)`;
     const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
     const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
-    const boxX = `(w-${boxWidth})/2`;
+    const boxX = `(w-${boxWidthExpr})/2`;
     const boxY = baseY - padding - 5;  // Start above first line with padding
 
     // Draw filled box background
-    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`;
+    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`;
 
     // Bold text by drawing twice with slight offset (faux bold)
     const textColor = 'black';
@@ -439,14 +439,15 @@ export async function addHeadline(
   } else {
     // Classic style: semi-transparent dark rounded box, white bold text
     // Calculate box dimensions to properly contain text
-    const boxWidth = 920;
+    // Use responsive width: 85% of video width, max 920px
+    const boxWidthExpr = `min(920\\,w*0.85)`;
     const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
     const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
-    const boxX = `(w-${boxWidth})/2`;
+    const boxX = `(w-${boxWidthExpr})/2`;
     const boxY = baseY - padding - 5;  // Start above first line with padding
 
     // Dark semi-transparent background
-    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`;
+    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`;
 
     // White bold text with shadow
     const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
@@ -939,10 +940,11 @@ export async function applyCombinedFilters(
     const lineHeight = 70;
     const padding = 30;
     // Calculate proper box dimensions to contain text
-    const boxWidth = 920;
+    // Use responsive width: 85% of video width, max 920px
+    const boxWidthExpr = `min(920\\,w*0.85)`;
     const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
     const boxHeight = textHeight + (padding * 2) + 10;  // Extra buffer
-    const boxX = `(w-${boxWidth})/2`;
+    const boxX = `(w-${boxWidthExpr})/2`;
     const boxY = baseY - padding - 5;  // Start above first line with padding
 
     if (style === 'speech-bubble') {
@@ -950,7 +952,7 @@ export async function applyCombinedFilters(
       const textColor = 'black';
 
       // Background box
-      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`);
+      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`);
 
       // Line 1 text (bold effect via double draw)
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
@@ -969,7 +971,7 @@ export async function applyCombinedFilters(
       // Classic style: semi-transparent dark box, white bold text
 
       // Background box
-      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`);
+      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`);
 
       // Line 1 text (bold with shadow)
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
