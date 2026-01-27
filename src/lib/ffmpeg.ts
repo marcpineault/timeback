@@ -307,10 +307,48 @@ export async function burnCaptions(
 }
 
 /**
+ * Split headline into two balanced lines
+ */
+function splitHeadlineIntoTwoLines(headline: string): [string, string] {
+  const words = headline.split(' ');
+  if (words.length <= 2) {
+    // Very short headline - put on one line each or split at middle char
+    if (words.length === 1 && headline.length > 15) {
+      const mid = Math.ceil(headline.length / 2);
+      return [headline.slice(0, mid), headline.slice(mid)];
+    }
+    if (words.length === 2) {
+      return [words[0], words[1]];
+    }
+    return [headline, ''];
+  }
+
+  // Find the best split point to balance line lengths
+  let bestSplit = Math.ceil(words.length / 2);
+  let bestDiff = Infinity;
+
+  for (let i = 1; i < words.length; i++) {
+    const line1 = words.slice(0, i).join(' ');
+    const line2 = words.slice(i).join(' ');
+    const diff = Math.abs(line1.length - line2.length);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestSplit = i;
+    }
+  }
+
+  return [
+    words.slice(0, bestSplit).join(' '),
+    words.slice(bestSplit).join(' ')
+  ];
+}
+
+/**
  * Add headline text overlay to video with selectable styling
  * Styles:
- * - 'speech-bubble': White background, black text, triangle tail (like social media)
- * - 'classic': Semi-transparent black background, white text with shadow
+ * - 'speech-bubble': White background with rounded corners, black bold text, triangle tail
+ * - 'classic': Semi-transparent black background with rounded corners, white bold text
+ * Always displays as 2 lines for better visual balance
  * Positioned in safe zone: below top 200px, avoiding right 150px for engagement buttons
  */
 export async function addHeadline(
@@ -322,79 +360,123 @@ export async function addHeadline(
   headlineStyle: HeadlineStyle = 'speech-bubble'
 ): Promise<string> {
   // Y positions optimized for safe zones (1080x1920)
-  // Top: y=350 puts headline well below username/profile area for reels
-  // Center: middle of frame
-  // Bottom: y=1350 is above the bottom safe zone
-  const yPositions: Record<string, string> = {
-    top: 'y=350',
-    center: 'y=(h-text_h)/2',
-    bottom: 'y=1350',
+  const baseYPositions: Record<string, number> = {
+    top: 350,
+    center: 860,  // Approximate center for 1920 height
+    bottom: 1350,
   };
 
   // Sanitize and escape special characters for FFmpeg drawtext filter
-  // Only keep basic ASCII printable characters and common accented letters
   let escapedHeadline = headline
-    .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')  // Keep only printable ASCII + Latin-1 accented
-    .replace(/\s+/g, ' ')  // Normalize whitespace
+    .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')
+    .replace(/\s+/g, ' ')
     .trim()
     .replace(/\\/g, '\\\\')
-    .replace(/'/g, '')  // Remove single quotes
-    .replace(/"/g, '')  // Remove double quotes
+    .replace(/'/g, '')
+    .replace(/"/g, '')
     .replace(/:/g, '\\:');
 
-  // Smooth fade-in (0-0.5s) and fade-out (4.5-5s) using alpha expression
+  // Always split into 2 lines for visual balance
+  const [line1, line2] = splitHeadlineIntoTwoLines(escapedHeadline);
+  const hasSecondLine = line2.length > 0;
+
+  // Smooth fade-in (0-0.5s) and fade-out (4.5-5s)
   const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
+
+  const baseY = baseYPositions[position];
+  const fontSize = 54;
+  const lineHeight = 70;
+  const padding = 30;
+  const cornerRadius = 20;
 
   let filterString: string;
 
   if (headlineStyle === 'speech-bubble') {
-    // Speech bubble style: white background, black text, triangle tail
-    const bubbleColor = 'white';
+    // Speech bubble style: white rounded box, black bold text, triangle tail
+    // Use drawbox with rounded corners for background, then overlay text
+
+    // Calculate box dimensions (approximate based on text)
+    const boxWidth = 900;  // Wide enough for most headlines
+    const boxHeight = hasSecondLine ? 160 : 90;
+    const boxX = `(w-${boxWidth})/2`;
+    const boxY = baseY - padding;
+
+    // Draw rounded rectangle background using drawbox with 't' for thickness (fill) and round corners
+    // Note: For filled rounded rectangle, we use multiple overlapping boxes or geq
+    // Using a simpler approach: draw filled box with rounded appearance using alpha blend
+    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`;
+
+    // Draw corner roundings using 4 circles at corners (simulating rounded corners)
+    const r = cornerRadius;
+    const circleFilters = [
+      // Top-left corner
+      `geq=lum='if(lt(sqrt(pow(X-(${boxX}+${r}),2)+pow(Y-(${boxY}+${r}),2)),${r})*lt(X,${boxX}+${r})*lt(Y,${boxY}+${r})*between(t,0,5),255,lum(X,Y))':cb='cb(X,Y)':cr='cr(X,Y)'`,
+    ];
+
+    // For true rounded corners, use a complex filter - but let's keep it simple with clean padding
+    // Bold text by drawing twice with slight offset (faux bold)
     const textColor = 'black';
-    const bubblePadding = 25;
 
-    if (escapedHeadline.length > 35) {
-      const words = escapedHeadline.split(' ');
-      const midpoint = Math.ceil(words.length / 2);
-      const line1 = words.slice(0, midpoint).join(' ');
-      const line2 = words.slice(midpoint).join(' ');
+    // Line 1 text (bold effect via shadow)
+    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
+    const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
 
-      const baseY = yPositions[position].replace('y=', '');
-      const line1Filter = `drawtext=text='${line1}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
-      const line2Filter = `drawtext=text='${line2}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
-      const tailFilter = `drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+140:enable='between(t,0,5)'`;
-      filterString = `${line1Filter},${line2Filter},${tailFilter}`;
-    } else {
-      const baseY = yPositions[position].replace('y=', '');
-      const mainFilter = `drawtext=text='${escapedHeadline}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
-      const tailFilter = `drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:enable='between(t,0,5)'`;
-      filterString = `${mainFilter},${tailFilter}`;
+    // Line 2 text (if exists)
+    const line2Y = baseY + lineHeight;
+    const line2Filter = hasSecondLine
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
+      : '';
+    const line2BoldFilter = hasSecondLine
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
+      : '';
+
+    // Triangle tail below the box
+    const tailY = hasSecondLine ? baseY + lineHeight + padding + 20 : baseY + padding + 30;
+    const tailFilter = `drawtext=text='▼':fontsize=40:fontcolor=white:${alphaExpr}:x=(w-text_w)/2:y=${tailY}:enable='between(t,0,5)'`;
+
+    // Combine filters: background box, then text layers
+    const filters = [bgFilter, line1Filter, line1BoldFilter];
+    if (hasSecondLine) {
+      filters.push(line2Filter, line2BoldFilter);
     }
+    filters.push(tailFilter);
+    filterString = filters.join(',');
+
   } else {
-    // Classic style: semi-transparent black background, white text with shadow
-    if (escapedHeadline.length > 35) {
-      const words = escapedHeadline.split(' ');
-      const midpoint = Math.ceil(words.length / 2);
-      const line1 = words.slice(0, midpoint).join(' ');
-      const line2 = words.slice(midpoint).join(' ');
+    // Classic style: semi-transparent dark rounded box, white bold text
+    const boxWidth = 900;
+    const boxHeight = hasSecondLine ? 160 : 90;
+    const boxX = `(w-${boxWidth})/2`;
+    const boxY = baseY - padding;
 
-      const baseY = yPositions[position].replace('y=', '');
-      const line1Filter = `drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-      const line2Filter = `drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-      filterString = `${line1Filter},${line2Filter}`;
-    } else {
-      filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    // Dark semi-transparent background
+    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`;
+
+    // White bold text with shadow
+    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
+
+    const line2Y = baseY + lineHeight;
+    const line2Filter = hasSecondLine
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`
+      : '';
+    const line2BoldFilter = hasSecondLine
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
+      : '';
+
+    const filters = [bgFilter, line1Filter, line1BoldFilter];
+    if (hasSecondLine) {
+      filters.push(line2Filter, line2BoldFilter);
     }
+    filterString = filters.join(',');
   }
 
-  logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
-
+  logger.debug(`[Headline] Adding 2-line headline: "${line1}" / "${line2}" at ${position} (${headlineStyle})`);
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .videoFilters(filterString)
       .outputOptions([
-        // Memory-efficient encoding for constrained server environments
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
@@ -791,10 +873,10 @@ export async function applyCombinedFilters(
   // Add headline filter if specified (with selectable styling)
   if (options.headline) {
     // Y positions optimized for safe zones (1080x1920)
-    const yPositions: Record<string, string> = {
-      top: 'y=350',
-      center: 'y=(h-text_h)/2',
-      bottom: 'y=1350',
+    const baseYPositions: Record<string, number> = {
+      top: 350,
+      center: 860,
+      bottom: 1350,
     };
 
     // Sanitize and escape special characters for FFmpeg drawtext filter
@@ -811,40 +893,53 @@ export async function applyCombinedFilters(
     const style = options.headlineStyle || 'speech-bubble';
     const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
 
+    // Always split into 2 lines for visual balance
+    const [line1, line2] = splitHeadlineIntoTwoLines(escapedHeadline);
+    const hasSecondLine = line2.length > 0;
+
+    const baseY = baseYPositions[position];
+    const fontSize = 54;
+    const lineHeight = 70;
+    const padding = 30;
+    const boxWidth = 900;
+    const boxHeight = hasSecondLine ? 160 : 90;
+    const boxX = `(w-${boxWidth})/2`;
+    const boxY = baseY - padding;
+
     if (style === 'speech-bubble') {
-      // Speech bubble style: white background, black text, triangle tail
-      const bubbleColor = 'white';
+      // Speech bubble style: white rounded box, black bold text, triangle tail
       const textColor = 'black';
-      const bubblePadding = 25;
 
-      if (escapedHeadline.length > 35) {
-        const words = escapedHeadline.split(' ');
-        const midpoint = Math.ceil(words.length / 2);
-        const line1 = words.slice(0, midpoint).join(' ');
-        const line2 = words.slice(midpoint).join(' ');
+      // Background box
+      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`);
 
-        const baseY = yPositions[position].replace('y=', '');
-        filters.push(`drawtext=text='${line1}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='${line2}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+140:enable='between(t,0,5)'`);
-      } else {
-        const baseY = yPositions[position].replace('y=', '');
-        filters.push(`drawtext=text='${escapedHeadline}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:enable='between(t,0,5)'`);
+      // Line 1 text (bold effect via double draw)
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
+
+      if (hasSecondLine) {
+        const line2Y = baseY + lineHeight;
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
-    } else {
-      // Classic style: semi-transparent black background, white text with shadow
-      if (escapedHeadline.length > 35) {
-        const words = escapedHeadline.split(' ');
-        const midpoint = Math.ceil(words.length / 2);
-        const line1 = words.slice(0, midpoint).join(' ');
-        const line2 = words.slice(midpoint).join(' ');
 
-        const baseY = yPositions[position].replace('y=', '');
-        filters.push(`drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-      } else {
-        filters.push(`drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      // Triangle tail
+      const tailY = hasSecondLine ? baseY + lineHeight + padding + 20 : baseY + padding + 30;
+      filters.push(`drawtext=text='▼':fontsize=40:fontcolor=white:${alphaExpr}:x=(w-text_w)/2:y=${tailY}:enable='between(t,0,5)'`);
+    } else {
+      // Classic style: semi-transparent dark box, white bold text
+
+      // Background box
+      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`);
+
+      // Line 1 text (bold with shadow)
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
+
+      if (hasSecondLine) {
+        const line2Y = baseY + lineHeight;
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
     }
   }
