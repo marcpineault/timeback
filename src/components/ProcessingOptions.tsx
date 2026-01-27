@@ -17,6 +17,14 @@ export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
 
 export type HeadlineStyle = 'classic' | 'speech-bubble';
 
+export type BRollStyle = 'minimal' | 'dynamic' | 'data-focused';
+
+export interface BRollConfig {
+  style: BRollStyle;
+  intensity: 'low' | 'medium' | 'high';
+  maxMoments: number;
+}
+
 export interface ProcessingConfig {
   generateCaptions: boolean;
   headline: string;
@@ -28,6 +36,7 @@ export interface ProcessingConfig {
   useHookAsHeadline: boolean;
   generateAIHeadline: boolean;  // Use AI to generate engaging headline
   generateBRoll: boolean;
+  bRollConfig: BRollConfig;
   normalizeAudio: boolean;
   colorGrade: 'none' | 'warm' | 'cool' | 'cinematic' | 'vibrant' | 'vintage';
   autoZoom: boolean;
@@ -132,6 +141,11 @@ export default function ProcessingOptions({
     useHookAsHeadline: false,
     generateAIHeadline: false,
     generateBRoll: false,
+    bRollConfig: {
+      style: 'dynamic',
+      intensity: 'medium',
+      maxMoments: 3,
+    },
     normalizeAudio: true,
     colorGrade: 'none',
     autoZoom: false,
@@ -434,6 +448,106 @@ export default function ProcessingOptions({
                   </span>
                 </div>
               </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* B-Roll Animations Settings */}
+      <div className="space-y-3 sm:space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base sm:text-lg font-medium text-white">B-Roll Animations</h3>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.generateBRoll}
+              onChange={(e) => setConfig({ ...config, generateBRoll: e.target.checked })}
+              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+            />
+            <span className="text-gray-400">Enable B-Roll</span>
+          </label>
+        </div>
+
+        {config.generateBRoll && (
+          <div className="space-y-4 p-4 bg-gray-700/50 rounded-lg">
+            <p className="text-xs text-gray-400">
+              AI-generated animations that appear during key moments to add visual context
+            </p>
+
+            {/* Animation Style */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Animation Style</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'minimal', label: 'Minimal', desc: 'Clean & subtle' },
+                  { value: 'dynamic', label: 'Dynamic', desc: 'Engaging & varied' },
+                  { value: 'data-focused', label: 'Data', desc: 'Charts & stats' },
+                ] as const).map((style) => (
+                  <button
+                    key={style.value}
+                    type="button"
+                    onClick={() => setConfig({
+                      ...config,
+                      bRollConfig: { ...config.bRollConfig, style: style.value }
+                    })}
+                    className={`p-2 rounded-lg border-2 transition-colors text-center ${
+                      config.bRollConfig.style === style.value
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-gray-600 hover:border-gray-500'
+                    }`}
+                  >
+                    <span className={`text-xs font-medium ${
+                      config.bRollConfig.style === style.value ? 'text-blue-400' : 'text-gray-300'
+                    }`}>
+                      {style.label}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-0.5">{style.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Intensity */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-sm text-gray-400">Frequency</label>
+                <span className="text-sm text-white font-medium capitalize">{config.bRollConfig.intensity}</span>
+              </div>
+              <div className="flex gap-2">
+                {(['low', 'medium', 'high'] as const).map((intensity) => (
+                  <button
+                    key={intensity}
+                    type="button"
+                    onClick={() => setConfig({
+                      ...config,
+                      bRollConfig: {
+                        ...config.bRollConfig,
+                        intensity,
+                        maxMoments: intensity === 'low' ? 2 : intensity === 'medium' ? 3 : 5,
+                      }
+                    })}
+                    className={`flex-1 py-2 px-3 rounded-lg capitalize text-sm transition-colors ${
+                      config.bRollConfig.intensity === intensity
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                    }`}
+                  >
+                    {intensity}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {config.bRollConfig.intensity === 'low' && '2 animations - one at the start, one at a key point'}
+                {config.bRollConfig.intensity === 'medium' && '3 animations - balanced throughout the video'}
+                {config.bRollConfig.intensity === 'high' && '5 animations - frequent visual variety'}
+              </p>
+            </div>
+
+            {/* Animation Types Preview */}
+            <div className="pt-2 border-t border-gray-600">
+              <p className="text-xs text-gray-500">
+                Animations include: charts, graphs, progress bars, checkmarks, comparisons, countdowns, and more - automatically selected based on your content
+              </p>
             </div>
           </div>
         )}

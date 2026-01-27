@@ -475,14 +475,15 @@ export async function insertBRollCutaways(
   inputPath: string,
   outputPath: string,
   cutaways: BRollCutaway[],
-  outputDir: string
+  outputDir: string,
+  style: 'minimal' | 'dynamic' | 'data-focused' = 'dynamic'
 ): Promise<string> {
   if (cutaways.length === 0) {
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
 
-  logger.debug(`[B-Roll] Overlaying ${cutaways.length} animated B-roll clips`);
+  logger.debug(`[B-Roll] Overlaying ${cutaways.length} animated B-roll clips (style: ${style})`);
 
   // Get video dimensions
   const videoInfo = await new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -517,7 +518,8 @@ export async function insertBRollCutaways(
         cutaway.duration,
         animWidth,
         animHeight,
-        cutaway.context
+        cutaway.context,
+        style
       );
       return animPath;
     })
