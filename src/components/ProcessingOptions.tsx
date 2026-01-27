@@ -15,10 +15,13 @@ interface ProcessingOptionsProps {
 
 export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
 
+export type HeadlineStyle = 'classic' | 'speech-bubble';
+
 export interface ProcessingConfig {
   generateCaptions: boolean;
   headline: string;
   headlinePosition: 'top' | 'center' | 'bottom';
+  headlineStyle: HeadlineStyle;
   captionStyle: 'instagram';
   silenceThreshold: number;
   silenceDuration: number;
@@ -122,6 +125,7 @@ export default function ProcessingOptions({
     generateCaptions: true,
     headline: '',
     headlinePosition: 'top',
+    headlineStyle: 'speech-bubble',
     captionStyle: 'instagram',
     silenceThreshold: -30,
     silenceDuration: 0.5,
@@ -379,6 +383,57 @@ export default function ProcessingOptions({
                   {pos}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Style selector - show when any headline mode is active */}
+        {(config.headline || config.useHookAsHeadline || config.generateAIHeadline) && (
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Style</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, headlineStyle: 'speech-bubble' })}
+                className={`p-3 rounded-lg border-2 transition-colors ${
+                  config.headlineStyle === 'speech-bubble'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-600 hover:border-gray-500'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  {/* Speech bubble preview */}
+                  <div className="relative">
+                    <div className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded">
+                      Headline
+                    </div>
+                    <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white mx-auto" />
+                  </div>
+                  <span className={`text-xs ${config.headlineStyle === 'speech-bubble' ? 'text-blue-400' : 'text-gray-400'}`}>
+                    Speech Bubble
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, headlineStyle: 'classic' })}
+                className={`p-3 rounded-lg border-2 transition-colors ${
+                  config.headlineStyle === 'classic'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-600 hover:border-gray-500'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  {/* Classic preview */}
+                  <div className="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded shadow-lg">
+                    Headline
+                  </div>
+                  <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-blue-400' : 'text-gray-400'}`}>
+                    Classic
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
         )}

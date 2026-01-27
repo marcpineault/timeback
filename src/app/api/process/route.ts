@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       s3Key,  // S3 key if file was uploaded to S3
       headline,
       headlinePosition,
+      headlineStyle,
       captionStyle,
       silenceThreshold,
       silenceDuration,
@@ -162,6 +163,7 @@ export async function POST(request: NextRequest) {
       silenceDuration: silenceDuration ?? 0.4,
       headline: headline || undefined,
       headlinePosition: headlinePosition || 'top',
+      headlineStyle: headlineStyle || 'speech-bubble',
       captionStyle: captionStyle || 'instagram',
     };
 
@@ -409,6 +411,7 @@ export async function POST(request: NextRequest) {
         colorGrade: colorGrade as ColorGradePreset,
         headline: finalHeadline,
         headlinePosition: options.headlinePosition,
+        headlineStyle: options.headlineStyle,
         captionStyle,
       });
       // Clean up intermediate file
@@ -419,7 +422,7 @@ export async function POST(request: NextRequest) {
     } else if (finalHeadline) {
       logger.info('Step 4: Adding headline', { headline: finalHeadline });
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
-      await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle);
+      await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle, options.headlineStyle);
       // Clean up intermediate file
       if (currentInput !== inputPath) {
         await fs.unlink(currentInput).catch(() => {})
