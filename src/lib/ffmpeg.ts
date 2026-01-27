@@ -8,11 +8,14 @@ export interface SilenceInterval {
   end: number;
 }
 
+export type HeadlineStyle = 'classic' | 'speech-bubble';
+
 export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
   silenceDuration?: number; // minimum silence duration in seconds, default 0.5
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
+  headlineStyle?: HeadlineStyle;
   captionStyle?: 'instagram';
 }
 
@@ -304,8 +307,10 @@ export async function burnCaptions(
 }
 
 /**
- * Add headline text overlay to video with enhanced styling
- * Features: larger text, shadow effect, smooth fade-in/out animation
+ * Add headline text overlay to video with selectable styling
+ * Styles:
+ * - 'speech-bubble': White background, black text, triangle tail (like social media)
+ * - 'classic': Semi-transparent black background, white text with shadow
  * Positioned in safe zone: below top 200px, avoiding right 150px for engagement buttons
  */
 export async function addHeadline(
@@ -313,7 +318,8 @@ export async function addHeadline(
   outputPath: string,
   headline: string,
   position: 'top' | 'center' | 'bottom' = 'top',
-  captionStyle: string = 'instagram'
+  captionStyle: string = 'instagram',
+  headlineStyle: HeadlineStyle = 'speech-bubble'
 ): Promise<string> {
   // Y positions optimized for safe zones (1080x1920)
   // Top: y=350 puts headline well below username/profile area for reels
@@ -336,29 +342,49 @@ export async function addHeadline(
     .replace(/"/g, '')  // Remove double quotes
     .replace(/:/g, '\\:');
 
-  // Enhanced headline styling with:
-  // - Larger font (48px for better readability)
-  // - Shadow effect for depth
-  // - Smooth fade-in (0-0.5s) and fade-out (4.5-5s) using alpha expression
-  // - Semi-transparent background box with generous padding
-  // - Centered with slight left offset for engagement buttons
+  // Smooth fade-in (0-0.5s) and fade-out (4.5-5s) using alpha expression
   const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
 
-  // Split into two lines if longer than ~35 chars, using two separate drawtext filters
   let filterString: string;
-  if (escapedHeadline.length > 35) {
-    const words = escapedHeadline.split(' ');
-    const midpoint = Math.ceil(words.length / 2);
-    const line1 = words.slice(0, midpoint).join(' ');
-    const line2 = words.slice(midpoint).join(' ');
 
-    // Two drawtext filters with adjusted y positions (line spacing ~60px)
-    const baseY = yPositions[position].replace('y=', '');
-    const line1Filter = `drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-    const line2Filter = `drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-    filterString = `${line1Filter},${line2Filter}`;
+  if (headlineStyle === 'speech-bubble') {
+    // Speech bubble style: white background, black text, triangle tail
+    const bubbleColor = 'white';
+    const textColor = 'black';
+    const bubblePadding = 25;
+
+    if (escapedHeadline.length > 35) {
+      const words = escapedHeadline.split(' ');
+      const midpoint = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, midpoint).join(' ');
+      const line2 = words.slice(midpoint).join(' ');
+
+      const baseY = yPositions[position].replace('y=', '');
+      const line1Filter = `drawtext=text='${line1}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
+      const line2Filter = `drawtext=text='${line2}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
+      const tailFilter = `drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+140:enable='between(t,0,5)'`;
+      filterString = `${line1Filter},${line2Filter},${tailFilter}`;
+    } else {
+      const baseY = yPositions[position].replace('y=', '');
+      const mainFilter = `drawtext=text='${escapedHeadline}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
+      const tailFilter = `drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:enable='between(t,0,5)'`;
+      filterString = `${mainFilter},${tailFilter}`;
+    }
   } else {
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    // Classic style: semi-transparent black background, white text with shadow
+    if (escapedHeadline.length > 35) {
+      const words = escapedHeadline.split(' ');
+      const midpoint = Math.ceil(words.length / 2);
+      const line1 = words.slice(0, midpoint).join(' ');
+      const line2 = words.slice(midpoint).join(' ');
+
+      const baseY = yPositions[position].replace('y=', '');
+      const line1Filter = `drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+      const line2Filter = `drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+      filterString = `${line1Filter},${line2Filter}`;
+    } else {
+      filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    }
   }
 
   logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
@@ -736,6 +762,7 @@ export interface CombinedProcessingOptions {
   colorGrade?: ColorGradePreset;
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
+  headlineStyle?: HeadlineStyle;
   captionStyle?: string;
 }
 
@@ -759,7 +786,7 @@ export async function applyCombinedFilters(
     }
   }
 
-  // Add headline filter if specified (with enhanced styling, safe zone optimized)
+  // Add headline filter if specified (with selectable styling)
   if (options.headline) {
     // Y positions optimized for safe zones (1080x1920)
     const yPositions: Record<string, string> = {
@@ -769,34 +796,54 @@ export async function applyCombinedFilters(
     };
 
     // Sanitize and escape special characters for FFmpeg drawtext filter
-    // Only keep basic ASCII printable characters and common accented letters
     let escapedHeadline = options.headline
-      .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')  // Keep only printable ASCII + Latin-1 accented
-      .replace(/\s+/g, ' ')  // Normalize whitespace
+      .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')
+      .replace(/\s+/g, ' ')
       .trim()
       .replace(/\\/g, '\\\\')
-      .replace(/'/g, '')  // Remove single quotes
-      .replace(/"/g, '')  // Remove double quotes
+      .replace(/'/g, '')
+      .replace(/"/g, '')
       .replace(/:/g, '\\:');
 
     const position = options.headlinePosition || 'top';
-
-    // Enhanced headline styling with larger font, shadow, and fade animation
+    const style = options.headlineStyle || 'speech-bubble';
     const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
 
-    // Split into two lines if longer than ~35 chars, using two separate drawtext filters
-    if (escapedHeadline.length > 35) {
-      const words = escapedHeadline.split(' ');
-      const midpoint = Math.ceil(words.length / 2);
-      const line1 = words.slice(0, midpoint).join(' ');
-      const line2 = words.slice(midpoint).join(' ');
+    if (style === 'speech-bubble') {
+      // Speech bubble style: white background, black text, triangle tail
+      const bubbleColor = 'white';
+      const textColor = 'black';
+      const bubblePadding = 25;
 
-      // Two drawtext filters with adjusted y positions (line spacing ~60px)
-      const baseY = yPositions[position].replace('y=', '');
-      filters.push(`drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-      filters.push(`drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      if (escapedHeadline.length > 35) {
+        const words = escapedHeadline.split(' ');
+        const midpoint = Math.ceil(words.length / 2);
+        const line1 = words.slice(0, midpoint).join(' ');
+        const line2 = words.slice(midpoint).join(' ');
+
+        const baseY = yPositions[position].replace('y=', '');
+        filters.push(`drawtext=text='${line1}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+140:enable='between(t,0,5)'`);
+      } else {
+        const baseY = yPositions[position].replace('y=', '');
+        filters.push(`drawtext=text='${escapedHeadline}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:enable='between(t,0,5)'`);
+      }
     } else {
-      filters.push(`drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      // Classic style: semi-transparent black background, white text with shadow
+      if (escapedHeadline.length > 35) {
+        const words = escapedHeadline.split(' ');
+        const midpoint = Math.ceil(words.length / 2);
+        const line1 = words.slice(0, midpoint).join(' ');
+        const line2 = words.slice(midpoint).join(' ');
+
+        const baseY = yPositions[position].replace('y=', '');
+        filters.push(`drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      } else {
+        filters.push(`drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      }
     }
   }
 
