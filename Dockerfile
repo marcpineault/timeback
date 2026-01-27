@@ -1,8 +1,12 @@
 # Use Node.js LTS with Alpine for smaller image
 FROM node:20-alpine AS base
 
-# Install FFmpeg, fonts, and dependencies for video/image processing
-RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu vips
+# Install FFmpeg, fonts, Chromium, and dependencies for video/image processing
+RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu vips chromium nss freetype harfbuzz ca-certificates
+
+# Set Chromium path for Puppeteer
+ENV CHROME_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -62,6 +66,8 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
 COPY --from=builder /app/node_modules/@img ./node_modules/@img
+COPY --from=builder /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
+COPY --from=builder /app/node_modules/@anthropic-ai ./node_modules/@anthropic-ai
 
 EXPOSE 3000
 
