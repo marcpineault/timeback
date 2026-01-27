@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       useHookAsHeadline,
       generateAIHeadline: shouldGenerateAIHeadline,
       generateBRoll,
+      bRollConfig,
       normalizeAudio: shouldNormalizeAudio,
       colorGrade,
       autoZoom,
@@ -361,13 +362,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3.5: Generate and insert AI B-Roll if enabled
-    logger.debug('B-Roll check', { enabled: generateBRoll, segmentCount: transcriptionSegments.length });
+    // Extract B-roll configuration with defaults
+    const bRollStyle = bRollConfig?.style || 'dynamic';
+    const bRollMaxMoments = bRollConfig?.maxMoments || 3;
+
+    logger.debug('B-Roll check', { enabled: generateBRoll, segmentCount: transcriptionSegments.length, style: bRollStyle, maxMoments: bRollMaxMoments });
     if (generateBRoll && transcriptionSegments.length > 0) {
       logger.info('Step 3.5: Generating AI B-Roll animations');
 
-      // Identify key moments for B-roll
-      const moments = await identifyBRollMoments(transcriptionSegments, 2);
-      logger.info('Identified B-roll moments', { count: moments.length });
+      // Identify key moments for B-roll using configured style and count
+      const moments = await identifyBRollMoments(transcriptionSegments, bRollMaxMoments, bRollStyle);
+      logger.info('Identified B-roll moments', { count: moments.length, style: bRollStyle });
 
       if (moments.length > 0) {
         // Create cutaways from identified moments - pass context for animation generation
@@ -377,9 +382,9 @@ export async function POST(request: NextRequest) {
           context: moment.context, // Pass context for contextual animation
         }));
 
-        // Insert animated cutaways into video
+        // Insert animated cutaways into video with configured style
         stepOutput = path.join(processedDir, `${baseName}_broll.mp4`);
-        await insertBRollCutaways(currentInput, stepOutput, cutaways, processedDir);
+        await insertBRollCutaways(currentInput, stepOutput, cutaways, processedDir, bRollStyle);
 
         // Clean up intermediate file
         if (currentInput !== inputPath) {

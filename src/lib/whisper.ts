@@ -316,11 +316,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 }
 
 /**
- * Analyze transcript and identify key moments for B-roll
+ * Animation context keywords that help select appropriate animations
+ */
+const ANIMATION_CONTEXT_HINTS = `
+Animation keywords to include in context (use these exact terms when applicable):
+- For upward trends: "growth", "increase", "rise", "profit", "success", "gains", "boost"
+- For downward trends: "crash", "fall", "decline", "loss", "drop", "decrease"
+- For money/numbers: "money", "dollar", "revenue", "income", "million", "thousand", "price", "cost"
+- For percentages: "percent", "percentage", "rate", "conversion"
+- For comparisons: "compare", "versus", "vs", "better than", "difference", "before and after"
+- For progress: "progress", "completion", "goal", "target", "achieving"
+- For success: "success", "correct", "approved", "verified", "achieved", "completed"
+- For time: "time", "hours", "minutes", "duration", "deadline", "schedule"
+- For data: "data", "statistics", "analytics", "metrics", "results", "research"
+- For emphasis: "important", "key", "crucial", "highlight", "attention", "critical"
+`.trim();
+
+/**
+ * Analyze transcript and identify key moments for B-roll animations
  */
 export async function identifyBRollMoments(
   segments: TranscriptionSegment[],
-  maxMoments: number = 3
+  maxMoments: number = 3,
+  style: 'minimal' | 'dynamic' | 'data-focused' = 'dynamic'
 ): Promise<BRollMoment[]> {
   const openai = getOpenAIClient();
 
@@ -329,29 +347,47 @@ export async function identifyBRollMoments(
     .map(s => `[${s.start.toFixed(1)}s] ${s.text}`)
     .join('\n');
 
-  console.log(`[B-Roll] Analyzing transcript with ${segments.length} segments`);
+  console.log(`[B-Roll] Analyzing transcript with ${segments.length} segments (style: ${style})`);
+
+  // Adjust prompt based on style
+  const styleGuidance = style === 'minimal'
+    ? 'Focus on the most impactful moments only. Prefer simple, clean visual concepts.'
+    : style === 'data-focused'
+    ? 'Prioritize moments mentioning numbers, statistics, comparisons, or data-driven concepts.'
+    : 'Balance between data visualizations and engaging visual highlights throughout the video.';
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       {
         role: 'system',
-        content: `You are a video editor assistant. Analyze the transcript and identify exactly ${maxMoments} key moments where a visual B-roll cutaway would enhance the content.
+        content: `You are a video editor specializing in short-form content. Identify exactly ${maxMoments} key moments for animated B-roll overlays.
+
+${styleGuidance}
 
 For each moment, provide:
-1. timestamp: The time in seconds where the cutaway should start
-2. duration: How long the cutaway should last (2-4 seconds)
-3. prompt: A detailed DALL-E image prompt that would create an engaging visual
-4. context: Brief description of what's being discussed
+1. timestamp: Time in seconds where the animation should start (avoid the first 1 second)
+2. duration: How long the animation should display (2-4 seconds, shorter for high-energy content)
+3. context: A keyword-rich description that will help select the right animation type
 
-Focus on moments that mention specific concepts, objects, or scenarios that can be visualized.
+${ANIMATION_CONTEXT_HINTS}
+
+Guidelines:
+- Space moments throughout the video for visual variety
+- Don't overlap with natural visual hooks (first few seconds)
+- Choose moments where the speaker makes a key point or presents information
+- The context field should contain relevant keywords from the list above
 
 You MUST return a JSON object with a "moments" array containing exactly ${maxMoments} objects.
-Example: {"moments": [{"timestamp": 5.2, "duration": 3, "prompt": "A luxurious modern office with floor-to-ceiling windows overlooking a city skyline", "context": "discussing business growth"}]}`
+Example: {"moments": [
+  {"timestamp": 3.5, "duration": 3, "context": "discussing revenue growth and profit increase"},
+  {"timestamp": 12.0, "duration": 2.5, "context": "comparing results before and after, showing improvement"},
+  {"timestamp": 22.5, "duration": 3, "context": "key statistics showing 75 percent success rate"}
+]}`
       },
       {
         role: 'user',
-        content: `Analyze this transcript and find ${maxMoments} key visual moments:\n\n${transcriptWithTimestamps}`
+        content: `Analyze this transcript and find ${maxMoments} key moments for animated overlays:\n\n${transcriptWithTimestamps}`
       }
     ],
     response_format: { type: 'json_object' }
@@ -359,7 +395,7 @@ Example: {"moments": [{"timestamp": 5.2, "duration": 3, "prompt": "A luxurious m
 
   try {
     const content = response.choices[0].message.content || '{"moments": []}';
-    console.log(`[B-Roll] GPT response: ${content.substring(0, 200)}...`);
+    console.log(`[B-Roll] GPT response: ${content.substring(0, 300)}...`);
     const parsed = JSON.parse(content);
     const moments = parsed.moments || [];
     console.log(`[B-Roll] Parsed ${moments.length} moments`);
