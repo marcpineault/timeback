@@ -51,12 +51,17 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [s3Available, setS3Available] = useState<boolean | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const isUploading = uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending');
 
-  // Check if S3 is available on mount
+  // Check if S3 is available and detect mobile on mount
   useEffect(() => {
     checkS3Available().then(setS3Available);
+    // Detect mobile device
+    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    setIsMobile(mobile);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -321,7 +326,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     });
   };
 
-  // Optimized batch S3 upload - gets all URLs upfront, uploads with limited concurrency, confirms all at once
+  // Optimized batch S3 upload - gets all URLs upfront, uploads with true parallel queue, confirms all at once
   const uploadFilesToS3Batch = async (files: File[], initialState: UploadingFile[]): Promise<UploadedFile[]> => {
     // Step 1: Get all presigned URLs in a single request
     const fileInfos: FileInfo[] = files.map(f => ({
@@ -335,24 +340,48 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       throw new Error(batchUrlResult.error || 'Failed to get upload URLs');
     }
 
-    // Step 2: Upload files with limited concurrency (better for mobile bandwidth)
-    // Using a simple chunked approach: process MAX_CONCURRENT_UPLOADS files at a time
-    const allResults: ({ index: number; s3Key: string } | null)[] = [];
+    // Step 2: Upload files with true parallel queue (sliding window approach)
+    // As soon as one upload completes, the next one starts immediately
+    const allResults: ({ index: number; s3Key: string } | null)[] = new Array(files.length).fill(null);
+    let nextIndex = 0;
+    let activeCount = 0;
 
-    for (let i = 0; i < files.length; i += MAX_CONCURRENT_UPLOADS) {
-      const batch = files.slice(i, i + MAX_CONCURRENT_UPLOADS);
-      const batchPromises = batch.map((file, batchIndex) => {
-        const actualIndex = i + batchIndex;
-        const urlInfo = batchUrlResult.urls!.find(u => u.index === actualIndex);
-        if (!urlInfo) {
-          return Promise.resolve(null);
+    await new Promise<void>((resolve) => {
+      const startNextUpload = () => {
+        while (activeCount < MAX_CONCURRENT_UPLOADS && nextIndex < files.length) {
+          const currentIndex = nextIndex;
+          nextIndex++;
+          activeCount++;
+
+          const urlInfo = batchUrlResult.urls!.find(u => u.index === currentIndex);
+          if (!urlInfo) {
+            allResults[currentIndex] = null;
+            activeCount--;
+            continue;
+          }
+
+          uploadSingleFileToS3(files[currentIndex], currentIndex, urlInfo)
+            .then((result) => {
+              allResults[currentIndex] = result;
+              activeCount--;
+
+              // Immediately start next upload when a slot becomes available
+              if (nextIndex < files.length) {
+                startNextUpload();
+              } else if (activeCount === 0) {
+                resolve();
+              }
+            });
         }
-        return uploadSingleFileToS3(file, actualIndex, urlInfo);
-      });
 
-      const batchResults = await Promise.all(batchPromises);
-      allResults.push(...batchResults);
-    }
+        // If no uploads were started and none are active, we're done
+        if (activeCount === 0) {
+          resolve();
+        }
+      };
+
+      startNextUpload();
+    });
 
     const successfulUploads = allResults.filter((r): r is { index: number; s3Key: string } => r !== null);
 
@@ -433,9 +462,16 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
   const uploadFiles = async (files: File[]) => {
     setError(null);
+    setIsPreparing(true);
+
+    // Small delay on mobile to show preparing state (iOS may have already processed, but gives visual feedback)
+    if (isMobile) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     // Validate file types (with iOS-friendly fallback to extension check)
     const validFiles = files.filter(f => isValidVideoFile(f));
+    setIsPreparing(false);
 
     if (validFiles.length === 0) {
       setError('No valid video files selected. Please upload MP4, MOV, WebM, or AVI files.');
@@ -474,20 +510,42 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         setError(err instanceof Error ? err.message : 'Upload failed');
       }
     } else {
-      // Fallback: Upload files with limited concurrency (better for mobile)
-      console.log('[Upload] Using fallback upload methods with limited concurrency');
-      const allResults: (UploadedFile | null)[] = [];
+      // Fallback: Upload files with true parallel queue (sliding window approach)
+      console.log('[Upload] Using fallback upload with parallel queue');
+      const allResults: (UploadedFile | null)[] = new Array(validFiles.length).fill(null);
 
-      for (let i = 0; i < validFiles.length; i += MAX_CONCURRENT_UPLOADS) {
-        const batch = validFiles.slice(i, i + MAX_CONCURRENT_UPLOADS);
-        const batchPromises = batch.map((file, batchIndex) => {
-          const actualIndex = i + batchIndex;
-          return uploadSingleFile(file, actualIndex, initialState[actualIndex].previewUrl);
-        });
+      await new Promise<void>((resolve) => {
+        let nextIndex = 0;
+        let activeCount = 0;
 
-        const batchResults = await Promise.all(batchPromises);
-        allResults.push(...batchResults);
-      }
+        const startNextUpload = () => {
+          while (activeCount < MAX_CONCURRENT_UPLOADS && nextIndex < validFiles.length) {
+            const currentIndex = nextIndex;
+            nextIndex++;
+            activeCount++;
+
+            uploadSingleFile(validFiles[currentIndex], currentIndex, initialState[currentIndex].previewUrl)
+              .then((result) => {
+                allResults[currentIndex] = result;
+                activeCount--;
+
+                // Immediately start next upload when a slot becomes available
+                if (nextIndex < validFiles.length) {
+                  startNextUpload();
+                } else if (activeCount === 0) {
+                  resolve();
+                }
+              });
+          }
+
+          // If no uploads were started and none are active, we're done
+          if (activeCount === 0) {
+            resolve();
+          }
+        };
+
+        startNextUpload();
+      });
 
       results = allResults.filter((r): r is UploadedFile => r !== null);
     }
@@ -540,7 +598,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
             ? 'border-blue-500 bg-blue-500/10'
             : 'border-gray-600 hover:border-gray-500 bg-gray-800/50'
           }
-          ${isUploading || disabled ? 'pointer-events-none opacity-75' : ''}
+          ${isUploading || disabled || isPreparing ? 'pointer-events-none opacity-75' : ''}
         `}
       >
         <input
@@ -549,30 +607,40 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           onChange={handleFileSelect}
           className="hidden"
           id="video-upload"
-          disabled={isUploading || disabled}
+          disabled={isUploading || disabled || isPreparing}
           multiple
         />
         <label htmlFor="video-upload" className="cursor-pointer">
           <div className="flex flex-col items-center gap-3 sm:gap-4">
-            <svg
-              className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-blue-500' : 'text-gray-500'}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
+            {isPreparing ? (
+              <>
+                <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-lg sm:text-xl text-gray-300">Preparing videos...</p>
+                <p className="text-gray-500 text-sm sm:text-base">This may take a moment on mobile</p>
+              </>
+            ) : (
+              <>
+                <svg
+                  className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-blue-500' : 'text-gray-500'}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
 
-            <p className="text-lg sm:text-xl text-gray-300">
-              {isDragging ? 'Drop your videos here' : 'Tap to upload videos'}
-            </p>
-            <p className="text-gray-500 text-sm sm:text-base">or drag and drop</p>
-            <p className="text-xs sm:text-sm text-gray-600">MP4, MOV, WebM, AVI • Multiple files</p>
+                <p className="text-lg sm:text-xl text-gray-300">
+                  {isDragging ? 'Drop your videos here' : 'Tap to upload videos'}
+                </p>
+                <p className="text-gray-500 text-sm sm:text-base">or drag and drop</p>
+                <p className="text-xs sm:text-sm text-gray-600">MP4, MOV, WebM, AVI • Multiple files</p>
+              </>
+            )}
           </div>
         </label>
       </div>
