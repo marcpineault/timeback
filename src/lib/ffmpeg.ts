@@ -397,29 +397,21 @@ export async function addHeadline(
     // Speech bubble style: white rounded box, black bold text, triangle tail
     // Use drawbox with rounded corners for background, then overlay text
 
-    // Calculate box dimensions (approximate based on text)
-    const boxWidth = 900;  // Wide enough for most headlines
-    const boxHeight = hasSecondLine ? 160 : 90;
+    // Calculate box dimensions to properly contain text
+    // Box needs: top padding + line1 height + line spacing + line2 height + bottom padding
+    const boxWidth = 920;  // Wide enough for most headlines
+    const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
+    const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
     const boxX = `(w-${boxWidth})/2`;
-    const boxY = baseY - padding;
+    const boxY = baseY - padding - 5;  // Start above first line with padding
 
-    // Draw rounded rectangle background using drawbox with 't' for thickness (fill) and round corners
-    // Note: For filled rounded rectangle, we use multiple overlapping boxes or geq
-    // Using a simpler approach: draw filled box with rounded appearance using alpha blend
+    // Draw filled box background
     const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`;
 
-    // Draw corner roundings using 4 circles at corners (simulating rounded corners)
-    const r = cornerRadius;
-    const circleFilters = [
-      // Top-left corner
-      `geq=lum='if(lt(sqrt(pow(X-(${boxX}+${r}),2)+pow(Y-(${boxY}+${r}),2)),${r})*lt(X,${boxX}+${r})*lt(Y,${boxY}+${r})*between(t,0,5),255,lum(X,Y))':cb='cb(X,Y)':cr='cr(X,Y)'`,
-    ];
-
-    // For true rounded corners, use a complex filter - but let's keep it simple with clean padding
     // Bold text by drawing twice with slight offset (faux bold)
     const textColor = 'black';
 
-    // Line 1 text (bold effect via shadow)
+    // Line 1 text (centered within box)
     const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
     const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
 
@@ -433,7 +425,7 @@ export async function addHeadline(
       : '';
 
     // Triangle tail below the box
-    const tailY = hasSecondLine ? baseY + lineHeight + padding + 20 : baseY + padding + 30;
+    const tailY = boxY + boxHeight;
     const tailFilter = `drawtext=text='▼':fontsize=40:fontcolor=white:${alphaExpr}:x=(w-text_w)/2:y=${tailY}:enable='between(t,0,5)'`;
 
     // Combine filters: background box, then text layers
@@ -446,10 +438,12 @@ export async function addHeadline(
 
   } else {
     // Classic style: semi-transparent dark rounded box, white bold text
-    const boxWidth = 900;
-    const boxHeight = hasSecondLine ? 160 : 90;
+    // Calculate box dimensions to properly contain text
+    const boxWidth = 920;
+    const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
+    const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
     const boxX = `(w-${boxWidth})/2`;
-    const boxY = baseY - padding;
+    const boxY = baseY - padding - 5;  // Start above first line with padding
 
     // Dark semi-transparent background
     const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`;
@@ -944,10 +938,12 @@ export async function applyCombinedFilters(
     const fontSize = 54;
     const lineHeight = 70;
     const padding = 30;
-    const boxWidth = 900;
-    const boxHeight = hasSecondLine ? 160 : 90;
+    // Calculate proper box dimensions to contain text
+    const boxWidth = 920;
+    const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
+    const boxHeight = textHeight + (padding * 2) + 10;  // Extra buffer
     const boxX = `(w-${boxWidth})/2`;
-    const boxY = baseY - padding;
+    const boxY = baseY - padding - 5;  // Start above first line with padding
 
     if (style === 'speech-bubble') {
       // Speech bubble style: white rounded box, black bold text, triangle tail
@@ -966,8 +962,8 @@ export async function applyCombinedFilters(
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
 
-      // Triangle tail
-      const tailY = hasSecondLine ? baseY + lineHeight + padding + 20 : baseY + padding + 30;
+      // Triangle tail positioned below the box
+      const tailY = boxY + boxHeight;
       filters.push(`drawtext=text='▼':fontsize=40:fontcolor=white:${alphaExpr}:x=(w-text_w)/2:y=${tailY}:enable='between(t,0,5)'`);
     } else {
       // Classic style: semi-transparent dark box, white bold text
