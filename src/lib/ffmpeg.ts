@@ -551,7 +551,133 @@ export async function imageToVideoClip(
 }
 
 /**
- * Insert animated B-roll overlays on top of the video
+ * Get animation filter for a specific context (draws directly on video)
+ * This approach doesn't require lavfi - uses standard filters
+ */
+function getAnimationFilter(
+  context: string,
+  startTime: number,
+  duration: number,
+  width: number,
+  height: number,
+  style: 'minimal' | 'dynamic' | 'data-focused'
+): string {
+  const lowerContext = context.toLowerCase();
+  const endTime = startTime + duration;
+  const enableExpr = `between(t,${startTime},${endTime})`;
+
+  // Box dimensions for overlay area
+  const boxW = Math.floor(width * 0.7);
+  const boxH = Math.floor(height * 0.25);
+  const boxX = Math.floor((width - boxW) / 2);
+  const boxY = Math.floor((height - boxH) / 2);
+  const padding = 20;
+
+  // Determine animation type based on context keywords
+  let animationType = 'default';
+
+  if (lowerContext.match(/growth|increase|rise|profit|success|gains|boost|up/)) {
+    animationType = 'graph_up';
+  } else if (lowerContext.match(/crash|fall|decline|loss|drop|decrease|down/)) {
+    animationType = 'graph_down';
+  } else if (lowerContext.match(/money|dollar|revenue|income|million|billion|thousand|price|cost|\$/)) {
+    animationType = 'counter';
+  } else if (lowerContext.match(/percent|%|percentage|rate/)) {
+    animationType = 'percentage';
+  } else if (lowerContext.match(/compare|versus|vs|better|worse|difference/)) {
+    animationType = 'comparison';
+  } else if (lowerContext.match(/time|hours|minutes|seconds|duration|clock/)) {
+    animationType = 'clock';
+  } else if (lowerContext.match(/success|correct|approved|verified|achieved|completed|done/)) {
+    animationType = 'checkmark';
+  } else if (lowerContext.match(/data|statistics|analytics|metrics|results/)) {
+    animationType = 'bars';
+  } else if (lowerContext.match(/important|key|crucial|highlight|attention/)) {
+    animationType = 'highlight';
+  }
+
+  // Build filter based on animation type
+  const filters: string[] = [];
+
+  // Dark semi-transparent background box
+  filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxW}:h=${boxH}:color=black@0.75:t=fill:enable='${enableExpr}'`);
+
+  switch (animationType) {
+    case 'graph_up':
+      // Animated upward arrow/indicator using text
+      filters.push(`drawtext=text='📈':fontsize=${Math.floor(boxH * 0.5)}:fontcolor=white:x=${boxX + boxW/2 - boxH*0.25}:y=${boxY + boxH*0.25}:enable='${enableExpr}'`);
+      filters.push(`drawtext=text='Growth':fontsize=${Math.floor(boxH * 0.15)}:fontcolor=0x22C55E:x=${boxX + boxW/2 - 50}:y=${boxY + boxH*0.75}:enable='${enableExpr}'`);
+      break;
+
+    case 'graph_down':
+      filters.push(`drawtext=text='📉':fontsize=${Math.floor(boxH * 0.5)}:fontcolor=white:x=${boxX + boxW/2 - boxH*0.25}:y=${boxY + boxH*0.25}:enable='${enableExpr}'`);
+      filters.push(`drawtext=text='Decline':fontsize=${Math.floor(boxH * 0.15)}:fontcolor=0xEF4444:x=${boxX + boxW/2 - 50}:y=${boxY + boxH*0.75}:enable='${enableExpr}'`);
+      break;
+
+    case 'counter':
+      // Animated counter using expression
+      const counterExpr = `%{eif\\:(t-${startTime})/${duration}*1000000\\:d}`;
+      filters.push(`drawtext=text='$${counterExpr}':fontsize=${Math.floor(boxH * 0.3)}:fontcolor=0x22C55E:x=(${boxX}+${boxW}/2-text_w/2):y=${boxY + boxH*0.35}:enable='${enableExpr}'`);
+      break;
+
+    case 'percentage':
+      const pctExpr = `%{eif\\:(t-${startTime})/${duration}*100\\:d}`;
+      filters.push(`drawtext=text='${pctExpr}%%':fontsize=${Math.floor(boxH * 0.4)}:fontcolor=0x3B82F6:x=(${boxX}+${boxW}/2-text_w/2):y=${boxY + boxH*0.3}:enable='${enableExpr}'`);
+      break;
+
+    case 'comparison':
+      // Two bars side by side
+      const bar1W = Math.floor(boxW * 0.35);
+      const bar2W = Math.floor(boxW * 0.35);
+      const bar1X = boxX + Math.floor(boxW * 0.1);
+      const bar2X = boxX + Math.floor(boxW * 0.55);
+      const barMaxH = Math.floor(boxH * 0.6);
+      const barY = boxY + Math.floor(boxH * 0.15);
+      filters.push(`drawbox=x=${bar1X}:y=${barY + barMaxH - Math.floor(barMaxH * 0.4)}:w=${bar1W}:h=${Math.floor(barMaxH * 0.4)}:color=0xEF4444:t=fill:enable='${enableExpr}'`);
+      filters.push(`drawbox=x=${bar2X}:y=${barY + barMaxH - Math.floor(barMaxH * 0.8)}:w=${bar2W}:h=${Math.floor(barMaxH * 0.8)}:color=0x22C55E:t=fill:enable='${enableExpr}'`);
+      filters.push(`drawtext=text='Before':fontsize=${Math.floor(boxH * 0.1)}:fontcolor=white:x=${bar1X + bar1W/2 - 30}:y=${boxY + boxH*0.85}:enable='${enableExpr}'`);
+      filters.push(`drawtext=text='After':fontsize=${Math.floor(boxH * 0.1)}:fontcolor=white:x=${bar2X + bar2W/2 - 25}:y=${boxY + boxH*0.85}:enable='${enableExpr}'`);
+      break;
+
+    case 'clock':
+      filters.push(`drawtext=text='⏱️':fontsize=${Math.floor(boxH * 0.5)}:fontcolor=white:x=${boxX + boxW/2 - boxH*0.25}:y=${boxY + boxH*0.25}:enable='${enableExpr}'`);
+      break;
+
+    case 'checkmark':
+      filters.push(`drawtext=text='✓':fontsize=${Math.floor(boxH * 0.6)}:fontcolor=0x22C55E:x=${boxX + boxW/2 - boxH*0.2}:y=${boxY + boxH*0.2}:enable='${enableExpr}'`);
+      break;
+
+    case 'bars':
+      // Multiple small bars
+      const numBars = 5;
+      const barSpacing = Math.floor(boxW / (numBars + 1));
+      const heights = [0.4, 0.7, 0.5, 0.85, 0.6];
+      for (let i = 0; i < numBars; i++) {
+        const bx = boxX + barSpacing * (i + 1) - 15;
+        const bh = Math.floor(boxH * 0.6 * heights[i]);
+        const by = boxY + boxH * 0.8 - bh;
+        filters.push(`drawbox=x=${bx}:y=${by}:w=30:h=${bh}:color=0x3B82F6:t=fill:enable='${enableExpr}'`);
+      }
+      break;
+
+    case 'highlight':
+      // Pulsing highlight circle
+      filters.push(`drawtext=text='💡':fontsize=${Math.floor(boxH * 0.5)}:fontcolor=white:x=${boxX + boxW/2 - boxH*0.25}:y=${boxY + boxH*0.25}:enable='${enableExpr}'`);
+      filters.push(`drawtext=text='Key Point':fontsize=${Math.floor(boxH * 0.12)}:fontcolor=0xFBBF24:x=${boxX + boxW/2 - 45}:y=${boxY + boxH*0.8}:enable='${enableExpr}'`);
+      break;
+
+    default:
+      // Simple pulsing dot
+      filters.push(`drawtext=text='●':fontsize=${Math.floor(boxH * 0.4)}:fontcolor=0x00ff88:x=${boxX + boxW/2 - boxH*0.1}:y=${boxY + boxH*0.3}:enable='${enableExpr}'`);
+      break;
+  }
+
+  return filters.join(',');
+}
+
+/**
+ * Insert B-roll animation overlays directly onto video using drawbox/drawtext
+ * This approach doesn't require lavfi - works on any FFmpeg installation
  */
 export async function insertBRollCutaways(
   inputPath: string,
@@ -565,7 +691,7 @@ export async function insertBRollCutaways(
     return outputPath;
   }
 
-  logger.debug(`[B-Roll] Overlaying ${cutaways.length} animated B-roll clips (style: ${style})`);
+  logger.debug(`[B-Roll] Adding ${cutaways.length} animation overlays (style: ${style})`);
 
   // Get video dimensions
   const videoInfo = await new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -579,88 +705,31 @@ export async function insertBRollCutaways(
     });
   });
 
-  // Import animation generator
-  const { generateContextualAnimation } = await import('./animations');
-
   // Sort cutaways by timestamp
   const sortedCutaways = [...cutaways].sort((a, b) => a.timestamp - b.timestamp);
 
-  // Generate animation videos for each cutaway
-  // Use smaller resolution for animations (will be scaled up during overlay)
-  // This significantly reduces memory usage
-  const animWidth = Math.floor(videoInfo.width * 0.5);
-  const animHeight = Math.floor(videoInfo.height * 0.25);
+  // Build filter string with all animation overlays
+  const allFilters: string[] = [];
 
-  // Generate all animations in parallel for better performance
-  const animationPaths = await Promise.all(
-    sortedCutaways.map(async (cutaway, i) => {
-      const animPath = path.join(outputDir, `anim_${i}.mp4`);
-      await generateContextualAnimation(
-        animPath,
-        cutaway.duration,
-        animWidth,
-        animHeight,
-        cutaway.context,
-        style
-      );
-      return animPath;
-    })
-  );
-
-  // Build filter complex for overlaying animations
-  const filterParts: string[] = [];
-  const inputLabels: string[] = ['0:v'];
-
-  // Add each animation as an input
-  for (let i = 0; i < animationPaths.length; i++) {
-    inputLabels.push(`${i + 1}:v`);
+  for (const cutaway of sortedCutaways) {
+    const animFilter = getAnimationFilter(
+      cutaway.context,
+      cutaway.timestamp,
+      cutaway.duration,
+      videoInfo.width,
+      videoInfo.height,
+      style
+    );
+    allFilters.push(animFilter);
   }
 
-  let lastOutput = '0:v';
-
-  for (let i = 0; i < sortedCutaways.length; i++) {
-    const cutaway = sortedCutaways[i];
-    const startTime = cutaway.timestamp;
-    const duration = cutaway.duration;
-    const fadeTime = 0.3;
-
-    // Target overlay size (centered, 80% of video width, 40% of height)
-    const overlayWidth = Math.floor(videoInfo.width * 0.8);
-    const overlayHeight = Math.floor(videoInfo.height * 0.4);
-    const xPos = Math.floor((videoInfo.width - overlayWidth) / 2);
-    const yPos = Math.floor((videoInfo.height - overlayHeight) / 2);
-
-    // Scale from smaller animation to overlay size, then fade
-    // Using fast_bilinear for faster scaling with less memory
-    filterParts.push(
-      `[${i + 1}:v]scale=${overlayWidth}:${overlayHeight}:flags=fast_bilinear,format=rgba,fade=t=in:st=0:d=${fadeTime}:alpha=1,fade=t=out:st=${duration - fadeTime}:d=${fadeTime}:alpha=1[anim${i}]`
-    );
-
-    // Overlay on video with time enable
-    const inputLabel = lastOutput;
-    const outputLabel = i < sortedCutaways.length - 1 ? `tmp${i}` : 'outv';
-    filterParts.push(
-      `[${inputLabel}][anim${i}]overlay=x=${xPos}:y=${yPos}:enable='between(t,${startTime},${startTime + duration})'[${outputLabel}]`
-    );
-    lastOutput = outputLabel;
-  }
-
-  const filterComplex = filterParts.join(';');
-  logger.debug(`[B-Roll] Filter complex: ${filterComplex.substring(0, 200)}...`);
+  const filterString = allFilters.join(',');
+  logger.debug(`[B-Roll] Filter: ${filterString.substring(0, 300)}...`);
 
   return new Promise((resolve, reject) => {
-    let cmd = ffmpeg(inputPath);
-
-    // Add animation videos as inputs
-    for (const animPath of animationPaths) {
-      cmd = cmd.input(animPath);
-    }
-
-    cmd
-      .complexFilter(filterComplex)
+    ffmpeg(inputPath)
+      .videoFilters(filterString)
       .outputOptions([
-        '-map', '[outv]',
-        '-map', '0:a',
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-crf', '28',
@@ -671,11 +740,7 @@ export async function insertBRollCutaways(
       ])
       .output(outputPath)
       .on('end', () => {
-        logger.debug(`[B-Roll] Animated overlays added successfully`);
-        // Clean up animation files
-        for (const animPath of animationPaths) {
-          try { fs.unlinkSync(animPath); } catch {}
-        }
+        logger.debug(`[B-Roll] Animation overlays added successfully`);
         resolve(outputPath);
       })
       .on('error', (err) => {
