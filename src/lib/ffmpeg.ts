@@ -336,13 +336,18 @@ export async function addHeadline(
     .replace(/"/g, '')  // Remove double quotes
     .replace(/:/g, '\\:');
 
-  // Enhanced headline styling with:
-  // - Larger font (48px for better readability)
-  // - Shadow effect for depth
+  // Speech bubble style headline:
+  // - White/cream background box
+  // - Bold black text
   // - Smooth fade-in (0-0.5s) and fade-out (4.5-5s) using alpha expression
-  // - Semi-transparent background box with generous padding
-  // - Centered with slight left offset for engagement buttons
+  // - Generous padding for rounded appearance
+  // - Small triangle tail below the bubble
   const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
+
+  // Speech bubble colors
+  const bubbleColor = 'white';  // White background
+  const textColor = 'black';     // Black text
+  const bubblePadding = 25;      // Generous padding
 
   // Split into two lines if longer than ~35 chars, using two separate drawtext filters
   let filterString: string;
@@ -352,13 +357,21 @@ export async function addHeadline(
     const line1 = words.slice(0, midpoint).join(' ');
     const line2 = words.slice(midpoint).join(' ');
 
-    // Two drawtext filters with adjusted y positions (line spacing ~60px)
+    // Two drawtext filters with adjusted y positions (line spacing ~70px for speech bubble)
     const baseY = yPositions[position].replace('y=', '');
-    const line1Filter = `drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-    const line2Filter = `drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-    filterString = `${line1Filter},${line2Filter}`;
+    // Main text boxes - white background, black text
+    const line1Filter = `drawtext=text='${line1}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
+    const line2Filter = `drawtext=text='${line2}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
+    // Small triangle tail below the bubble (using unicode triangle character)
+    const tailFilter = `drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+140:enable='between(t,0,5)'`;
+    filterString = `${line1Filter},${line2Filter},${tailFilter}`;
   } else {
-    filterString = `drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    // Single line with speech bubble tail
+    const baseY = yPositions[position].replace('y=', '');
+    const mainFilter = `drawtext=text='${escapedHeadline}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`;
+    // Small triangle tail below the bubble
+    const tailFilter = `drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:enable='between(t,0,5)'`;
+    filterString = `${mainFilter},${tailFilter}`;
   }
 
   logger.debug(`[Headline] Adding headline: "${headline}" at ${position}`);
@@ -781,8 +794,11 @@ export async function applyCombinedFilters(
 
     const position = options.headlinePosition || 'top';
 
-    // Enhanced headline styling with larger font, shadow, and fade animation
+    // Speech bubble style headline: white background, black text, triangle tail
     const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
+    const bubbleColor = 'white';
+    const textColor = 'black';
+    const bubblePadding = 25;
 
     // Split into two lines if longer than ~35 chars, using two separate drawtext filters
     if (escapedHeadline.length > 35) {
@@ -791,12 +807,17 @@ export async function applyCombinedFilters(
       const line1 = words.slice(0, midpoint).join(' ');
       const line2 = words.slice(midpoint).join(' ');
 
-      // Two drawtext filters with adjusted y positions (line spacing ~60px)
+      // Two drawtext filters with adjusted y positions (line spacing ~70px for speech bubble)
       const baseY = yPositions[position].replace('y=', '');
-      filters.push(`drawtext=text='${line1}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-      filters.push(`drawtext=text='${line2}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:y=${baseY}+60:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      filters.push(`drawtext=text='${line1}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
+      filters.push(`drawtext=text='${line2}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
+      // Small triangle tail below the bubble
+      filters.push(`drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+140:enable='between(t,0,5)'`);
     } else {
-      filters.push(`drawtext=text='${escapedHeadline}':fontsize=48:fontcolor=white:${alphaExpr}:x=(w-text_w)/2-30:${yPositions[position]}:box=1:boxcolor=black@0.6:boxborderw=20:shadowcolor=black@0.8:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      const baseY = yPositions[position].replace('y=', '');
+      filters.push(`drawtext=text='${escapedHeadline}':fontsize=52:fontcolor=${textColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${bubbleColor}:boxborderw=${bubblePadding}:enable='between(t,0,5)'`);
+      // Small triangle tail below the bubble
+      filters.push(`drawtext=text='▼':fontsize=36:fontcolor=${bubbleColor}:${alphaExpr}:x=(w-text_w)/2:y=${baseY}+70:enable='between(t,0,5)'`);
     }
   }
 
