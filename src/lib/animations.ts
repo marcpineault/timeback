@@ -1,6 +1,7 @@
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import fs from 'fs';
+import { spawn } from 'child_process';
 
 export type AnimationType =
   | 'graph_up'
@@ -29,6 +30,36 @@ export interface AnimationConfig {
 }
 
 /**
+ * Run FFmpeg command directly using spawn for better compatibility
+ * This avoids issues with lavfi input format not being available
+ */
+function runFFmpegCommand(args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    console.log(`[Animation] Running: ffmpeg ${args.join(' ').substring(0, 200)}...`);
+
+    const proc = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+
+    let stderr = '';
+    proc.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        console.error(`[Animation] FFmpeg stderr: ${stderr.substring(stderr.length - 500)}`);
+        reject(new Error(`FFmpeg exited with code ${code}`));
+      }
+    });
+
+    proc.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+/**
  * Generate an animated graph going up using FFmpeg
  */
 export async function generateGraphAnimation(
@@ -42,66 +73,32 @@ export async function generateGraphAnimation(
 
   const fps = 30;
   const totalFrames = duration * fps;
-  const color = direction === 'up' ? '0x00FF00' : '0xFF0000'; // Green for up, red for down
-  const bgColor = '0x1a1a2e';
 
-  // Create animated graph using geq (generic equation) filter
-  // This draws a line that animates over time
-  const filterComplex = direction === 'up'
-    ? [
-        // Dark background
-        `color=c=${bgColor}:s=${width}x${height}:d=${duration}`,
-        // Draw animated rising line graph
-        `geq=lum='if(gt(Y,H-H*0.1-H*0.7*(X/W)*(N/${totalFrames})),16,235)':cb=128:cr=128`,
-        // Add green tint to the graph area
-        `colorbalance=gs=0.5:gm=0.3`,
-        // Add glow effect
-        `gblur=sigma=2`,
-      ].join(',')
-    : [
-        // Dark background
-        `color=c=${bgColor}:s=${width}x${height}:d=${duration}`,
-        // Draw animated falling line graph
-        `geq=lum='if(gt(Y,H*0.1+H*0.7*(X/W)*(N/${totalFrames})),235,16)':cb=128:cr=128`,
-        // Add red tint
-        `colorbalance=rs=0.5:rm=0.3`,
-        `gblur=sigma=2`,
-      ].join(',');
+  // Create animated line graph using filter_complex with color source
+  const lineColor = direction === 'up' ? '100:255:100' : '255:100:100';
+  const bgColor = '15:15:35';
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input('color=black:s=' + width + 'x' + height + ':d=' + duration)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Create gradient background
-        `color=c=0x0f0f23:s=${width}x${height}:d=${duration}[bg]`,
-        // Create animated line
-        `color=c=black:s=${width}x${height}:d=${duration},geq=r='if(between(Y,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})-5,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})+5),${direction === 'up' ? 100 : 255},15)':g='if(between(Y,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})-5,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})+5),${direction === 'up' ? 255 : 50},20)':b='if(between(Y,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})-5,H-H*0.15-H*0.6*pow(X/W,0.7)*(N/${totalFrames})+5),100,30)'[line]`,
-        // Composite
-        `[bg][line]overlay=0:0:format=auto[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Graph animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const filterComplex = [
+    `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    `geq=r='if(between(Y,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})-8,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})+8),${direction === 'up' ? 100 : 255},15)':g='if(between(Y,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})-8,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})+8),${direction === 'up' ? 255 : 80},20)':b='if(between(Y,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})-8,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})+8),100,35)'`
+  ].join(',');
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(between(Y,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})-8,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})+8),${direction === 'up' ? 100 : 255},15)':g='if(between(Y,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})-8,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})+8),${direction === 'up' ? 255 : 80},20)':b='if(between(Y,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})-8,H-H*0.15-H*0.6*pow(X/W\\,0.7)*(N/${totalFrames})+8),100,35)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Graph animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -119,39 +116,24 @@ export async function generateCounterAnimation(
   console.log(`[Animation] Generating counter animation ${startValue} -> ${endValue}`);
 
   const fps = 30;
+  const fontSize = Math.floor(height * 0.12);
 
-  // FFmpeg drawtext with expression for animated number
-  const filterComplex = [
-    `color=c=0x0f0f23:s=${width}x${height}:d=${duration}`,
-    `drawtext=text='${prefix}%{eif\\:${startValue}+${endValue - startValue}*t/${duration}\\:d}':fontsize=${Math.floor(height * 0.15)}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:fontfile=/System/Library/Fonts/Helvetica.ttc`,
-  ].join(',');
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `drawtext=text='${prefix}%{eif\\:${startValue}+${endValue - startValue}*t/${duration}\\:d}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=black:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .videoFilters(filterComplex)
-      .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Counter animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Counter animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -171,36 +153,27 @@ export async function generatePulseAnimation(
   const centerY = height / 2;
   const maxRadius = Math.min(width, height) * 0.3;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Create pulsing circle using geq
-        `geq=r='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(0, 2)},15)':g='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(2, 4)},15)':b='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*(0.5+0.5*sin(2*PI*N/30))),0x${color.substring(4, 6)},25)'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Pulse animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  // Parse color
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*(0.5+0.5*sin(2*PI*N/30)))\\,${r}\\,15)':g='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*(0.5+0.5*sin(2*PI*N/30)))\\,${g}\\,20)':b='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*(0.5+0.5*sin(2*PI*N/30)))\\,${b}\\,35)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Pulse animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -216,36 +189,22 @@ export async function generateParticleAnimation(
 
   const fps = 30;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23@0.8:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Create noise-based particles that rise up
-        `noise=alls=50:allf=t,geq=lum='if(gt(lum(X,Y),200)*random(1),255,0)':cb=128:cr=128,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=${duration - 0.5}:d=0.5:alpha=1[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuva420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Particle animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `noise=alls=30:allf=t,geq=r='if(gt(lum(X\\,Y)\\,220)\\,255\\,15)':g='if(gt(lum(X\\,Y)\\,220)\\,255\\,20)':b='if(gt(lum(X\\,Y)\\,220)\\,200\\,35)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Particle animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -257,7 +216,7 @@ export async function generatePieChartAnimation(
   width: number,
   height: number,
   percentage: number = 75,
-  color: string = '4F46E5' // Indigo
+  color: string = '4F46E5'
 ): Promise<string> {
   console.log(`[Animation] Generating pie chart animation (${percentage}%)`);
 
@@ -265,39 +224,29 @@ export async function generatePieChartAnimation(
   const totalFrames = duration * fps;
   const centerX = width / 2;
   const centerY = height / 2;
-  const radius = Math.min(width, height) * 0.35;
+  const outerRadius = Math.min(width, height) * 0.35;
+  const innerRadius = outerRadius * 0.6;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Draw animated pie segment using geq
-        // We simulate a pie chart by drawing pixels in a circular sector
-        `geq=r='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius})*gt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.6})*lt(mod(atan2(Y-${centerY},X-${centerX})+PI,2*PI),2*PI*${percentage / 100}*min(N/${totalFrames * 0.7},1)),0x${color.substring(0, 2)},20)':g='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius})*gt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.6})*lt(mod(atan2(Y-${centerY},X-${centerX})+PI,2*PI),2*PI*${percentage / 100}*min(N/${totalFrames * 0.7},1)),0x${color.substring(2, 4)},25)':b='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius})*gt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.6})*lt(mod(atan2(Y-${centerY},X-${centerX})+PI,2*PI),2*PI*${percentage / 100}*min(N/${totalFrames * 0.7},1)),0x${color.substring(4, 6)},35)'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Pie chart animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${outerRadius})*gt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius})*lt(mod(atan2(Y-${centerY}\\,X-${centerX})+PI\\,2*PI)\\,2*PI*${percentage / 100}*min(N/${totalFrames * 0.7}\\,1))\\,${r}\\,20)':g='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${outerRadius})*gt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius})*lt(mod(atan2(Y-${centerY}\\,X-${centerX})+PI\\,2*PI)\\,2*PI*${percentage / 100}*min(N/${totalFrames * 0.7}\\,1))\\,${g}\\,25)':b='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${outerRadius})*gt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius})*lt(mod(atan2(Y-${centerY}\\,X-${centerX})+PI\\,2*PI)\\,2*PI*${percentage / 100}*min(N/${totalFrames * 0.7}\\,1))\\,${b}\\,35)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Pie chart animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -308,8 +257,8 @@ export async function generateBarChartAnimation(
   duration: number,
   width: number,
   height: number,
-  values: number[] = [40, 70, 55, 85, 60], // Relative heights (0-100)
-  color: string = '10B981' // Emerald green
+  values: number[] = [40, 70, 55, 85, 60],
+  color: string = '10B981'
 ): Promise<string> {
   console.log(`[Animation] Generating bar chart animation`);
 
@@ -321,54 +270,37 @@ export async function generateBarChartAnimation(
   const maxBarHeight = height * 0.7;
   const baseY = height * 0.85;
 
-  // Build geq expression for multiple bars
-  let rExpr = '20';
-  let gExpr = '25';
-  let bExpr = '35';
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
 
+  // Build expression for multiple bars
+  let expr = '';
   for (let i = 0; i < numBars; i++) {
     const barX = gap + i * (barWidth + gap);
     const targetHeight = (values[i] / 100) * maxBarHeight;
-    // Each bar grows with a slight delay
-    const delay = i * 0.1;
-    const growProgress = `min(max((N/${totalFrames}-${delay})/${0.5 - delay},0),1)`;
-    const currentHeight = `${targetHeight}*${growProgress}`;
+    const delay = i * 0.08;
 
-    // Add this bar to the expression
-    rExpr = `if(between(X,${barX},${barX + barWidth})*between(Y,${baseY}-${currentHeight},${baseY}),0x${color.substring(0, 2)},${rExpr})`;
-    gExpr = `if(between(X,${barX},${barX + barWidth})*between(Y,${baseY}-${currentHeight},${baseY}),0x${color.substring(2, 4)},${gExpr})`;
-    bExpr = `if(between(X,${barX},${barX + barWidth})*between(Y,${baseY}-${currentHeight},${baseY}),0x${color.substring(4, 6)},${bExpr})`;
+    if (i > 0) expr += '+';
+    expr += `between(X\\,${barX}\\,${barX + barWidth})*between(Y\\,${baseY}-${targetHeight}*min(max((N/${totalFrames}-${delay})/0.4\\,0)\\,1)\\,${baseY})`;
   }
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        `geq=r='${rExpr}':g='${gExpr}':b='${bExpr}'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Bar chart animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(${expr}\\,${r}\\,20)':g='if(${expr}\\,${g}\\,25)':b='if(${expr}\\,${b}\\,35)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Bar chart animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -380,7 +312,7 @@ export async function generateProgressBarAnimation(
   width: number,
   height: number,
   targetPercent: number = 85,
-  color: string = '3B82F6' // Blue
+  color: string = '3B82F6'
 ): Promise<string> {
   console.log(`[Animation] Generating progress bar animation`);
 
@@ -390,38 +322,27 @@ export async function generateProgressBarAnimation(
   const barHeight = height * 0.12;
   const barX = (width - barWidth) / 2;
   const barY = (height - barHeight) / 2;
-  const borderRadius = barHeight / 2;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Draw progress bar background and animated fill
-        `geq=r='if(between(X,${barX},${barX + barWidth})*between(Y,${barY},${barY + barHeight}),if(lt(X,${barX}+${barWidth * targetPercent / 100}*min(N/${totalFrames * 0.6},1)),0x${color.substring(0, 2)},40),20)':g='if(between(X,${barX},${barX + barWidth})*between(Y,${barY},${barY + barHeight}),if(lt(X,${barX}+${barWidth * targetPercent / 100}*min(N/${totalFrames * 0.6},1)),0x${color.substring(2, 4)},45),25)':b='if(between(X,${barX},${barX + barWidth})*between(Y,${barY},${barY + barHeight}),if(lt(X,${barX}+${barWidth * targetPercent / 100}*min(N/${totalFrames * 0.6},1)),0x${color.substring(4, 6)},55),35)'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Progress bar animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(between(X\\,${barX}\\,${barX + barWidth})*between(Y\\,${barY}\\,${barY + barHeight})\\,if(lt(X\\,${barX}+${barWidth * targetPercent / 100}*min(N/${totalFrames * 0.6}\\,1))\\,${r}\\,40)\\,20)':g='if(between(X\\,${barX}\\,${barX + barWidth})*between(Y\\,${barY}\\,${barY + barHeight})\\,if(lt(X\\,${barX}+${barWidth * targetPercent / 100}*min(N/${totalFrames * 0.6}\\,1))\\,${g}\\,45)\\,25)':b='if(between(X\\,${barX}\\,${barX + barWidth})*between(Y\\,${barY}\\,${barY + barHeight})\\,if(lt(X\\,${barX}+${barWidth * targetPercent / 100}*min(N/${totalFrames * 0.6}\\,1))\\,${b}\\,55)\\,35)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Progress bar animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -432,7 +353,7 @@ export async function generateCheckmarkAnimation(
   duration: number,
   width: number,
   height: number,
-  color: string = '22C55E' // Green
+  color: string = '22C55E'
 ): Promise<string> {
   console.log(`[Animation] Generating checkmark animation`);
 
@@ -442,38 +363,26 @@ export async function generateCheckmarkAnimation(
   const centerY = height / 2;
   const size = Math.min(width, height) * 0.35;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Draw circle background that scales in, then checkmark that draws
-        `geq=r='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${size}*min(N/${totalFrames * 0.3},1)),0x${color.substring(0, 2)},20)':g='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${size}*min(N/${totalFrames * 0.3},1)),0x${color.substring(2, 4)},25)':b='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${size}*min(N/${totalFrames * 0.3},1)),0x${color.substring(4, 6)},35)'[circle]`,
-        // Overlay white checkmark shape using drawtext with unicode
-        `[circle]drawtext=text='✓':fontsize=${Math.floor(size * 1.2)}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(gt(N,${totalFrames * 0.3}),min((N-${totalFrames * 0.3})/${totalFrames * 0.2},1),0)'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Checkmark animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${size}*min(N/${totalFrames * 0.3}\\,1))\\,${r}\\,20)':g='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${size}*min(N/${totalFrames * 0.3}\\,1))\\,${g}\\,25)':b='if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${size}*min(N/${totalFrames * 0.3}\\,1))\\,${b}\\,35)',drawtext=text='✓':fontsize=${Math.floor(size * 1.2)}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:alpha='if(gt(n\\,${Math.floor(totalFrames * 0.3)})\\,min((n-${Math.floor(totalFrames * 0.3)})/${Math.floor(totalFrames * 0.2)}\\,1)\\,0)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Checkmark animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -486,8 +395,8 @@ export async function generateComparisonAnimation(
   height: number,
   valueA: number = 35,
   valueB: number = 80,
-  colorA: string = 'EF4444', // Red
-  colorB: string = '22C55E'  // Green
+  colorA: string = 'EF4444',
+  colorB: string = '22C55E'
 ): Promise<string> {
   console.log(`[Animation] Generating comparison animation (${valueA}% vs ${valueB}%)`);
 
@@ -499,36 +408,29 @@ export async function generateComparisonAnimation(
   const barAX = width * 0.15;
   const barBX = width * 0.5;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Draw two comparison bars with labels
-        `geq=r='if(between(X,${barAX},${barAX + barWidth})*between(Y,${baseY}-${maxBarHeight * valueA / 100}*min(N/${totalFrames * 0.5},1),${baseY}),0x${colorA.substring(0, 2)},if(between(X,${barBX},${barBX + barWidth})*between(Y,${baseY}-${maxBarHeight * valueB / 100}*min(N/${totalFrames * 0.5},1),${baseY}),0x${colorB.substring(0, 2)},20))':g='if(between(X,${barAX},${barAX + barWidth})*between(Y,${baseY}-${maxBarHeight * valueA / 100}*min(N/${totalFrames * 0.5},1),${baseY}),0x${colorA.substring(2, 4)},if(between(X,${barBX},${barBX + barWidth})*between(Y,${baseY}-${maxBarHeight * valueB / 100}*min(N/${totalFrames * 0.5},1),${baseY}),0x${colorB.substring(2, 4)},25))':b='if(between(X,${barAX},${barAX + barWidth})*between(Y,${baseY}-${maxBarHeight * valueA / 100}*min(N/${totalFrames * 0.5},1),${baseY}),0x${colorA.substring(4, 6)},if(between(X,${barBX},${barBX + barWidth})*between(Y,${baseY}-${maxBarHeight * valueB / 100}*min(N/${totalFrames * 0.5},1),${baseY}),0x${colorB.substring(4, 6)},35))'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Comparison animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const rA = parseInt(colorA.substring(0, 2), 16);
+  const gA = parseInt(colorA.substring(2, 4), 16);
+  const bA = parseInt(colorA.substring(4, 6), 16);
+  const rB = parseInt(colorB.substring(0, 2), 16);
+  const gB = parseInt(colorB.substring(2, 4), 16);
+  const bB = parseInt(colorB.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(between(X\\,${barAX}\\,${barAX + barWidth})*between(Y\\,${baseY}-${maxBarHeight * valueA / 100}*min(N/${totalFrames * 0.5}\\,1)\\,${baseY})\\,${rA}\\,if(between(X\\,${barBX}\\,${barBX + barWidth})*between(Y\\,${baseY}-${maxBarHeight * valueB / 100}*min(N/${totalFrames * 0.5}\\,1)\\,${baseY})\\,${rB}\\,20))':g='if(between(X\\,${barAX}\\,${barAX + barWidth})*between(Y\\,${baseY}-${maxBarHeight * valueA / 100}*min(N/${totalFrames * 0.5}\\,1)\\,${baseY})\\,${gA}\\,if(between(X\\,${barBX}\\,${barBX + barWidth})*between(Y\\,${baseY}-${maxBarHeight * valueB / 100}*min(N/${totalFrames * 0.5}\\,1)\\,${baseY})\\,${gB}\\,25))':b='if(between(X\\,${barAX}\\,${barAX + barWidth})*between(Y\\,${baseY}-${maxBarHeight * valueA / 100}*min(N/${totalFrames * 0.5}\\,1)\\,${baseY})\\,${bA}\\,if(between(X\\,${barBX}\\,${barBX + barWidth})*between(Y\\,${baseY}-${maxBarHeight * valueB / 100}*min(N/${totalFrames * 0.5}\\,1)\\,${baseY})\\,${bB}\\,35))'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Comparison animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -539,7 +441,7 @@ export async function generateSpotlightAnimation(
   duration: number,
   width: number,
   height: number,
-  color: string = 'FBBF24' // Amber/Yellow
+  color: string = 'FBBF24'
 ): Promise<string> {
   console.log(`[Animation] Generating spotlight animation`);
 
@@ -549,36 +451,26 @@ export async function generateSpotlightAnimation(
   const centerY = height / 2;
   const maxRadius = Math.min(width, height) * 0.4;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Create expanding ring effect with glow
-        `geq=r='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*min(N/${totalFrames * 0.5},1)*0.8,${maxRadius}*min(N/${totalFrames * 0.5},1)),0x${color.substring(0, 2)},if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*min(N/${totalFrames * 0.5},1)*0.8),40,20))':g='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*min(N/${totalFrames * 0.5},1)*0.8,${maxRadius}*min(N/${totalFrames * 0.5},1)),0x${color.substring(2, 4)},if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*min(N/${totalFrames * 0.5},1)*0.8),45,25))':b='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*min(N/${totalFrames * 0.5},1)*0.8,${maxRadius}*min(N/${totalFrames * 0.5},1)),0x${color.substring(4, 6)},if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${maxRadius}*min(N/${totalFrames * 0.5},1)*0.8),55,35))'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Spotlight animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1)*0.7\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1))\\,${r}\\,if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1)*0.7)\\,40\\,20))':g='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1)*0.7\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1))\\,${g}\\,if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1)*0.7)\\,45\\,25))':b='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1)*0.7\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1))\\,${b}\\,if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${maxRadius}*min(N/${totalFrames * 0.5}\\,1)*0.7)\\,55\\,35))'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Spotlight animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -590,54 +482,41 @@ export async function generateArrowAnimation(
   width: number,
   height: number,
   direction: 'up' | 'down' = 'up',
-  color: string = '22C55E' // Green for up, will be overridden for down
+  color: string = '22C55E'
 ): Promise<string> {
   console.log(`[Animation] Generating ${direction} arrow animation`);
 
   const fps = 30;
-  const totalFrames = duration * fps;
   const actualColor = direction === 'up' ? '22C55E' : 'EF4444';
   const centerX = width / 2;
   const centerY = height / 2;
-  const arrowHeight = height * 0.4;
-  const arrowWidth = width * 0.25;
+  const arrowSize = Math.min(width, height) * 0.25;
 
-  // Arrow triangle points
-  const tipY = direction === 'up' ? centerY - arrowHeight / 2 : centerY + arrowHeight / 2;
-  const baseY = direction === 'up' ? centerY + arrowHeight / 4 : centerY - arrowHeight / 4;
+  const r = parseInt(actualColor.substring(0, 2), 16);
+  const g = parseInt(actualColor.substring(2, 4), 16);
+  const b = parseInt(actualColor.substring(4, 6), 16);
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Draw arrow triangle with bounce animation
-        direction === 'up'
-          ? `geq=r='if(lt(Y,${centerY}+${arrowHeight / 4}-${arrowHeight * 0.1}*sin(2*PI*N/30))*gt(Y,${centerY}-${arrowHeight / 2}-${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(abs(X-${centerX}),(${centerY}+${arrowHeight / 4}-Y)/${arrowHeight * 0.75}*${arrowWidth / 2}),0x${actualColor.substring(0, 2)},20)':g='if(lt(Y,${centerY}+${arrowHeight / 4}-${arrowHeight * 0.1}*sin(2*PI*N/30))*gt(Y,${centerY}-${arrowHeight / 2}-${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(abs(X-${centerX}),(${centerY}+${arrowHeight / 4}-Y)/${arrowHeight * 0.75}*${arrowWidth / 2}),0x${actualColor.substring(2, 4)},25)':b='if(lt(Y,${centerY}+${arrowHeight / 4}-${arrowHeight * 0.1}*sin(2*PI*N/30))*gt(Y,${centerY}-${arrowHeight / 2}-${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(abs(X-${centerX}),(${centerY}+${arrowHeight / 4}-Y)/${arrowHeight * 0.75}*${arrowWidth / 2}),0x${actualColor.substring(4, 6)},35)'[out]`
-          : `geq=r='if(gt(Y,${centerY}-${arrowHeight / 4}+${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(Y,${centerY}+${arrowHeight / 2}+${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(abs(X-${centerX}),(Y-${centerY}+${arrowHeight / 4})/${arrowHeight * 0.75}*${arrowWidth / 2}),0x${actualColor.substring(0, 2)},20)':g='if(gt(Y,${centerY}-${arrowHeight / 4}+${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(Y,${centerY}+${arrowHeight / 2}+${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(abs(X-${centerX}),(Y-${centerY}+${arrowHeight / 4})/${arrowHeight * 0.75}*${arrowWidth / 2}),0x${actualColor.substring(2, 4)},25)':b='if(gt(Y,${centerY}-${arrowHeight / 4}+${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(Y,${centerY}+${arrowHeight / 2}+${arrowHeight * 0.1}*sin(2*PI*N/30))*lt(abs(X-${centerX}),(Y-${centerY}+${arrowHeight / 4})/${arrowHeight * 0.75}*${arrowWidth / 2}),0x${actualColor.substring(4, 6)},35)'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Arrow animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  // Simplified arrow using a triangle
+  const bounce = `${arrowSize * 0.08}*sin(2*PI*N/30)`;
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', direction === 'up'
+      ? `geq=r='if(lt(Y\\,${centerY}+${arrowSize * 0.4}-${bounce})*gt(Y\\,${centerY}-${arrowSize * 0.6}-${bounce})*lt(abs(X-${centerX})\\,(${centerY}+${arrowSize * 0.4}-Y)/${arrowSize}*${arrowSize * 0.5})\\,${r}\\,20)':g='if(lt(Y\\,${centerY}+${arrowSize * 0.4}-${bounce})*gt(Y\\,${centerY}-${arrowSize * 0.6}-${bounce})*lt(abs(X-${centerX})\\,(${centerY}+${arrowSize * 0.4}-Y)/${arrowSize}*${arrowSize * 0.5})\\,${g}\\,25)':b='if(lt(Y\\,${centerY}+${arrowSize * 0.4}-${bounce})*gt(Y\\,${centerY}-${arrowSize * 0.6}-${bounce})*lt(abs(X-${centerX})\\,(${centerY}+${arrowSize * 0.4}-Y)/${arrowSize}*${arrowSize * 0.5})\\,${b}\\,35)'`
+      : `geq=r='if(gt(Y\\,${centerY}-${arrowSize * 0.4}+${bounce})*lt(Y\\,${centerY}+${arrowSize * 0.6}+${bounce})*lt(abs(X-${centerX})\\,(Y-${centerY}+${arrowSize * 0.4})/${arrowSize}*${arrowSize * 0.5})\\,${r}\\,20)':g='if(gt(Y\\,${centerY}-${arrowSize * 0.4}+${bounce})*lt(Y\\,${centerY}+${arrowSize * 0.6}+${bounce})*lt(abs(X-${centerX})\\,(Y-${centerY}+${arrowSize * 0.4})/${arrowSize}*${arrowSize * 0.5})\\,${g}\\,25)':b='if(gt(Y\\,${centerY}-${arrowSize * 0.4}+${bounce})*lt(Y\\,${centerY}+${arrowSize * 0.6}+${bounce})*lt(abs(X-${centerX})\\,(Y-${centerY}+${arrowSize * 0.4})/${arrowSize}*${arrowSize * 0.5})\\,${b}\\,35)'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Arrow animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -648,48 +527,35 @@ export async function generateClockAnimation(
   duration: number,
   width: number,
   height: number,
-  color: string = '8B5CF6' // Purple
+  color: string = '8B5CF6'
 ): Promise<string> {
   console.log(`[Animation] Generating clock animation`);
 
   const fps = 30;
-  const totalFrames = duration * fps;
   const centerX = width / 2;
   const centerY = height / 2;
   const radius = Math.min(width, height) * 0.3;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Draw clock face ring
-        `geq=r='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.85},${radius}),0x${color.substring(0, 2)},20)':g='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.85},${radius}),0x${color.substring(2, 4)},25)':b='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.85},${radius}),0x${color.substring(4, 6)},35)'[clock]`,
-        // Add center dot
-        `[clock]geq=r='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.08}),255,p(X,Y))':g='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.08}),255,p(X,Y))':b='if(lt(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${radius * 0.08}),255,p(X,Y))'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Clock animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${radius * 0.85}\\,${radius})\\,${r}\\,if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${radius * 0.08})\\,255\\,20))':g='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${radius * 0.85}\\,${radius})\\,${g}\\,if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${radius * 0.08})\\,255\\,25))':b='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${radius * 0.85}\\,${radius})\\,${b}\\,if(lt(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${radius * 0.08})\\,255\\,35))'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Clock animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -701,7 +567,7 @@ export async function generatePercentageRingAnimation(
   width: number,
   height: number,
   percentage: number = 75,
-  color: string = '06B6D4' // Cyan
+  color: string = '06B6D4'
 ): Promise<string> {
   console.log(`[Animation] Generating percentage ring animation (${percentage}%)`);
 
@@ -712,36 +578,26 @@ export async function generatePercentageRingAnimation(
   const outerRadius = Math.min(width, height) * 0.35;
   const innerRadius = outerRadius * 0.7;
 
-  return new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(`color=c=0x0f0f23:s=${width}x${height}:d=${duration}`)
-      .inputFormat('lavfi')
-      .complexFilter([
-        // Draw animated ring that fills based on percentage
-        `geq=r='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${innerRadius},${outerRadius})*lt(mod(atan2(${centerY}-Y,X-${centerX})+PI,2*PI),2*PI*${percentage / 100}*min(N/${totalFrames * 0.6},1)),0x${color.substring(0, 2)},if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${innerRadius},${outerRadius}),40,20))':g='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${innerRadius},${outerRadius})*lt(mod(atan2(${centerY}-Y,X-${centerX})+PI,2*PI),2*PI*${percentage / 100}*min(N/${totalFrames * 0.6},1)),0x${color.substring(2, 4)},if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${innerRadius},${outerRadius}),45,25))':b='if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${innerRadius},${outerRadius})*lt(mod(atan2(${centerY}-Y,X-${centerX})+PI,2*PI),2*PI*${percentage / 100}*min(N/${totalFrames * 0.6},1)),0x${color.substring(4, 6)},if(between(sqrt(pow(X-${centerX},2)+pow(Y-${centerY},2)),${innerRadius},${outerRadius}),55,35))'[out]`
-      ])
-      .outputOptions([
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '30',
-        '-threads', '1',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', String(fps),
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        console.log(`[Animation] Percentage ring animation created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err) => {
-        console.error(`[Animation] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+
+  const args = [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=0x0f0f23:s=${width}x${height}:d=${duration}:r=${fps}`,
+    '-vf', `geq=r='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius}\\,${outerRadius})*lt(mod(atan2(${centerY}-Y\\,X-${centerX})+PI\\,2*PI)\\,2*PI*${percentage / 100}*min(N/${totalFrames * 0.6}\\,1))\\,${r}\\,if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius}\\,${outerRadius})\\,40\\,20))':g='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius}\\,${outerRadius})*lt(mod(atan2(${centerY}-Y\\,X-${centerX})+PI\\,2*PI)\\,2*PI*${percentage / 100}*min(N/${totalFrames * 0.6}\\,1))\\,${g}\\,if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius}\\,${outerRadius})\\,45\\,25))':b='if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius}\\,${outerRadius})*lt(mod(atan2(${centerY}-Y\\,X-${centerX})+PI\\,2*PI)\\,2*PI*${percentage / 100}*min(N/${totalFrames * 0.6}\\,1))\\,${b}\\,if(between(sqrt(pow(X-${centerX}\\,2)+pow(Y-${centerY}\\,2))\\,${innerRadius}\\,${outerRadius})\\,55\\,35))'`,
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-pix_fmt', 'yuv420p',
+    '-t', String(duration),
+    outputPath
+  ];
+
+  await runFFmpegCommand(args);
+  console.log(`[Animation] Percentage ring animation created: ${outputPath}`);
+  return outputPath;
 }
 
 /**
@@ -767,7 +623,7 @@ export const DEFAULT_BROLL_CONFIG: BRollConfig = {
 const ANIMATION_PATTERNS: Array<{
   keywords: string[];
   animation: AnimationType;
-  weight: number; // Higher weight = higher priority when multiple matches
+  weight: number;
 }> = [
   // Growth & Positive trends
   { keywords: ['growth', 'increase', 'rise', 'rising', 'profit', 'success', 'gains', 'improved', 'boost', 'surge', 'skyrocket'], animation: 'graph_up', weight: 10 },
@@ -849,11 +705,9 @@ export async function generateContextualAnimation(
 
   // Apply style preferences
   if (style === 'minimal') {
-    // Prefer simpler animations for minimal style
     if (bestAnimation === 'bar_chart') bestAnimation = 'progress_bar';
     if (bestAnimation === 'particles') bestAnimation = 'pulse';
   } else if (style === 'data-focused') {
-    // Prefer data visualizations
     if (bestAnimation === 'pulse') bestAnimation = 'bar_chart';
     if (bestAnimation === 'spotlight') bestAnimation = 'percentage_ring';
   }
