@@ -1,8 +1,8 @@
 # Use Node.js LTS with Alpine for smaller image
 FROM node:20-alpine AS base
 
-# Install FFmpeg, fonts, and dependencies
-RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu
+# Install FFmpeg, fonts, and dependencies for video/image processing
+RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu vips
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -60,6 +60,8 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
+COPY --from=builder /app/node_modules/@img ./node_modules/@img
 
 EXPOSE 3000
 
