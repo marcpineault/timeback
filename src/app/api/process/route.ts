@@ -361,8 +361,10 @@ export async function POST(request: NextRequest) {
       currentInput = stepOutput;
     }
 
-    // Step 3.5: Generate and insert AI B-Roll if enabled
-    // Extract B-roll configuration with defaults
+    // Step 3.5: AI B-Roll - TEMPORARILY DISABLED
+    // TODO: Re-enable once animation generation is stable
+    // The B-roll feature is disabled while we improve the animation quality
+    /*
     const bRollStyle = bRollConfig?.style || 'dynamic';
     const bRollMaxMoments = bRollConfig?.maxMoments || 3;
 
@@ -393,6 +395,7 @@ export async function POST(request: NextRequest) {
         currentInput = stepOutput;
       }
     }
+    */
 
     // Step 3.8: Apply auto-zoom on speech if enabled
     if (autoZoom && transcriptionSegments.length > 0) {
