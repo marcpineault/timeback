@@ -361,6 +361,19 @@ export async function addHeadline(
   captionStyle: string = 'instagram',
   headlineStyle: HeadlineStyle = 'speech-bubble'
 ): Promise<string> {
+  // Validate input file exists
+  if (!fs.existsSync(inputPath)) {
+    throw new Error(`[Headline] Input file does not exist: ${inputPath}`);
+  }
+
+  // Validate headline is not empty after sanitization
+  const sanitizedTest = headline.replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '').trim();
+  if (!sanitizedTest) {
+    logger.debug(`[Headline] Empty headline after sanitization, copying original file`);
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
   // Y positions optimized for safe zones (1080x1920)
   const baseYPositions: Record<string, number> = {
     top: 350,
@@ -424,16 +437,12 @@ export async function addHeadline(
       ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
       : '';
 
-    // Triangle tail below the box
-    const tailY = boxY + boxHeight;
-    const tailFilter = `drawtext=text='▼':fontsize=40:fontcolor=white:${alphaExpr}:x=(w-text_w)/2:y=${tailY}:enable='between(t,0,5)'`;
-
     // Combine filters: background box, then text layers
+    // Note: Decorative tail removed - Unicode characters can cause FFmpeg filter parsing failures
     const filters = [bgFilter, line1Filter, line1BoldFilter];
     if (hasSecondLine) {
       filters.push(line2Filter, line2BoldFilter);
     }
-    filters.push(tailFilter);
     filterString = filters.join(',');
 
   } else {
@@ -963,10 +972,7 @@ export async function applyCombinedFilters(
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
-
-      // Triangle tail positioned below the box
-      const tailY = boxY + boxHeight;
-      filters.push(`drawtext=text='▼':fontsize=40:fontcolor=white:${alphaExpr}:x=(w-text_w)/2:y=${tailY}:enable='between(t,0,5)'`);
+      // Note: Decorative tail removed - Unicode characters can cause FFmpeg filter parsing failures
     } else {
       // Classic style: semi-transparent dark box, white bold text
 
