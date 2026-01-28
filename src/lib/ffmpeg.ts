@@ -412,9 +412,9 @@ export async function addHeadline(
   const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
   const boxHeight = textHeight + (padding * 2);
   const boxY = baseY - padding;
-  // Box width: 70% of video width, centered (iw = input width for drawbox)
-  const boxWidth = `iw*0.70`;
-  const boxX = `iw*0.15`;  // 15% margin on each side = centered 70% width
+  // Box width: 55% of video width, centered (iw = input width for drawbox)
+  const boxWidth = `iw*0.55`;
+  const boxX = `iw*0.225`;  // 22.5% margin on each side = centered 55% width
 
   if (headlineStyle === 'speech-bubble') {
     // Speech bubble style: white background box, black bold text
@@ -958,9 +958,9 @@ export async function applyCombinedFilters(
     const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
     const boxHeight = textHeight + (padding * 2);
     const boxY = baseY - padding;
-    // Box width: 70% of video width, centered (iw = input width for drawbox)
-    const boxWidth = `iw*0.70`;
-    const boxX = `iw*0.15`;
+    // Box width: 55% of video width, centered (iw = input width for drawbox)
+    const boxWidth = `iw*0.55`;
+    const boxX = `iw*0.225`;
 
     if (style === 'speech-bubble') {
       // Speech bubble style: white background box, black bold text
