@@ -229,51 +229,77 @@ export default function VideoProcessor({
 
   const handleDownloadAll = async () => {
     const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
+    setIsSavingAll(true)
 
-    if (platform === 'ios') {
-      // On iOS, we need to save one at a time using the share sheet
-      setIsSavingAll(true)
+    // Helper function to download via blob (fallback method)
+    const downloadViaBlob = async (video: QueuedVideo) => {
+      const response = await fetch(video.downloadUrl!)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = video.outputFilename || 'video.mp4'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }
+
+    // Helper function to save via Web Share API
+    const saveViaShareApi = async (video: QueuedVideo): Promise<boolean> => {
+      const response = await fetch(video.downloadUrl!)
+      const blob = await response.blob()
+      const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Save Video',
+        })
+        return true
+      }
+      return false
+    }
+
+    if (platform === 'ios' || platform === 'android') {
+      // On mobile, try to use Web Share API first, fall back to download
       for (const video of completedVideos) {
         try {
-          const response = await fetch(video.downloadUrl!)
-          const blob = await response.blob()
-          const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
-
-          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: 'Save Video',
-            })
+          const shared = await saveViaShareApi(video)
+          if (!shared) {
+            // Web Share API not available or doesn't support files, fall back to download
+            await downloadViaBlob(video)
           }
         } catch (err) {
           // User cancelled is not an error
           if (err instanceof Error && err.name === 'AbortError') {
             break // Stop if user cancels
           }
+          // For other errors, try fallback download
+          try {
+            await downloadViaBlob(video)
+          } catch (downloadErr) {
+            console.error('Download failed:', downloadErr)
+          }
         }
       }
-      setIsSavingAll(false)
     } else {
-      // Desktop/Android: trigger sequential downloads
-      completedVideos.forEach((video, index) => {
-        setTimeout(async () => {
-          try {
-            const response = await fetch(video.downloadUrl!)
-            const blob = await response.blob()
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = video.outputFilename || 'video.mp4'
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-          } catch (err) {
-            console.error('Download failed:', err)
-          }
-        }, index * 500)
-      })
+      // Desktop: trigger sequential downloads with stagger
+      for (let i = 0; i < completedVideos.length; i++) {
+        const video = completedVideos[i]
+        if (i > 0) {
+          // Add delay between downloads to prevent browser throttling
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+        try {
+          await downloadViaBlob(video)
+        } catch (err) {
+          console.error('Download failed:', err)
+        }
+      }
     }
+
+    setIsSavingAll(false)
   }
 
   const pendingVideos = videoQueue.filter(v => v.status === 'pending')
@@ -374,12 +400,12 @@ export default function VideoProcessor({
                     </svg>
                     Saving...
                   </>
-                ) : platform === 'ios' ? (
+                ) : (platform === 'ios' || platform === 'android') ? (
                   <>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    Save All to Camera Roll
+                    Save All to Device
                   </>
                 ) : (
                   <>
