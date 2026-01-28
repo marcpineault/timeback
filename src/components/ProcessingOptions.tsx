@@ -453,8 +453,8 @@ export default function ProcessingOptions({
         )}
       </div>
 
-      {/* B-Roll Animations Settings - TEMPORARILY DISABLED */}
-      <div className="space-y-3 sm:space-y-4 opacity-50">
+      {/* B-Roll Animations Settings - TEMPORARILY DISABLED - Hidden on mobile */}
+      <div className="hidden sm:block space-y-3 sm:space-y-4 opacity-50">
         <div className="flex items-center justify-between">
           <h3 className="text-base sm:text-lg font-medium text-white">B-Roll Animations</h3>
           <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">Coming Soon</span>
