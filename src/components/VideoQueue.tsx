@@ -47,14 +47,14 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
       const blob = await response.blob();
       const file = new File([blob], video.outputFilename, { type: 'video/mp4' });
 
-      // iOS: Use Web Share API to open share sheet
-      if (platform === 'ios' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      // Mobile (iOS/Android): Use Web Share API to open share sheet
+      if ((platform === 'ios' || platform === 'android') && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: 'Save Video',
         });
       } else {
-        // Android/Desktop: Trigger download
+        // Desktop: Trigger download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
