@@ -398,11 +398,11 @@ export async function addHeadline(
     // Use drawbox with rounded corners for background, then overlay text
 
     // Calculate box dimensions to properly contain text
-    // Use responsive width: 85% of video width, max 920px
-    const boxWidthExpr = `min(920\\,w*0.85)`;
+    // Use 85% of video width for responsive sizing (works on any video size)
+    const boxWidthExpr = `w*0.85`;
     const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
     const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
-    const boxX = `(w-${boxWidthExpr})/2`;
+    const boxX = `w*0.075`;  // 7.5% margin on each side = centered 85% width
     const boxY = baseY - padding - 5;  // Start above first line with padding
 
     // Draw filled box background
@@ -439,11 +439,11 @@ export async function addHeadline(
   } else {
     // Classic style: semi-transparent dark rounded box, white bold text
     // Calculate box dimensions to properly contain text
-    // Use responsive width: 85% of video width, max 920px
-    const boxWidthExpr = `min(920\\,w*0.85)`;
+    // Use 85% of video width for responsive sizing (works on any video size)
+    const boxWidthExpr = `w*0.85`;
     const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
     const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
-    const boxX = `(w-${boxWidthExpr})/2`;
+    const boxX = `w*0.075`;  // 7.5% margin on each side = centered 85% width
     const boxY = baseY - padding - 5;  // Start above first line with padding
 
     // Dark semi-transparent background
@@ -940,11 +940,11 @@ export async function applyCombinedFilters(
     const lineHeight = 70;
     const padding = 30;
     // Calculate proper box dimensions to contain text
-    // Use responsive width: 85% of video width, max 920px
-    const boxWidthExpr = `min(920\\,w*0.85)`;
+    // Use 85% of video width for responsive sizing (works on any video size)
+    const boxWidthExpr = `w*0.85`;
     const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
     const boxHeight = textHeight + (padding * 2) + 10;  // Extra buffer
-    const boxX = `(w-${boxWidthExpr})/2`;
+    const boxX = `w*0.075`;  // 7.5% margin on each side = centered 85% width
     const boxY = baseY - padding - 5;  // Start above first line with padding
 
     if (style === 'speech-bubble') {

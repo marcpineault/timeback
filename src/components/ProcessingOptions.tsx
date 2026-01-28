@@ -453,7 +453,18 @@ export default function ProcessingOptions({
         )}
       </div>
 
-      {/* B-Roll Animations Settings */}
+      {/* B-Roll Animations Settings - TEMPORARILY DISABLED */}
+      <div className="space-y-3 sm:space-y-4 opacity-50">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base sm:text-lg font-medium text-white">B-Roll Animations</h3>
+          <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">Coming Soon</span>
+        </div>
+        <p className="text-xs text-gray-500">
+          AI-generated animations that appear during key moments to add visual context. This feature is currently being improved.
+        </p>
+      </div>
+
+      {/* Original B-Roll UI - Hidden while feature is disabled
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base sm:text-lg font-medium text-white">B-Roll Animations</h3>
@@ -474,7 +485,6 @@ export default function ProcessingOptions({
               AI-generated animations that appear during key moments to add visual context
             </p>
 
-            {/* Animation Style */}
             <div>
               <label className="block text-sm text-gray-400 mb-2">Animation Style</label>
               <div className="grid grid-cols-3 gap-2">
@@ -507,7 +517,6 @@ export default function ProcessingOptions({
               </div>
             </div>
 
-            {/* Intensity */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="text-sm text-gray-400">Frequency</label>
@@ -543,7 +552,6 @@ export default function ProcessingOptions({
               </p>
             </div>
 
-            {/* Animation Types Preview */}
             <div className="pt-2 border-t border-gray-600">
               <p className="text-xs text-gray-500">
                 Animations include: charts, graphs, progress bars, checkmarks, comparisons, countdowns, and more - automatically selected based on your content
@@ -552,6 +560,7 @@ export default function ProcessingOptions({
           </div>
         )}
       </div>
+      */}
 
       {/* Submit Button */}
       <button
