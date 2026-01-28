@@ -403,65 +403,53 @@ export async function addHeadline(
   const baseY = baseYPositions[position];
   const fontSize = 54;
   const lineHeight = 70;
-  const padding = 30;
+  const boxPadding = 15;  // Padding around text in the auto-sized box
 
   let filterString: string;
 
-  // Calculate box dimensions for unified background
-  // Box height: contains both lines with padding
-  const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
-  const boxHeight = textHeight + (padding * 2);
-  const boxY = baseY - padding;
-  // Box width: 55% of video width, centered (iw = input width for drawbox)
-  const boxWidth = `iw*0.55`;
-  const boxX = `iw*0.225`;  // 22.5% margin on each side = centered 55% width
-
   if (headlineStyle === 'speech-bubble') {
-    // Speech bubble style: white background box, black bold text
+    // Speech bubble style: white background box (auto-sized), black bold text
     const textColor = 'black';
+    const boxColor = 'white@0.98';
 
-    // Single unified background box
-    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`;
-
-    // Line 1 text (centered)
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
+    // Line 1 text with auto-sized background box
+    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`;
+    // Bold overlay (no box, just text slightly offset)
     const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
 
     // Line 2 text (if exists)
     const line2Y = baseY + lineHeight;
     const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`
       : '';
     const line2BoldFilter = hasSecondLine
       ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
       : '';
 
-    const filters = [bgFilter, line1Filter, line1BoldFilter];
+    const filters = [line1Filter, line1BoldFilter];
     if (hasSecondLine) {
       filters.push(line2Filter, line2BoldFilter);
     }
     filterString = filters.join(',');
 
   } else {
-    // Classic style: semi-transparent dark background box, white bold text
+    // Classic style: semi-transparent dark background box (auto-sized), white bold text
+    const boxColor = 'black@0.7';
 
-    // Single unified background box
-    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`;
-
-    // Line 1 text with shadow
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    // Line 1 text with auto-sized background box and shadow
+    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
     const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
 
     // Line 2 text (if exists)
     const line2Y = baseY + lineHeight;
     const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`
       : '';
     const line2BoldFilter = hasSecondLine
       ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
       : '';
 
-    const filters = [bgFilter, line1Filter, line1BoldFilter];
+    const filters = [line1Filter, line1BoldFilter];
     if (hasSecondLine) {
       filters.push(line2Filter, line2BoldFilter);
     }
@@ -952,45 +940,34 @@ export async function applyCombinedFilters(
     const baseY = baseYPositions[position];
     const fontSize = 54;
     const lineHeight = 70;
-    const padding = 30;
-
-    // Calculate box dimensions for unified background
-    const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
-    const boxHeight = textHeight + (padding * 2);
-    const boxY = baseY - padding;
-    // Box width: 55% of video width, centered (iw = input width for drawbox)
-    const boxWidth = `iw*0.55`;
-    const boxX = `iw*0.225`;
+    const boxPadding = 15;  // Padding around text in the auto-sized box
 
     if (style === 'speech-bubble') {
-      // Speech bubble style: white background box, black bold text
+      // Speech bubble style: white background box (auto-sized), black bold text
       const textColor = 'black';
+      const boxColor = 'white@0.98';
 
-      // Single unified background box
-      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`);
-
-      // Line 1 text (centered)
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
+      // Line 1 text with auto-sized background box
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
+      // Bold overlay (no box)
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
 
       if (hasSecondLine) {
         const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
     } else {
-      // Classic style: semi-transparent dark background box, white bold text
+      // Classic style: semi-transparent dark background box (auto-sized), white bold text
+      const boxColor = 'black@0.7';
 
-      // Single unified background box
-      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`);
-
-      // Line 1 text with shadow
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      // Line 1 text with auto-sized background box and shadow
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
 
       if (hasSecondLine) {
         const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
     }
