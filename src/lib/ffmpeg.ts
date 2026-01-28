@@ -409,72 +409,50 @@ export async function addHeadline(
   let filterString: string;
 
   if (headlineStyle === 'speech-bubble') {
-    // Speech bubble style: white rounded box, black bold text, triangle tail
-    // Use drawbox with rounded corners for background, then overlay text
-
-    // Calculate box dimensions to properly contain text
-    // Use 85% of video width for responsive sizing (works on any video size)
-    // Note: drawbox uses iw/ih for input dimensions, not w/h (which refer to the box itself)
-    const boxWidthExpr = `iw*0.85`;
-    const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
-    const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
-    const boxX = `iw*0.075`;  // 7.5% margin on each side = centered 85% width
-    const boxY = baseY - padding - 5;  // Start above first line with padding
-
-    // Draw filled box background
-    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`;
-
-    // Bold text by drawing twice with slight offset (faux bold)
+    // Speech bubble style: white background box that wraps text, black bold text
+    // Uses drawtext's built-in box parameter for tight text wrapping
     const textColor = 'black';
+    const boxPadding = padding;  // boxborderw controls padding around text
 
-    // Line 1 text (centered within box)
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
+    // Line 1 text with background box (centered)
+    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`;
+    // Bold effect (drawn on top without box)
     const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
 
     // Line 2 text (if exists)
     const line2Y = baseY + lineHeight;
     const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`
       : '';
     const line2BoldFilter = hasSecondLine
       ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
       : '';
 
-    // Combine filters: background box, then text layers
-    // Note: Decorative tail removed - Unicode characters can cause FFmpeg filter parsing failures
-    const filters = [bgFilter, line1Filter, line1BoldFilter];
+    // Combine filters: text with box background, then bold overlay
+    const filters = [line1Filter, line1BoldFilter];
     if (hasSecondLine) {
       filters.push(line2Filter, line2BoldFilter);
     }
     filterString = filters.join(',');
 
   } else {
-    // Classic style: semi-transparent dark rounded box, white bold text
-    // Calculate box dimensions to properly contain text
-    // Use 85% of video width for responsive sizing (works on any video size)
-    // Note: drawbox uses iw/ih for input dimensions, not w/h (which refer to the box itself)
-    const boxWidthExpr = `iw*0.85`;
-    const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
-    const boxHeight = textHeight + (padding * 2) + 10;  // Extra 10px buffer
-    const boxX = `iw*0.075`;  // 7.5% margin on each side = centered 85% width
-    const boxY = baseY - padding - 5;  // Start above first line with padding
+    // Classic style: semi-transparent dark background box, white bold text
+    // Uses drawtext's built-in box parameter for tight text wrapping
+    const boxPadding = padding;
 
-    // Dark semi-transparent background
-    const bgFilter = `drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`;
-
-    // White bold text with shadow
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    // White bold text with dark background box and shadow
+    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
     const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
 
     const line2Y = baseY + lineHeight;
     const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`
+      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`
       : '';
     const line2BoldFilter = hasSecondLine
       ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
       : '';
 
-    const filters = [bgFilter, line1Filter, line1BoldFilter];
+    const filters = [line1Filter, line1BoldFilter];
     if (hasSecondLine) {
       filters.push(line2Filter, line2BoldFilter);
     }
@@ -966,45 +944,33 @@ export async function applyCombinedFilters(
     const fontSize = 54;
     const lineHeight = 70;
     const padding = 30;
-    // Calculate proper box dimensions to contain text
-    // Use 85% of video width for responsive sizing (works on any video size)
-    // Note: drawbox uses iw/ih for input dimensions, not w/h (which refer to the box itself)
-    const boxWidthExpr = `iw*0.85`;
-    const textHeight = hasSecondLine ? (fontSize + lineHeight) : fontSize;
-    const boxHeight = textHeight + (padding * 2) + 10;  // Extra buffer
-    const boxX = `iw*0.075`;  // 7.5% margin on each side = centered 85% width
-    const boxY = baseY - padding - 5;  // Start above first line with padding
+    const boxPadding = padding;
 
     if (style === 'speech-bubble') {
-      // Speech bubble style: white rounded box, black bold text, triangle tail
+      // Speech bubble style: white background box that wraps text, black bold text
+      // Uses drawtext's built-in box parameter for tight text wrapping
       const textColor = 'black';
 
-      // Background box
-      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=white@0.98:t=fill:enable='between(t,0,5)'`);
-
-      // Line 1 text (bold effect via double draw)
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
+      // Line 1 text with background box
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
 
       if (hasSecondLine) {
         const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
-      // Note: Decorative tail removed - Unicode characters can cause FFmpeg filter parsing failures
     } else {
-      // Classic style: semi-transparent dark box, white bold text
+      // Classic style: semi-transparent dark background box, white bold text
+      // Uses drawtext's built-in box parameter for tight text wrapping
 
-      // Background box
-      filters.push(`drawbox=x=${boxX}:y=${boxY}:w=${boxWidthExpr}:h=${boxHeight}:color=black@0.7:t=fill:enable='between(t,0,5)'`);
-
-      // Line 1 text (bold with shadow)
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      // Line 1 text with dark background box and shadow
+      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
 
       if (hasSecondLine) {
         const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
     }
