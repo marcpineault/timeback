@@ -412,30 +412,49 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Add headline if provided or using hook
     // If combined filters are used, apply color grade + headline in one pass
+    // Wrapped in try-catch so headline failures don't crash the entire pipeline
     if (canUseCombinedFilters) {
       logger.info('Step 4: Applying combined filters (color grade + headline)');
       stepOutput = path.join(processedDir, `${baseName}_combined.mp4`);
-      await applyCombinedFilters(currentInput, stepOutput, {
-        colorGrade: colorGrade as ColorGradePreset,
-        headline: finalHeadline,
-        headlinePosition: options.headlinePosition,
-        headlineStyle: options.headlineStyle,
-        captionStyle,
-      });
-      // Clean up intermediate file
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
+      try {
+        await applyCombinedFilters(currentInput, stepOutput, {
+          colorGrade: colorGrade as ColorGradePreset,
+          headline: finalHeadline,
+          headlinePosition: options.headlinePosition,
+          headlineStyle: options.headlineStyle,
+          captionStyle,
+        });
+        // Clean up intermediate file
+        if (currentInput !== inputPath) {
+          await fs.unlink(currentInput).catch(() => {})
+        }
+        currentInput = stepOutput;
+      } catch (headlineErr) {
+        logger.error('Step 4: Combined filters failed, falling back to color grade only', { error: String(headlineErr) });
+        // Fall back to just color grade without headline
+        try {
+          await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
+          if (currentInput !== inputPath) {
+            await fs.unlink(currentInput).catch(() => {})
+          }
+          currentInput = stepOutput;
+        } catch (fallbackErr) {
+          logger.error('Step 4: Color grade fallback also failed, continuing without filters', { error: String(fallbackErr) });
+        }
       }
-      currentInput = stepOutput;
     } else if (finalHeadline) {
       logger.info('Step 4: Adding headline', { headline: finalHeadline });
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
-      await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle, options.headlineStyle);
-      // Clean up intermediate file
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
+      try {
+        await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle, options.headlineStyle);
+        // Clean up intermediate file
+        if (currentInput !== inputPath) {
+          await fs.unlink(currentInput).catch(() => {})
+        }
+        currentInput = stepOutput;
+      } catch (headlineErr) {
+        logger.error('Step 4: Headline failed, continuing without headline', { error: String(headlineErr) });
       }
-      currentInput = stepOutput;
     }
 
     // Step 5: Convert aspect ratio if specified

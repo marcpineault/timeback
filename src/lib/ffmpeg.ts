@@ -389,6 +389,8 @@ export async function addHeadline(
     .replace(/\\/g, '\\\\')
     .replace(/'/g, '')
     .replace(/"/g, '')
+    .replace(/%/g, '%%')
+    .replace(/;/g, '\\;')
     .replace(/:/g, '\\:');
 
   // Always split into 2 lines for visual balance
@@ -478,26 +480,6 @@ export async function addHeadline(
   }
 
   logger.debug(`[Headline] Adding 2-line headline: "${line1}" / "${line2}" at ${position} (${headlineStyle})`);
-
-  // Validate input video is readable before processing
-  const videoInfo = await new Promise<{ valid: boolean; error?: string }>((resolve) => {
-    ffmpeg.ffprobe(inputPath, (err, metadata) => {
-      if (err) {
-        resolve({ valid: false, error: err.message });
-        return;
-      }
-      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-      if (!videoStream) {
-        resolve({ valid: false, error: 'No video stream found in input file' });
-        return;
-      }
-      resolve({ valid: true });
-    });
-  });
-
-  if (!videoInfo.valid) {
-    throw new Error(`[Headline] Invalid input video: ${videoInfo.error}`);
-  }
 
   return new Promise((resolve, reject) => {
     let stderrOutput = '';
@@ -966,6 +948,8 @@ export async function applyCombinedFilters(
       .replace(/\\/g, '\\\\')
       .replace(/'/g, '')
       .replace(/"/g, '')
+      .replace(/%/g, '%%')
+      .replace(/;/g, '\\;')
       .replace(/:/g, '\\:');
 
     const position = options.headlinePosition || 'top';
@@ -1032,26 +1016,6 @@ export async function applyCombinedFilters(
 
   const filterString = filters.join(',');
   logger.debug(`[Combined] Applying ${filters.length} filters in single pass`);
-
-  // Validate input video is readable before processing
-  const videoInfo = await new Promise<{ valid: boolean; error?: string }>((resolve) => {
-    ffmpeg.ffprobe(inputPath, (err, metadata) => {
-      if (err) {
-        resolve({ valid: false, error: err.message });
-        return;
-      }
-      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-      if (!videoStream) {
-        resolve({ valid: false, error: 'No video stream found in input file' });
-        return;
-      }
-      resolve({ valid: true });
-    });
-  });
-
-  if (!videoInfo.valid) {
-    throw new Error(`[Combined] Invalid input video: ${videoInfo.error}`);
-  }
 
   return new Promise((resolve, reject) => {
     let stderrOutput = '';
