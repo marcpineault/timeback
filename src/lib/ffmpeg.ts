@@ -408,55 +408,35 @@ export async function addHeadline(
 
   let filterString: string;
 
+  // Combine lines with \n for single unified background box
+  // FFmpeg's drawtext box=1 will create one box around all lines when using \n
+  const combinedText = hasSecondLine ? `${line1}\\n${line2}` : line1;
+  const lineSpacing = 16;  // Extra spacing between lines
+
   if (headlineStyle === 'speech-bubble') {
     // Speech bubble style: white background box that wraps text, black bold text
-    // Uses drawtext's built-in box parameter for tight text wrapping
+    // Uses single drawtext with newline for unified box around both lines
     const textColor = 'black';
-    const boxPadding = padding;  // boxborderw controls padding around text
+    const boxPadding = padding;
 
-    // Line 1 text with background box (centered)
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`;
+    // Single drawtext with both lines - creates one unified background box
+    const textFilter = `drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:line_spacing=${lineSpacing}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`;
     // Bold effect (drawn on top without box)
-    const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
+    const boldFilter = `drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:line_spacing=${lineSpacing}:${alphaExpr}:enable='between(t,0,5)'`;
 
-    // Line 2 text (if exists)
-    const line2Y = baseY + lineHeight;
-    const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`
-      : '';
-    const line2BoldFilter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
-      : '';
-
-    // Combine filters: text with box background, then bold overlay
-    const filters = [line1Filter, line1BoldFilter];
-    if (hasSecondLine) {
-      filters.push(line2Filter, line2BoldFilter);
-    }
-    filterString = filters.join(',');
+    filterString = `${textFilter},${boldFilter}`;
 
   } else {
     // Classic style: semi-transparent dark background box, white bold text
-    // Uses drawtext's built-in box parameter for tight text wrapping
+    // Uses single drawtext with newline for unified box around both lines
     const boxPadding = padding;
 
-    // White bold text with dark background box and shadow
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-    const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
+    // Single drawtext with both lines and dark background box
+    const textFilter = `drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:line_spacing=${lineSpacing}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
+    // Bold effect (drawn on top without box)
+    const boldFilter = `drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:line_spacing=${lineSpacing}:${alphaExpr}:enable='between(t,0,5)'`;
 
-    const line2Y = baseY + lineHeight;
-    const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`
-      : '';
-    const line2BoldFilter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
-      : '';
-
-    const filters = [line1Filter, line1BoldFilter];
-    if (hasSecondLine) {
-      filters.push(line2Filter, line2BoldFilter);
-    }
-    filterString = filters.join(',');
+    filterString = `${textFilter},${boldFilter}`;
   }
 
   logger.debug(`[Headline] Adding 2-line headline: "${line1}" / "${line2}" at ${position} (${headlineStyle})`);
@@ -945,34 +925,28 @@ export async function applyCombinedFilters(
     const lineHeight = 70;
     const padding = 30;
     const boxPadding = padding;
+    const lineSpacing = 16;  // Extra spacing between lines
+
+    // Combine lines with \n for single unified background box
+    const combinedText = hasSecondLine ? `${line1}\\n${line2}` : line1;
 
     if (style === 'speech-bubble') {
       // Speech bubble style: white background box that wraps text, black bold text
-      // Uses drawtext's built-in box parameter for tight text wrapping
+      // Uses single drawtext with newline for unified box around both lines
       const textColor = 'black';
 
-      // Line 1 text with background box
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
-
-      if (hasSecondLine) {
-        const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
-      }
+      // Single drawtext with both lines - creates one unified background box
+      filters.push(`drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:line_spacing=${lineSpacing}:box=1:boxcolor=white@0.98:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
+      // Bold effect (drawn on top without box)
+      filters.push(`drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:line_spacing=${lineSpacing}:${alphaExpr}:enable='between(t,0,5)'`);
     } else {
       // Classic style: semi-transparent dark background box, white bold text
-      // Uses drawtext's built-in box parameter for tight text wrapping
+      // Uses single drawtext with newline for unified box around both lines
 
-      // Line 1 text with dark background box and shadow
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
-
-      if (hasSecondLine) {
-        const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
-      }
+      // Single drawtext with both lines and dark background box
+      filters.push(`drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:line_spacing=${lineSpacing}:box=1:boxcolor=black@0.7:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
+      // Bold effect (drawn on top without box)
+      filters.push(`drawtext=text='${combinedText}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:line_spacing=${lineSpacing}:${alphaExpr}:enable='between(t,0,5)'`);
     }
   }
 
