@@ -230,8 +230,8 @@ export default function VideoProcessor({
   const handleDownloadAll = async () => {
     const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
 
-    if (platform === 'ios') {
-      // On iOS, we need to save one at a time using the share sheet
+    if (platform === 'ios' || platform === 'android') {
+      // On mobile, we need to save one at a time using the share sheet
       setIsSavingAll(true)
       for (const video of completedVideos) {
         try {
@@ -254,7 +254,7 @@ export default function VideoProcessor({
       }
       setIsSavingAll(false)
     } else {
-      // Desktop/Android: trigger sequential downloads
+      // Desktop: trigger sequential downloads
       completedVideos.forEach((video, index) => {
         setTimeout(async () => {
           try {
@@ -380,6 +380,13 @@ export default function VideoProcessor({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     Save All to Camera Roll
+                  </>
+                ) : platform === 'android' ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    Save All Videos
                   </>
                 ) : (
                   <>
