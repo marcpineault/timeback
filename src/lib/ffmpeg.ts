@@ -63,7 +63,7 @@ export async function detectSilence(
         logger.debug(`[Silence Detection] Complete. Found ${silences.length} silent intervals`);
         resolve(silences);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Silence Detection] Error:`, err);
         reject(err);
       })
@@ -215,7 +215,7 @@ export async function removeSilence(
         logger.debug(`[Silence Removal] Complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Silence Removal] Error:`, err);
         reject(err);
       })
@@ -298,7 +298,7 @@ export async function burnCaptions(
         try { fs.unlinkSync(tempSubPath); } catch {}
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Captions] Error:`, err);
         try { fs.unlinkSync(tempSubPath); } catch {}
         reject(err);
@@ -487,7 +487,7 @@ export async function addHeadline(
         logger.debug(`[Headline] Complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Headline] Error:`, err);
         reject(err);
       })
@@ -539,7 +539,7 @@ export async function imageToVideoClip(
         logger.debug(`[B-Roll] Video clip created: ${outputPath}`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[B-Roll] Error creating clip:`, err);
         reject(err);
       })
@@ -612,7 +612,7 @@ export async function insertBRollCutaways(
       });
       logger.debug(`[B-Roll] Generated animation ${i + 1}/${sortedCutaways.length} for: "${cutaway.context.slice(0, 40)}..."`);
     } catch (err) {
-      logger.error(`[B-Roll] Failed to generate animation for cutaway ${i}:`, err);
+      logger.error(`[B-Roll] Failed to generate animation for cutaway ${i}:`, err as Error);
       // Continue with other cutaways
     }
   }
@@ -747,7 +747,7 @@ export async function normalizeAudio(
         logger.debug(`[Audio] Normalization complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Audio] Normalization error:`, err);
         reject(err);
       })
@@ -859,7 +859,7 @@ export async function convertAspectRatio(
         logger.debug(`[Aspect] Conversion complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Aspect] Conversion error:`, err);
         reject(err);
       })
@@ -1012,7 +1012,7 @@ export async function applyCombinedFilters(
         logger.debug(`[Combined] Processing complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Combined] Error:`, err);
         reject(err);
       })
@@ -1052,7 +1052,7 @@ export async function applyColorGrade(
         logger.debug(`[Color] Color grading complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Color] Color grading error:`, err);
         reject(err);
       })
@@ -1130,7 +1130,7 @@ export async function applyAutoZoom(
         logger.debug(`[Zoom] Auto-zoom complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Zoom] Auto-zoom error:`, err);
         // Graceful fallback: just copy the file if zoom fails
         logger.debug(`[Zoom] Falling back to original video without zoom`);
@@ -1178,7 +1178,7 @@ export async function trimVideo(
         logger.debug(`[Trim] Complete!`);
         resolve(outputPath);
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         logger.error(`[Trim] Error:`, err);
         reject(err);
       })
@@ -1244,7 +1244,7 @@ export async function splitVideo(
           outputPaths.push(segment.outputPath);
           resolve();
         })
-        .on('error', (err) => {
+        .on('error', (err: Error) => {
           logger.error(`[Split] Error:`, err);
           reject(err);
         })
