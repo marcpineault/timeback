@@ -245,38 +245,34 @@ export default function VideoProcessor({
       URL.revokeObjectURL(url)
     }
 
-    // Helper function to download as ZIP (reliable for mobile)
-    const downloadAsZip = async () => {
-      // Extract filenames from download URLs (e.g., /api/download/filename.mp4 -> filename.mp4)
-      const filenames = completedVideos
-        .map(v => v.downloadUrl?.split('/').pop())
-        .filter((f): f is string => !!f)
+    // Helper function to share via Web Share API (for mobile)
+    const shareVideosOneByOne = async () => {
+      for (const video of completedVideos) {
+        try {
+          const response = await fetch(video.downloadUrl!)
+          const blob = await response.blob()
+          const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
 
-      const response = await fetch('/api/download/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filenames }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create ZIP')
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Save Video',
+            })
+          }
+        } catch (err) {
+          // User cancelled - stop the loop
+          if (err instanceof Error && err.name === 'AbortError') {
+            break
+          }
+        }
       }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `timeback-videos.zip`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
     }
 
     try {
       if (platform === 'ios' || platform === 'android') {
-        // On mobile, download as a single ZIP file (most reliable)
-        await downloadAsZip()
+        // On mobile, use Web Share API to share videos one at a time
+        // This is the most reliable method for saving to camera roll
+        await shareVideosOneByOne()
       } else {
         // Desktop: trigger sequential downloads with stagger
         for (let i = 0; i < completedVideos.length; i++) {
