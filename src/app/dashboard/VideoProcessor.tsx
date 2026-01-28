@@ -229,51 +229,70 @@ export default function VideoProcessor({
 
   const handleDownloadAll = async () => {
     const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
+    setIsSavingAll(true)
 
-    if (platform === 'ios' || platform === 'android') {
-      // On mobile, we need to save one at a time using the share sheet
-      setIsSavingAll(true)
-      for (const video of completedVideos) {
-        try {
-          const response = await fetch(video.downloadUrl!)
-          const blob = await response.blob()
-          const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
+    // Helper function to download via blob
+    const downloadViaBlob = async (video: QueuedVideo) => {
+      const response = await fetch(video.downloadUrl!)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = video.outputFilename || 'video.mp4'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }
 
-          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: 'Save Video',
-            })
+    // Helper function to download as ZIP (reliable for mobile)
+    const downloadAsZip = async () => {
+      // Extract filenames from download URLs (e.g., /api/download/filename.mp4 -> filename.mp4)
+      const filenames = completedVideos
+        .map(v => v.downloadUrl?.split('/').pop())
+        .filter((f): f is string => !!f)
+
+      const response = await fetch('/api/download/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filenames }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create ZIP')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `timeback-videos.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }
+
+    try {
+      if (platform === 'ios' || platform === 'android') {
+        // On mobile, download as a single ZIP file (most reliable)
+        await downloadAsZip()
+      } else {
+        // Desktop: trigger sequential downloads with stagger
+        for (let i = 0; i < completedVideos.length; i++) {
+          const video = completedVideos[i]
+          if (i > 0) {
+            // Add delay between downloads to prevent browser throttling
+            await new Promise(resolve => setTimeout(resolve, 500))
           }
-        } catch (err) {
-          // User cancelled is not an error
-          if (err instanceof Error && err.name === 'AbortError') {
-            break // Stop if user cancels
-          }
+          await downloadViaBlob(video)
         }
       }
-      setIsSavingAll(false)
-    } else {
-      // Desktop: trigger sequential downloads
-      completedVideos.forEach((video, index) => {
-        setTimeout(async () => {
-          try {
-            const response = await fetch(video.downloadUrl!)
-            const blob = await response.blob()
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = video.outputFilename || 'video.mp4'
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-          } catch (err) {
-            console.error('Download failed:', err)
-          }
-        }, index * 500)
-      })
+    } catch (err) {
+      console.error('Download failed:', err)
     }
+
+    setIsSavingAll(false)
   }
 
   const pendingVideos = videoQueue.filter(v => v.status === 'pending')
@@ -374,19 +393,12 @@ export default function VideoProcessor({
                     </svg>
                     Saving...
                   </>
-                ) : platform === 'ios' ? (
+                ) : (platform === 'ios' || platform === 'android') ? (
                   <>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Save All to Camera Roll
-                  </>
-                ) : platform === 'android' ? (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                    </svg>
-                    Save All Videos
+                    Download All (ZIP)
                   </>
                 ) : (
                   <>
