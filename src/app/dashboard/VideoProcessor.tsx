@@ -30,6 +30,7 @@ export default function VideoProcessor({
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [platform, setPlatform] = useState<'ios' | 'android' | 'desktop'>('desktop')
   const [isSavingAll, setIsSavingAll] = useState(false)
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false)
 
   useEffect(() => {
     const ua = navigator.userAgent
@@ -227,27 +228,13 @@ export default function VideoProcessor({
     setVideosRemaining(prev => Math.max(0, prev - pendingVideos.length))
   }
 
-  const handleDownloadAll = async () => {
+  // Download as ZIP file
+  const handleDownloadZip = async () => {
     const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
-    setIsSavingAll(true)
+    setIsDownloadingZip(true)
 
-    // Helper function to download via blob
-    const downloadViaBlob = async (video: QueuedVideo) => {
-      const response = await fetch(video.downloadUrl!)
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = video.outputFilename || 'video.mp4'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-    }
-
-    // Helper function to download as ZIP (reliable for mobile)
-    const downloadAsZip = async () => {
-      // Extract filenames from download URLs (e.g., /api/download/filename.mp4 -> filename.mp4)
+    try {
+      // Extract filenames from download URLs
       const filenames = completedVideos
         .map(v => v.downloadUrl?.split('/').pop())
         .filter((f): f is string => !!f)
@@ -263,33 +250,90 @@ export default function VideoProcessor({
       }
 
       const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `timeback-videos.zip`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-    }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const zipFilename = `timeback-videos-${timestamp}.zip`
 
-    try {
-      if (platform === 'ios' || platform === 'android') {
-        // On mobile, download as a single ZIP file (most reliable)
-        await downloadAsZip()
-      } else {
-        // Desktop: trigger sequential downloads with stagger
-        for (let i = 0; i < completedVideos.length; i++) {
-          const video = completedVideos[i]
-          if (i > 0) {
-            // Add delay between downloads to prevent browser throttling
-            await new Promise(resolve => setTimeout(resolve, 500))
-          }
-          await downloadViaBlob(video)
+      // On mobile, use Web Share API to share the ZIP file
+      if ((platform === 'ios' || platform === 'android') && navigator.share && navigator.canShare) {
+        const file = new File([blob], zipFilename, { type: 'application/zip' })
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Download Videos',
+          })
         }
+      } else {
+        // Desktop: trigger download via anchor
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = zipFilename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
       }
     } catch (err) {
-      console.error('Download failed:', err)
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('ZIP download failed:', err)
+      }
+    }
+
+    setIsDownloadingZip(false)
+  }
+
+  // Save videos to camera roll one by one (mobile only)
+  const handleSaveAll = async () => {
+    const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
+    setIsSavingAll(true)
+
+    for (const video of completedVideos) {
+      try {
+        const response = await fetch(video.downloadUrl!)
+        const blob = await response.blob()
+        const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
+
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Save Video',
+          })
+        }
+      } catch (err) {
+        // User cancelled - stop the loop
+        if (err instanceof Error && err.name === 'AbortError') {
+          break
+        }
+      }
+    }
+
+    setIsSavingAll(false)
+  }
+
+  // Desktop: download all videos sequentially
+  const handleDownloadAll = async () => {
+    const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
+    setIsSavingAll(true)
+
+    for (let i = 0; i < completedVideos.length; i++) {
+      const video = completedVideos[i]
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      try {
+        const response = await fetch(video.downloadUrl!)
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = video.outputFilename || 'video.mp4'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Download failed:', err)
+      }
     }
 
     setIsSavingAll(false)
@@ -380,35 +424,77 @@ export default function VideoProcessor({
                   <p className="text-gray-400 text-xs sm:text-sm">{completedVideos.length} video(s) ready for review</p>
                 </div>
               </div>
-              <button
-                onClick={handleDownloadAll}
-                disabled={isSavingAll}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                {isSavingAll ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Saving...
-                  </>
-                ) : (platform === 'ios' || platform === 'android') ? (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download All (ZIP)
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download All
-                  </>
-                )}
-              </button>
+              {(platform === 'ios' || platform === 'android') ? (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={handleSaveAll}
+                    disabled={isSavingAll || isDownloadingZip}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isSavingAll ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Save to Camera Roll
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleDownloadZip}
+                    disabled={isSavingAll || isDownloadingZip}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-600/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isDownloadingZip ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Creating ZIP...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download ZIP
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleDownloadAll}
+                  disabled={isSavingAll}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {isSavingAll ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download All
+                    </>
+                  )}
+                </button>
+              )}
             </div>
             {/* Review tip */}
             <div className="flex items-start gap-2 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
