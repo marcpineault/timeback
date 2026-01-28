@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     // Generate the ZIP file
     const zipBuffer = await zip.generateAsync({
       type: 'nodebuffer',
-      compression: 'STORED', // No compression for videos (already compressed)
+      compression: 'STORE', // No compression for videos (already compressed)
       streamFiles: true,
     });
 
