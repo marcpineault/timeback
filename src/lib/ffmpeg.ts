@@ -479,7 +479,29 @@ export async function addHeadline(
 
   logger.debug(`[Headline] Adding 2-line headline: "${line1}" / "${line2}" at ${position} (${headlineStyle})`);
 
+  // Validate input video is readable before processing
+  const videoInfo = await new Promise<{ valid: boolean; error?: string }>((resolve) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) {
+        resolve({ valid: false, error: err.message });
+        return;
+      }
+      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      if (!videoStream) {
+        resolve({ valid: false, error: 'No video stream found in input file' });
+        return;
+      }
+      resolve({ valid: true });
+    });
+  });
+
+  if (!videoInfo.valid) {
+    throw new Error(`[Headline] Invalid input video: ${videoInfo.error}`);
+  }
+
   return new Promise((resolve, reject) => {
+    let stderrOutput = '';
+
     ffmpeg(inputPath)
       .videoFilters(filterString)
       .outputOptions([
@@ -492,13 +514,23 @@ export async function addHeadline(
         '-c:a', 'copy',
       ])
       .output(outputPath)
+      .on('stderr', (line: string) => {
+        stderrOutput += line + '\n';
+        // Log FFmpeg progress/errors in real-time for debugging
+        if (line.includes('Error') || line.includes('error') || line.includes('Invalid')) {
+          logger.debug(`[Headline FFmpeg] ${line}`);
+        }
+      })
       .on('end', () => {
         logger.debug(`[Headline] Complete!`);
         resolve(outputPath);
       })
       .on('error', (err: Error) => {
+        // Include stderr output in error for better diagnostics
+        const errorDetails = stderrOutput.slice(-1000); // Last 1000 chars of stderr
         logger.error(`[Headline] Error:`, err);
-        reject(err);
+        logger.error(`[Headline] FFmpeg stderr: ${errorDetails}`);
+        reject(new Error(`${err.message}\nFFmpeg details: ${errorDetails}`));
       })
       .run();
   });
@@ -1001,7 +1033,29 @@ export async function applyCombinedFilters(
   const filterString = filters.join(',');
   logger.debug(`[Combined] Applying ${filters.length} filters in single pass`);
 
+  // Validate input video is readable before processing
+  const videoInfo = await new Promise<{ valid: boolean; error?: string }>((resolve) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) {
+        resolve({ valid: false, error: err.message });
+        return;
+      }
+      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      if (!videoStream) {
+        resolve({ valid: false, error: 'No video stream found in input file' });
+        return;
+      }
+      resolve({ valid: true });
+    });
+  });
+
+  if (!videoInfo.valid) {
+    throw new Error(`[Combined] Invalid input video: ${videoInfo.error}`);
+  }
+
   return new Promise((resolve, reject) => {
+    let stderrOutput = '';
+
     ffmpeg(inputPath)
       .videoFilters(filterString)
       .outputOptions([
@@ -1014,13 +1068,21 @@ export async function applyCombinedFilters(
         '-c:a', 'copy',
       ])
       .output(outputPath)
+      .on('stderr', (line: string) => {
+        stderrOutput += line + '\n';
+        if (line.includes('Error') || line.includes('error') || line.includes('Invalid')) {
+          logger.debug(`[Combined FFmpeg] ${line}`);
+        }
+      })
       .on('end', () => {
         logger.debug(`[Combined] Processing complete!`);
         resolve(outputPath);
       })
       .on('error', (err: Error) => {
+        const errorDetails = stderrOutput.slice(-1000);
         logger.error(`[Combined] Error:`, err);
-        reject(err);
+        logger.error(`[Combined] FFmpeg stderr: ${errorDetails}`);
+        reject(new Error(`${err.message}\nFFmpeg details: ${errorDetails}`));
       })
       .run();
   });
