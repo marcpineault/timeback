@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const zipFilename = `timeback-videos-${timestamp}.zip`;
 
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(new Uint8Array(zipBuffer), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${zipFilename}"`,
