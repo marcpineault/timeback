@@ -65,6 +65,14 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Google Drive disabled - will be enabled later */}
             {/* <DriveSettings /> */}
+            <a
+              href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              Tutorials
+            </a>
             <Link
               href="/pricing"
               className="text-gray-400 hover:text-white transition-colors text-sm"

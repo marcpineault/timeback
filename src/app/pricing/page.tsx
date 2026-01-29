@@ -21,6 +21,14 @@ export default async function PricingPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-white">TimeBack</Link>
           <div className="flex items-center gap-2 sm:gap-4">
+            <a
+              href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base"
+            >
+              Tutorials
+            </a>
             {userId ? (
               <Link
                 href="/dashboard"

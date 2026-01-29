@@ -19,6 +19,14 @@ export default async function LandingPage() {
             <Link href="/pricing" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">
               Pricing
             </Link>
+            <a
+              href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base"
+            >
+              Tutorials
+            </a>
             <Link
               href="/sign-in"
               className="hidden sm:block text-gray-400 hover:text-white transition-colors"
@@ -376,6 +384,14 @@ export default async function LandingPage() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-500">
               <Link href="/pricing" className="hover:text-gray-300 transition-colors">Pricing</Link>
+              <a
+                href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-300 transition-colors"
+              >
+                Tutorials
+              </a>
               <a href="mailto:support@timebackvideo.com" className="hover:text-gray-300 transition-colors">Support</a>
             </div>
           </div>
