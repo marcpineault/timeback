@@ -9,11 +9,16 @@ import MediaEditor from '@/components/MediaEditor'
 // Google Drive disabled - will be enabled later
 // import GoogleDriveUpload from '@/components/GoogleDriveUpload'
 
+interface EnabledFeatures {
+  speechCorrection: boolean
+}
+
 interface VideoProcessorProps {
   userId: string
   canProcess: boolean
   videosRemaining: number
   hasWatermark: boolean
+  enabledFeatures?: EnabledFeatures
 }
 
 export default function VideoProcessor({
@@ -21,6 +26,7 @@ export default function VideoProcessor({
   canProcess,
   videosRemaining: initialVideosRemaining,
   hasWatermark,
+  enabledFeatures = { speechCorrection: false },
 }: VideoProcessorProps) {
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
@@ -399,6 +405,7 @@ export default function VideoProcessor({
           onProcess={handleProcess}
           isProcessing={isProcessing}
           videoCount={pendingVideos.length}
+          enabledFeatures={enabledFeatures}
         />
       )}
 
