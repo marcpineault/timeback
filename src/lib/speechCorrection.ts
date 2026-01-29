@@ -44,6 +44,7 @@ export interface SpeechMistake {
 export interface SpeechCorrectionConfig {
   removeFillerWords: boolean;      // Remove "um", "uh", "like" etc.
   removeRepeatedWords: boolean;    // Remove duplicate words
+  removeRepeatedPhrases: boolean;  // Remove duplicate phrases (e.g., "so basically, so basically")
   removeFalseStarts: boolean;      // Remove incomplete restarts
   removeSelfCorrections: boolean;  // Remove incorrect words in corrections
   aggressiveness: 'conservative' | 'moderate' | 'aggressive';
@@ -55,6 +56,7 @@ export interface SpeechCorrectionConfig {
 export const DEFAULT_SPEECH_CORRECTION_CONFIG: SpeechCorrectionConfig = {
   removeFillerWords: true,
   removeRepeatedWords: true,
+  removeRepeatedPhrases: true,
   removeFalseStarts: true,
   removeSelfCorrections: true,
   aggressiveness: 'moderate',
@@ -286,6 +288,118 @@ function isFillerWord(word: string): boolean {
 }
 
 /**
+ * Detect repeated phrases in the transcript
+ * Looks for consecutive identical phrases of 2-5 words
+ * e.g., "so basically, so basically" or "I think I think"
+ */
+function detectRepeatedPhrases(
+  words: TranscriptionWord[],
+  minPhraseLength: number = 2,
+  maxPhraseLength: number = 5
+): SpeechMistake[] {
+  const mistakes: SpeechMistake[] = [];
+
+  console.log('[Speech Correction] Detecting repeated phrases...');
+
+  // Try different phrase lengths, starting with longer phrases
+  for (let phraseLen = maxPhraseLength; phraseLen >= minPhraseLength; phraseLen--) {
+    // Slide through the transcript
+    for (let i = 0; i <= words.length - (phraseLen * 2); i++) {
+      // Get the first phrase
+      const phrase1Words = words.slice(i, i + phraseLen);
+      const phrase1Text = phrase1Words.map(w => normalizeWord(w.word)).join(' ');
+
+      // Skip if phrase contains only filler words or is too short
+      const nonFillerWords = phrase1Words.filter(w => !isFillerWord(w.word) && normalizeWord(w.word).length > 1);
+      if (nonFillerWords.length < 1) continue;
+
+      // Look for the same phrase immediately following (with small gap tolerance)
+      // Check positions i+phraseLen through i+phraseLen+2 to allow for small gaps
+      for (let offset = 0; offset <= 2 && (i + phraseLen + offset + phraseLen) <= words.length; offset++) {
+        const phrase2StartIdx = i + phraseLen + offset;
+        const phrase2Words = words.slice(phrase2StartIdx, phrase2StartIdx + phraseLen);
+        const phrase2Text = phrase2Words.map(w => normalizeWord(w.word)).join(' ');
+
+        // Check if phrases match
+        if (phrase1Text === phrase2Text && phrase1Text.length > 2) {
+          // Check time gap between phrases - should be relatively close
+          const gapBetweenPhrases = phrase2Words[0].start - phrase1Words[phrase1Words.length - 1].end;
+
+          // Only consider as duplicate if gap is less than 2 seconds
+          if (gapBetweenPhrases < 2.0) {
+            // Check if this region was already marked (avoid double-counting)
+            const alreadyMarked = mistakes.some(m =>
+              (m.startTime <= phrase1Words[0].start && m.endTime >= phrase1Words[phraseLen - 1].end) ||
+              (phrase1Words[0].start <= m.startTime && phrase1Words[phraseLen - 1].end >= m.startTime)
+            );
+
+            if (!alreadyMarked) {
+              const originalText = phrase1Words.map(w => w.word).join(' ');
+              mistakes.push({
+                type: 'repeated_phrase',
+                startTime: phrase1Words[0].start,
+                endTime: phrase1Words[phraseLen - 1].end,
+                text: originalText,
+                reason: `Repeated phrase "${originalText}" - removing first occurrence`,
+              });
+
+              console.log(`  [Pre-detect] Repeated phrase: "${originalText}" at ${phrase1Words[0].start.toFixed(2)}s (followed by same phrase at ${phrase2Words[0].start.toFixed(2)}s)`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Also detect near-duplicate phrases (with minor variations)
+  // e.g., "I think that" ... "I think that" or "you know what I mean" ... "you know what I mean"
+  for (let phraseLen = maxPhraseLength; phraseLen >= minPhraseLength; phraseLen--) {
+    for (let i = 0; i <= words.length - phraseLen; i++) {
+      const phrase1Words = words.slice(i, i + phraseLen);
+      const phrase1Text = phrase1Words.map(w => normalizeWord(w.word)).join(' ');
+
+      // Skip very short or filler-only phrases
+      if (phrase1Text.length < 4) continue;
+
+      // Look ahead for the same phrase (within 10 words)
+      const searchEnd = Math.min(i + phraseLen + 10, words.length - phraseLen);
+      for (let j = i + phraseLen; j <= searchEnd; j++) {
+        const phrase2Words = words.slice(j, j + phraseLen);
+        const phrase2Text = phrase2Words.map(w => normalizeWord(w.word)).join(' ');
+
+        if (phrase1Text === phrase2Text) {
+          // Check time gap
+          const gapBetweenPhrases = phrase2Words[0].start - phrase1Words[phraseLen - 1].end;
+
+          // For non-adjacent duplicates, use stricter time limit (1.5 seconds)
+          if (gapBetweenPhrases < 1.5 && gapBetweenPhrases > 0) {
+            const alreadyMarked = mistakes.some(m =>
+              Math.abs(m.startTime - phrase1Words[0].start) < 0.1
+            );
+
+            if (!alreadyMarked) {
+              const originalText = phrase1Words.map(w => w.word).join(' ');
+              mistakes.push({
+                type: 'repeated_phrase',
+                startTime: phrase1Words[0].start,
+                endTime: phrase1Words[phraseLen - 1].end,
+                text: originalText,
+                reason: `Repeated phrase "${originalText}" - removing first occurrence`,
+              });
+
+              console.log(`  [Pre-detect] Near-duplicate phrase: "${originalText}" at ${phrase1Words[0].start.toFixed(2)}s`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`[Speech Correction] Detected ${mistakes.length} repeated phrases`);
+  return mistakes;
+}
+
+/**
  * Pre-detect obvious mistakes programmatically (doesn't rely on GPT)
  * This catches things GPT might miss
  */
@@ -448,6 +562,21 @@ function preDetectMistakes(
     }
   }
 
+  // 5. Detect repeated phrases (e.g., "so basically, so basically")
+  if (config.removeRepeatedPhrases) {
+    const repeatedPhrases = detectRepeatedPhrases(words);
+    for (const phrase of repeatedPhrases) {
+      // Check if this overlaps with existing detections
+      const alreadyDetected = mistakes.some(m =>
+        (phrase.startTime >= m.startTime && phrase.startTime <= m.endTime) ||
+        (phrase.endTime >= m.startTime && phrase.endTime <= m.endTime)
+      );
+      if (!alreadyDetected) {
+        mistakes.push(phrase);
+      }
+    }
+  }
+
   console.log(`[Speech Correction] Pre-detection found ${mistakes.length} mistakes`);
   return mistakes;
 }
@@ -516,16 +645,26 @@ ${config.removeSelfCorrections ? `
 5. STUTTER: Stuttering or partial words
    - "b-b-but", "wh-what", "I-I-I"
    - Any partial word repetition
+${config.removeRepeatedPhrases ? `
+6. REPEATED_PHRASE: Multi-word phrases said twice in a row or very close together
+   - "so basically, so basically" → cut first "so basically"
+   - "I think I think" → cut first "I think"
+   - "you know what I mean you know what I mean" → cut first phrase
+   - "at the end of the day at the end of the day" → cut first phrase
+   - Look for 2-5 word phrases that repeat within a short time span
+   - Mark the FIRST occurrence for removal (keep the clearer second one)
+   - Do NOT flag intentional emphasis or rhetorical repetition` : ''}
 
 ${aggressivenessInstructions[config.aggressiveness]}
 
 CRITICAL RULES:
 1. Be THOROUGH - find every single mistake
 2. For repeated words, mark the FIRST occurrence for removal (keep the clearer second one)
-3. For self-corrections, mark the WRONG part (keep the correction)
-4. Each word has an index - use exact indices
-5. Do NOT flag "like" when used as "I like X" or "looks like X"
-6. Do NOT flag intentional emphasis or rhetorical repetition
+3. For repeated phrases, mark the FIRST phrase for removal (keep the clearer second one)
+4. For self-corrections, mark the WRONG part (keep the correction)
+5. Each word has an index - use exact indices
+6. Do NOT flag "like" when used as "I like X" or "looks like X"
+7. Do NOT flag intentional emphasis or rhetorical repetition
 
 OUTPUT FORMAT - Return JSON:
 {
@@ -543,6 +682,13 @@ OUTPUT FORMAT - Return JSON:
       "endIndex": 10,
       "text": "the",
       "reason": "First of repeated 'the the'"
+    },
+    {
+      "type": "REPEATED_PHRASE",
+      "startIndex": 15,
+      "endIndex": 17,
+      "text": "I think that",
+      "reason": "First of repeated phrase 'I think that I think that'"
     }
   ]
 }`;
