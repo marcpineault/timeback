@@ -288,8 +288,53 @@ function isFillerWord(word: string): boolean {
 }
 
 /**
+ * Common short phrases that are often repeated intentionally
+ * These should NOT be flagged as mistakes
+ */
+const COMMON_PHRASES_TO_SKIP = new Set([
+  'i think',
+  'you know',
+  'i mean',
+  'and then',
+  'but then',
+  'so then',
+  'and so',
+  'but i',
+  'and i',
+  'so i',
+  'i was',
+  'it was',
+  'that was',
+  'this is',
+  'that is',
+  'there is',
+  'here is',
+  'i have',
+  'you have',
+  'we have',
+  'i want',
+  'you want',
+  'we want',
+  'i need',
+  'you need',
+  'we need',
+  'to the',
+  'in the',
+  'on the',
+  'at the',
+  'for the',
+  'with the',
+  'from the',
+  'of the',
+  'is the',
+  'are the',
+  'was the',
+  'were the',
+]);
+
+/**
  * Detect repeated phrases in the transcript
- * Looks for consecutive identical phrases of 2-5 words
+ * CONSERVATIVE: Only catches truly back-to-back identical phrases
  * e.g., "so basically, so basically" or "I think I think"
  */
 function detectRepeatedPhrases(
@@ -299,7 +344,7 @@ function detectRepeatedPhrases(
 ): SpeechMistake[] {
   const mistakes: SpeechMistake[] = [];
 
-  console.log('[Speech Correction] Detecting repeated phrases...');
+  console.log('[Speech Correction] Detecting repeated phrases (conservative mode)...');
 
   // Try different phrase lengths, starting with longer phrases
   for (let phraseLen = maxPhraseLength; phraseLen >= minPhraseLength; phraseLen--) {
@@ -309,86 +354,50 @@ function detectRepeatedPhrases(
       const phrase1Words = words.slice(i, i + phraseLen);
       const phrase1Text = phrase1Words.map(w => normalizeWord(w.word)).join(' ');
 
-      // Skip if phrase contains only filler words or is too short
-      const nonFillerWords = phrase1Words.filter(w => !isFillerWord(w.word) && normalizeWord(w.word).length > 1);
-      if (nonFillerWords.length < 1) continue;
+      // Skip common phrases that are often repeated intentionally
+      if (COMMON_PHRASES_TO_SKIP.has(phrase1Text)) continue;
 
-      // Look for the same phrase immediately following (with small gap tolerance)
-      // Check positions i+phraseLen through i+phraseLen+2 to allow for small gaps
-      for (let offset = 0; offset <= 2 && (i + phraseLen + offset + phraseLen) <= words.length; offset++) {
-        const phrase2StartIdx = i + phraseLen + offset;
-        const phrase2Words = words.slice(phrase2StartIdx, phrase2StartIdx + phraseLen);
-        const phrase2Text = phrase2Words.map(w => normalizeWord(w.word)).join(' ');
+      // Skip if phrase is too short (less than 4 characters total)
+      if (phrase1Text.replace(/\s/g, '').length < 4) continue;
 
-        // Check if phrases match
-        if (phrase1Text === phrase2Text && phrase1Text.length > 2) {
-          // Check time gap between phrases - should be relatively close
-          const gapBetweenPhrases = phrase2Words[0].start - phrase1Words[phrase1Words.length - 1].end;
+      // Require at least 2 meaningful words (not just articles, pronouns, etc.)
+      const meaningfulWords = phrase1Words.filter(w => {
+        const norm = normalizeWord(w.word);
+        return norm.length > 2 && !['the', 'a', 'an', 'i', 'you', 'we', 'he', 'she', 'it', 'they', 'to', 'of', 'in', 'on', 'at', 'is', 'are', 'was', 'were', 'be', 'been', 'and', 'or', 'but', 'so', 'for', 'with', 'that', 'this'].includes(norm);
+      });
+      if (meaningfulWords.length < 1) continue;
 
-          // Only consider as duplicate if gap is less than 2 seconds
-          if (gapBetweenPhrases < 2.0) {
-            // Check if this region was already marked (avoid double-counting)
-            const alreadyMarked = mistakes.some(m =>
-              (m.startTime <= phrase1Words[0].start && m.endTime >= phrase1Words[phraseLen - 1].end) ||
-              (phrase1Words[0].start <= m.startTime && phrase1Words[phraseLen - 1].end >= m.startTime)
-            );
+      // Look for the EXACT same phrase immediately following (no offset - must be consecutive)
+      const phrase2StartIdx = i + phraseLen;
+      if (phrase2StartIdx + phraseLen > words.length) continue;
 
-            if (!alreadyMarked) {
-              const originalText = phrase1Words.map(w => w.word).join(' ');
-              mistakes.push({
-                type: 'repeated_phrase',
-                startTime: phrase1Words[0].start,
-                endTime: phrase1Words[phraseLen - 1].end,
-                text: originalText,
-                reason: `Repeated phrase "${originalText}" - removing first occurrence`,
-              });
+      const phrase2Words = words.slice(phrase2StartIdx, phrase2StartIdx + phraseLen);
+      const phrase2Text = phrase2Words.map(w => normalizeWord(w.word)).join(' ');
 
-              console.log(`  [Pre-detect] Repeated phrase: "${originalText}" at ${phrase1Words[0].start.toFixed(2)}s (followed by same phrase at ${phrase2Words[0].start.toFixed(2)}s)`);
-            }
-          }
-        }
-      }
-    }
-  }
+      // Check if phrases match exactly
+      if (phrase1Text === phrase2Text) {
+        // Check time gap between phrases - must be very close (under 0.5 seconds)
+        const gapBetweenPhrases = phrase2Words[0].start - phrase1Words[phrase1Words.length - 1].end;
 
-  // Also detect near-duplicate phrases (with minor variations)
-  // e.g., "I think that" ... "I think that" or "you know what I mean" ... "you know what I mean"
-  for (let phraseLen = maxPhraseLength; phraseLen >= minPhraseLength; phraseLen--) {
-    for (let i = 0; i <= words.length - phraseLen; i++) {
-      const phrase1Words = words.slice(i, i + phraseLen);
-      const phrase1Text = phrase1Words.map(w => normalizeWord(w.word)).join(' ');
+        // Only consider as duplicate if gap is very small (truly back-to-back)
+        if (gapBetweenPhrases >= 0 && gapBetweenPhrases < 0.5) {
+          // Check if this region was already marked (avoid double-counting)
+          const alreadyMarked = mistakes.some(m =>
+            (m.startTime <= phrase1Words[0].start && m.endTime >= phrase1Words[phraseLen - 1].end) ||
+            (phrase1Words[0].start <= m.startTime && phrase1Words[phraseLen - 1].end >= m.startTime)
+          );
 
-      // Skip very short or filler-only phrases
-      if (phrase1Text.length < 4) continue;
+          if (!alreadyMarked) {
+            const originalText = phrase1Words.map(w => w.word).join(' ');
+            mistakes.push({
+              type: 'repeated_phrase',
+              startTime: phrase1Words[0].start,
+              endTime: phrase1Words[phraseLen - 1].end,
+              text: originalText,
+              reason: `Repeated phrase "${originalText}" - removing first occurrence`,
+            });
 
-      // Look ahead for the same phrase (within 10 words)
-      const searchEnd = Math.min(i + phraseLen + 10, words.length - phraseLen);
-      for (let j = i + phraseLen; j <= searchEnd; j++) {
-        const phrase2Words = words.slice(j, j + phraseLen);
-        const phrase2Text = phrase2Words.map(w => normalizeWord(w.word)).join(' ');
-
-        if (phrase1Text === phrase2Text) {
-          // Check time gap
-          const gapBetweenPhrases = phrase2Words[0].start - phrase1Words[phraseLen - 1].end;
-
-          // For non-adjacent duplicates, use stricter time limit (1.5 seconds)
-          if (gapBetweenPhrases < 1.5 && gapBetweenPhrases > 0) {
-            const alreadyMarked = mistakes.some(m =>
-              Math.abs(m.startTime - phrase1Words[0].start) < 0.1
-            );
-
-            if (!alreadyMarked) {
-              const originalText = phrase1Words.map(w => w.word).join(' ');
-              mistakes.push({
-                type: 'repeated_phrase',
-                startTime: phrase1Words[0].start,
-                endTime: phrase1Words[phraseLen - 1].end,
-                text: originalText,
-                reason: `Repeated phrase "${originalText}" - removing first occurrence`,
-              });
-
-              console.log(`  [Pre-detect] Near-duplicate phrase: "${originalText}" at ${phrase1Words[0].start.toFixed(2)}s`);
-            }
+            console.log(`  [Pre-detect] Repeated phrase: "${originalText}" at ${phrase1Words[0].start.toFixed(2)}s (followed by same phrase at ${phrase2Words[0].start.toFixed(2)}s, gap: ${gapBetweenPhrases.toFixed(2)}s)`);
           }
         }
       }
@@ -646,14 +655,14 @@ ${config.removeSelfCorrections ? `
    - "b-b-but", "wh-what", "I-I-I"
    - Any partial word repetition
 ${config.removeRepeatedPhrases ? `
-6. REPEATED_PHRASE: Multi-word phrases said twice in a row or very close together
-   - "so basically, so basically" → cut first "so basically"
-   - "I think I think" → cut first "I think"
-   - "you know what I mean you know what I mean" → cut first phrase
-   - "at the end of the day at the end of the day" → cut first phrase
-   - Look for 2-5 word phrases that repeat within a short time span
-   - Mark the FIRST occurrence for removal (keep the clearer second one)
-   - Do NOT flag intentional emphasis or rhetorical repetition` : ''}
+6. REPEATED_PHRASE: ONLY flag phrases that are CLEARLY accidental back-to-back repetitions
+   - Must be IMMEDIATELY consecutive (no words between them)
+   - Example: "so basically so basically" → cut first "so basically"
+   - Example: "let me explain let me explain" → cut first phrase
+   - Do NOT flag common phrases like "I think", "you know", "and then"
+   - Do NOT flag if there's ANY pause or other words between the phrases
+   - Do NOT flag intentional emphasis or rhetorical repetition
+   - Be VERY conservative - when in doubt, do NOT flag it` : ''}
 
 ${aggressivenessInstructions[config.aggressiveness]}
 
@@ -799,8 +808,8 @@ export async function detectSpeechMistakes(
 export function calculateSegmentsToKeep(
   mistakes: SpeechMistake[],
   totalDuration: number,
-  padding: number = 0.02, // Smaller padding for tighter cuts around mistakes
-  timebackPadding: number = 0.15 // Extra padding on kept segments to make cuts less harsh
+  padding: number = 0.03, // Small padding for clean cuts around mistakes
+  timebackPadding: number = 0.25 // Extra padding on kept segments for smoother transitions
 ): Array<{ start: number; end: number }> {
   if (mistakes.length === 0) {
     return [{ start: 0, end: totalDuration }];
