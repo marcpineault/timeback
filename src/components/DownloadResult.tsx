@@ -35,6 +35,16 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
 
     try {
       const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setSaveError('Video file not found. It may have expired.');
+        } else if (response.status === 401 || response.status === 403) {
+          setSaveError('Access denied. Please refresh the page and try again.');
+        } else {
+          setSaveError(`Download failed (error ${response.status}). Please try again.`);
+        }
+        return;
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -46,7 +56,7 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
       URL.revokeObjectURL(url);
       setSaveSuccess(true);
     } catch (err) {
-      setSaveError('Download failed. Please try again.');
+      setSaveError('Download failed. Please check your connection and try again.');
     } finally {
       setSaving(false);
     }
@@ -61,6 +71,16 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
     try {
       // Fetch the video file
       const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        if (response.status === 404) {
+          setSaveError('Video file not found. It may have expired.');
+        } else if (response.status === 401 || response.status === 403) {
+          setSaveError('Access denied. Please refresh the page and try again.');
+        } else {
+          setSaveError(`Failed to load video (error ${response.status}). Please try again.`);
+        }
+        return;
+      }
       const blob = await response.blob();
       const file = new File([blob], filename, { type: 'video/mp4' });
 

@@ -112,9 +112,33 @@ export async function GET(
     const stream = createReadStream(filepath);
     const webStream = new ReadableStream({
       start(controller) {
-        stream.on('data', (chunk) => controller.enqueue(chunk));
-        stream.on('end', () => controller.close());
-        stream.on('error', (err) => controller.error(err));
+        stream.on('data', (chunk) => {
+          try {
+            controller.enqueue(chunk);
+          } catch {
+            // Controller closed (client disconnected), clean up the file stream
+            stream.destroy();
+          }
+        });
+        stream.on('end', () => {
+          try {
+            controller.close();
+          } catch {
+            // Controller already closed
+          }
+        });
+        stream.on('error', (err) => {
+          console.error('[Download] Stream error:', err.message);
+          try {
+            controller.error(err);
+          } catch {
+            // Controller already closed
+          }
+        });
+      },
+      cancel() {
+        // Client disconnected, clean up the file stream
+        stream.destroy();
       },
     });
 
@@ -127,8 +151,9 @@ export async function GET(
     });
   } catch (error) {
     console.error('Download error:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to download file' },
+      { error: 'Failed to download file', details: message },
       { status: 500 }
     );
   }
