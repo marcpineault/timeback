@@ -290,6 +290,10 @@ export default function VideoProcessor({
     for (const video of completedVideos) {
       try {
         const response = await fetch(video.downloadUrl!)
+        if (!response.ok) {
+          console.error('Save failed:', response.status, response.statusText)
+          continue
+        }
         const blob = await response.blob()
         const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
 
@@ -322,6 +326,10 @@ export default function VideoProcessor({
       }
       try {
         const response = await fetch(video.downloadUrl!)
+        if (!response.ok) {
+          console.error('Download failed:', response.status, response.statusText)
+          continue
+        }
         const blob = await response.blob()
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')

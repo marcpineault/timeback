@@ -44,6 +44,10 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
 
     try {
       const response = await fetch(video.downloadUrl);
+      if (!response.ok) {
+        console.error('Download failed:', response.status, response.statusText);
+        return;
+      }
       const blob = await response.blob();
       const file = new File([blob], video.outputFilename, { type: 'video/mp4' });
 
