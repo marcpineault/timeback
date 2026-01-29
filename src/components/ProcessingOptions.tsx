@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 
+interface EnabledFeatures {
+  speechCorrection: boolean;
+}
+
 interface ProcessingOptionsProps {
   onProcess: (options: ProcessingConfig) => void;
   isProcessing: boolean;
@@ -11,6 +15,7 @@ interface ProcessingOptionsProps {
     originalName: string;
   } | null;
   videoCount?: number;
+  enabledFeatures?: EnabledFeatures;
 }
 
 export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
@@ -127,6 +132,7 @@ export default function ProcessingOptions({
   isProcessing,
   uploadedFile,
   videoCount = 1,
+  enabledFeatures = { speechCorrection: false },
 }: ProcessingOptionsProps) {
   const [config, setConfig] = useState<ProcessingConfig>({
     generateCaptions: true,
@@ -257,10 +263,11 @@ export default function ProcessingOptions({
         </p>
       </div>
 
-      {/* Speech Correction Settings */}
+      {/* Speech Correction Settings - Beta Feature */}
+      {enabledFeatures.speechCorrection && (
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-white">Speech Correction</h3>
+          <h3 className="text-base sm:text-lg font-medium text-white">Speech Correction <span className="text-xs text-blue-400 ml-2">Beta</span></h3>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -405,6 +412,7 @@ export default function ProcessingOptions({
           </div>
         )}
       </div>
+      )}
 
       {/* Captions Settings */}
       <div className="space-y-3 sm:space-y-4">

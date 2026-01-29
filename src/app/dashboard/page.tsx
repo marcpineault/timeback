@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import { getOrCreateUser, getUserUsage } from '@/lib/user'
 import { PLANS } from '@/lib/plans'
+import { getEnabledFeatures } from '@/lib/featureFlags'
 import VideoProcessor from './VideoProcessor'
 // Google Drive disabled - will be enabled later
 // import DriveSettings from '@/components/DriveSettings'
@@ -126,6 +127,7 @@ export default async function DashboardPage() {
           canProcess={usage.videosRemaining === null || usage.videosRemaining > 0}
           videosRemaining={usage.videosRemaining ?? Infinity}
           hasWatermark={usage.planDetails.watermark}
+          enabledFeatures={getEnabledFeatures(user.email)}
         />
 
         {/* Recent Videos */}
