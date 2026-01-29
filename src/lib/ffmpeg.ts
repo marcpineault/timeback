@@ -764,11 +764,6 @@ export async function normalizeAudio(
 }
 
 /**
- * Color grading presets for video enhancement
- */
-export type ColorGradePreset = 'none' | 'warm' | 'cool' | 'cinematic' | 'vibrant' | 'vintage';
-
-/**
  * Aspect ratio presets for different platforms
  */
 export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
@@ -875,21 +870,12 @@ export async function convertAspectRatio(
   });
 }
 
-const colorGradeFilters: Record<ColorGradePreset, string> = {
-  none: '',
-  warm: 'colorbalance=rs=0.15:gs=0.05:bs=-0.1:rm=0.1:gm=0.05:bm=-0.05',
-  cool: 'colorbalance=rs=-0.1:gs=0:bs=0.15:rm=-0.05:gm=0.05:bm=0.1',
-  cinematic: 'colorbalance=rs=0.1:gs=-0.05:bs=-0.1,eq=contrast=1.1:brightness=-0.05:saturation=0.9',
-  vibrant: 'eq=saturation=1.4:contrast=1.1:brightness=0.02',
-  vintage: 'colorbalance=rs=0.2:gs=0.1:bs=-0.15,eq=saturation=0.85:contrast=1.05',
-};
-
 /**
  * Combined video processing options for single-pass encoding
  * This reduces multiple FFmpeg passes to a single pass when possible
  */
 export interface CombinedProcessingOptions {
-  colorGrade?: ColorGradePreset;
+  srtPath?: string;
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
   headlineStyle?: HeadlineStyle;
@@ -899,7 +885,7 @@ export interface CombinedProcessingOptions {
 /**
  * Apply multiple video filters in a single FFmpeg pass
  * This is more efficient than running separate passes for each filter
- * Combines color grading and headline into one re-encode
+ * Combines captions and headline into one re-encode
  */
 export async function applyCombinedFilters(
   inputPath: string,
@@ -908,12 +894,27 @@ export async function applyCombinedFilters(
 ): Promise<string> {
   const filters: string[] = [];
 
-  // Add color grading filter if specified
-  if (options.colorGrade && options.colorGrade !== 'none') {
-    const colorFilter = colorGradeFilters[options.colorGrade];
-    if (colorFilter) {
-      filters.push(colorFilter);
+  // Add caption/subtitle filter if SRT path provided
+  if (options.srtPath && fs.existsSync(options.srtPath)) {
+    const isAnimated = options.srtPath.endsWith('.ass');
+
+    // Copy subtitle to a temp file with simple name to avoid FFmpeg path escaping issues
+    const tempSubName = isAnimated ? 'temp_subs.ass' : 'temp_subs.srt';
+    const subDir = path.dirname(options.srtPath);
+    const tempSubPath = path.join(subDir, tempSubName);
+    fs.copyFileSync(options.srtPath, tempSubPath);
+
+    const escapedPath = tempSubPath.replace(/:/g, '\\:').replace(/'/g, "'\\''");
+
+    if (isAnimated) {
+      filters.push(`ass='${escapedPath}'`);
+    } else {
+      // Instagram style caption
+      const subtitleStyle = 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=85,MarginL=28,MarginR=53';
+      filters.push(`subtitles='${escapedPath}':force_style='${subtitleStyle}'`);
     }
+
+    logger.debug(`[Combined] Added caption filter for: ${options.srtPath}`);
   }
 
   // Add headline filter if specified (with selectable styling)
@@ -1021,131 +1022,6 @@ export async function applyCombinedFilters(
         logger.error(`[Combined] Error:`, err);
         logger.error(`[Combined] FFmpeg stderr: ${errorDetails}`);
         reject(new Error(`${err.message}\nFFmpeg details: ${errorDetails}`));
-      })
-      .run();
-  });
-}
-
-/**
- * Apply color grading preset to video
- */
-export async function applyColorGrade(
-  inputPath: string,
-  outputPath: string,
-  preset: ColorGradePreset
-): Promise<string> {
-  if (preset === 'none') {
-    logger.debug(`[Color] No color grading applied`);
-    fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
-  }
-
-  logger.debug(`[Color] Applying ${preset} color grade...`);
-  const filterString = colorGradeFilters[preset];
-
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .videoFilters(filterString)
-      .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '0',
-        '-c:a', 'copy',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        logger.debug(`[Color] Color grading complete!`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        logger.error(`[Color] Color grading error:`, err);
-        reject(err);
-      })
-      .run();
-  });
-}
-
-/**
- * Apply auto-zoom effect during speech segments
- * Creates a subtle "punch in" effect during speaking to increase engagement
- */
-export async function applyAutoZoom(
-  inputPath: string,
-  outputPath: string,
-  segments: { start: number; end: number }[],
-  zoomIntensity: number = 1.05
-): Promise<string> {
-  if (segments.length === 0) {
-    logger.debug(`[Zoom] No segments provided, skipping auto-zoom`);
-    fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
-  }
-
-  logger.debug(`[Zoom] Applying auto-zoom to ${segments.length} speech segments (intensity: ${zoomIntensity}x)...`);
-
-  // Get video info for dimensions
-  const videoInfo = await new Promise<{ width: number; height: number; duration: number }>((resolve, reject) => {
-    ffmpeg.ffprobe(inputPath, (err, metadata) => {
-      if (err) return reject(err);
-      const video = metadata.streams.find(s => s.codec_type === 'video');
-      resolve({
-        width: video?.width || 1080,
-        height: video?.height || 1920,
-        duration: metadata.format.duration || 0,
-      });
-    });
-  });
-
-  // Build zoom expression that activates during speech segments
-  // Use simpler approach: scale + crop with conditional zoom based on time
-  // Limit to first 20 segments to avoid overly complex expressions
-  const limitedSegments = segments.slice(0, 20);
-
-  const zoomConditions = limitedSegments
-    .map(seg => `between(t\\,${seg.start.toFixed(2)}\\,${seg.end.toFixed(2)})`)
-    .join('+');
-
-  // Calculate zoom factor (e.g., 1.05 = 5% zoom)
-  const zoomFactor = zoomIntensity;
-  const scaledWidth = Math.round(videoInfo.width * zoomFactor);
-  const scaledHeight = Math.round(videoInfo.height * zoomFactor);
-
-  // Use scale and crop for zoom effect - simpler and more reliable than zoompan
-  // When speaking: scale up and crop to center
-  // When not speaking: use original
-  const filterComplex = [
-    `[0:v]split=2[orig][zoom]`,
-    `[zoom]scale=${scaledWidth}:${scaledHeight},crop=${videoInfo.width}:${videoInfo.height}[zoomed]`,
-    `[orig][zoomed]overlay=x='if(${zoomConditions},0,W)':y=0:shortest=1[out]`
-  ].join(';');
-
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .complexFilter(filterComplex, 'out')
-      .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '23',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-movflags', '+faststart',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        logger.debug(`[Zoom] Auto-zoom complete!`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        logger.error(`[Zoom] Auto-zoom error:`, err);
-        // Graceful fallback: just copy the file if zoom fails
-        logger.debug(`[Zoom] Falling back to original video without zoom`);
-        try {
-          fs.copyFileSync(inputPath, outputPath);
-          resolve(outputPath);
-        } catch (copyErr) {
-          reject(err);
-        }
       })
       .run();
   });

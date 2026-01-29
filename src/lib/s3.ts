@@ -1,6 +1,9 @@
 import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomBytes } from 'crypto';
+import { createReadStream } from 'fs';
+import { Readable } from 'stream';
 import { logger } from './logger';
 
 // S3-compatible client singleton (works with AWS S3, Cloudflare R2, Backblaze B2, etc.)
@@ -113,8 +116,9 @@ export async function createUploadUrl(
 
 /**
  * Get a readable stream for an S3 object
+ * Returns a Node.js Readable stream compatible with archiver and other Node.js stream consumers
  */
-export async function getS3ObjectStream(key: string): Promise<NodeJS.ReadableStream> {
+export async function getS3ObjectStream(key: string): Promise<Readable> {
   const client = getS3Client();
   const bucket = getS3Bucket();
 
@@ -129,7 +133,31 @@ export async function getS3ObjectStream(key: string): Promise<NodeJS.ReadableStr
     throw new Error('No body in S3 response');
   }
 
-  return response.Body as NodeJS.ReadableStream;
+  // AWS SDK v3 returns a web ReadableStream, convert to Node.js Readable
+  // The Body can be ReadableStream | Readable | Blob depending on environment
+  const body = response.Body;
+
+  // If it's already a Node.js Readable, return it
+  if (body instanceof Readable) {
+    return body;
+  }
+
+  // If it's a web ReadableStream, convert it to Node.js Readable
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyBody = body as any;
+  if (typeof anyBody.getReader === 'function') {
+    // It's a web ReadableStream
+    return Readable.fromWeb(anyBody as import('stream/web').ReadableStream);
+  }
+
+  // Fallback: wrap in a Readable using SDK's transformToByteArray
+  if (typeof anyBody.transformToByteArray === 'function') {
+    const bytes = await anyBody.transformToByteArray();
+    return Readable.from(Buffer.from(bytes));
+  }
+
+  // Last resort: try to iterate
+  return Readable.from(anyBody);
 }
 
 /**
@@ -145,4 +173,67 @@ export async function deleteS3Object(key: string): Promise<void> {
   });
 
   await client.send(command);
+}
+
+/**
+ * Upload a processed video to S3/R2
+ * Uses multipart upload for large files with streaming
+ * @returns The S3 key for the uploaded file
+ */
+export async function uploadProcessedVideo(
+  localPath: string,
+  filename: string
+): Promise<string> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  // Generate a unique key in the processed/ prefix
+  const timestamp = Date.now();
+  const randomId = randomBytes(8).toString('hex');
+  const sanitized = sanitizeFilename(filename);
+  const key = `processed/${timestamp}-${randomId}-${sanitized}`;
+
+  logger.info('Uploading processed video to R2', { key, localPath });
+
+  // Use multipart upload for large files (streaming)
+  const upload = new Upload({
+    client,
+    params: {
+      Bucket: bucket,
+      Key: key,
+      Body: createReadStream(localPath),
+      ContentType: 'video/mp4',
+    },
+    // Upload in 5MB chunks
+    partSize: 5 * 1024 * 1024,
+    // Allow up to 4 concurrent uploads
+    queueSize: 4,
+  });
+
+  await upload.done();
+
+  logger.info('Processed video uploaded to R2', { key });
+
+  return key;
+}
+
+/**
+ * Get a presigned URL for downloading a processed video from S3/R2
+ * The URL expires after 1 hour
+ */
+export async function getProcessedVideoUrl(key: string): Promise<string> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+
+  // URL expires in 1 hour
+  const url = await getSignedUrl(client, command, { expiresIn: 3600 });
+
+  logger.debug('Generated presigned URL for processed video', { key });
+
+  return url;
 }
