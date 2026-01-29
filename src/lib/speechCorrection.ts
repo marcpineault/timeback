@@ -653,7 +653,8 @@ export async function detectSpeechMistakes(
 export function calculateSegmentsToKeep(
   mistakes: SpeechMistake[],
   totalDuration: number,
-  padding: number = 0.02 // Smaller padding for tighter cuts
+  padding: number = 0.02, // Smaller padding for tighter cuts around mistakes
+  timebackPadding: number = 0.15 // Extra padding on kept segments to make cuts less harsh
 ): Array<{ start: number; end: number }> {
   if (mistakes.length === 0) {
     return [{ start: 0, end: totalDuration }];
@@ -704,16 +705,38 @@ export function calculateSegmentsToKeep(
   // Filter out very short segments (less than 50ms)
   const filteredSegments = segmentsToKeep.filter(seg => (seg.end - seg.start) >= 0.05);
 
-  console.log(`[Speech Correction] Keeping ${filteredSegments.length} segments:`);
-  filteredSegments.forEach((seg, i) => {
+  // Apply timeback padding to expand segments (makes cuts less harsh)
+  const paddedSegments = filteredSegments.map(seg => ({
+    start: Math.max(0, seg.start - timebackPadding),
+    end: Math.min(totalDuration, seg.end + timebackPadding),
+  }));
+
+  // Merge any segments that now overlap after padding expansion
+  const finalSegments: Array<{ start: number; end: number }> = [];
+  for (const seg of paddedSegments) {
+    if (finalSegments.length === 0) {
+      finalSegments.push({ ...seg });
+    } else {
+      const last = finalSegments[finalSegments.length - 1];
+      if (seg.start <= last.end) {
+        // Segments overlap, merge them
+        last.end = Math.max(last.end, seg.end);
+      } else {
+        finalSegments.push({ ...seg });
+      }
+    }
+  }
+
+  console.log(`[Speech Correction] Keeping ${finalSegments.length} segments (with ${timebackPadding}s timeback padding):`);
+  finalSegments.forEach((seg, i) => {
     console.log(`  Segment ${i + 1}: ${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s (${(seg.end - seg.start).toFixed(2)}s)`);
   });
 
-  const totalKept = filteredSegments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+  const totalKept = finalSegments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
   const totalCut = totalDuration - totalKept;
   console.log(`[Speech Correction] Total duration: ${totalDuration.toFixed(2)}s, Keeping: ${totalKept.toFixed(2)}s, Cutting: ${totalCut.toFixed(2)}s`);
 
-  return filteredSegments;
+  return finalSegments;
 }
 
 /**
