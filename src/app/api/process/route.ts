@@ -3,14 +3,14 @@ import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
+import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
 import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
 import { correctSpeechMistakes, SpeechCorrectionConfig, DEFAULT_SPEECH_CORRECTION_CONFIG } from '@/lib/speechCorrection';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { canProcessVideo, incrementVideoCount } from '@/lib/user';
 import { cleanupOldFiles } from '@/lib/cleanup';
-import { isS3Configured, getS3ObjectStream, deleteS3Object } from '@/lib/s3';
+import { isS3Configured, getS3ObjectStream, deleteS3Object, uploadProcessedVideo } from '@/lib/s3';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
 
@@ -36,9 +36,6 @@ export async function POST(request: NextRequest) {
       generateBRoll,
       bRollConfig,
       normalizeAudio: shouldNormalizeAudio,
-      colorGrade,
-      autoZoom,
-      autoZoomIntensity,
       aspectRatio,
       speechCorrection,
       speechCorrectionConfig,
@@ -344,22 +341,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 3.2: Apply color grading if selected
-    // Use combined filter if both colorGrade and headline are enabled (saves one FFmpeg pass)
     // Priority: AI headline > Hook from video > Manual headline
     const finalHeadline = shouldGenerateAIHeadline ? aiHeadlineText : (useHookAsHeadline ? hookText : options.headline);
-    const canUseCombinedFilters = (colorGrade && colorGrade !== 'none') && finalHeadline && !autoZoom;
-
-    if (colorGrade && colorGrade !== 'none' && !canUseCombinedFilters) {
-      logger.info('Step 3.2: Applying color grade', { colorGrade });
-      stepOutput = path.join(processedDir, `${baseName}_graded.mp4`);
-      await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
-      // Clean up intermediate file
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
-      }
-      currentInput = stepOutput;
-    }
 
     // Step 3.5: AI B-Roll - TEMPORARILY DISABLED
     // TODO: Re-enable once animation generation is stable
@@ -397,52 +380,9 @@ export async function POST(request: NextRequest) {
     }
     */
 
-    // Step 3.8: Apply auto-zoom on speech if enabled
-    if (autoZoom && transcriptionSegments.length > 0) {
-      logger.info('Step 3.8: Applying auto-zoom on speech');
-      const zoomIntensity = 1 + (autoZoomIntensity || 5) / 100; // Convert percentage to multiplier (e.g., 5% -> 1.05)
-      stepOutput = path.join(processedDir, `${baseName}_zoomed.mp4`);
-      await applyAutoZoom(currentInput, stepOutput, transcriptionSegments, zoomIntensity);
-      // Clean up intermediate file
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
-      }
-      currentInput = stepOutput;
-    }
-
     // Step 4: Add headline if provided or using hook
-    // If combined filters are used, apply color grade + headline in one pass
     // Wrapped in try-catch so headline failures don't crash the entire pipeline
-    if (canUseCombinedFilters) {
-      logger.info('Step 4: Applying combined filters (color grade + headline)');
-      stepOutput = path.join(processedDir, `${baseName}_combined.mp4`);
-      try {
-        await applyCombinedFilters(currentInput, stepOutput, {
-          colorGrade: colorGrade as ColorGradePreset,
-          headline: finalHeadline,
-          headlinePosition: options.headlinePosition,
-          headlineStyle: options.headlineStyle,
-          captionStyle,
-        });
-        // Clean up intermediate file
-        if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
-        }
-        currentInput = stepOutput;
-      } catch (headlineErr) {
-        logger.error('Step 4: Combined filters failed, falling back to color grade only', { error: String(headlineErr) });
-        // Fall back to just color grade without headline
-        try {
-          await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
-          if (currentInput !== inputPath) {
-            await fs.unlink(currentInput).catch(() => {})
-          }
-          currentInput = stepOutput;
-        } catch (fallbackErr) {
-          logger.error('Step 4: Color grade fallback also failed, continuing without filters', { error: String(fallbackErr) });
-        }
-      }
-    } else if (finalHeadline) {
+    if (finalHeadline) {
       logger.info('Step 4: Adding headline', { headline: finalHeadline });
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
       try {
@@ -487,12 +427,31 @@ export async function POST(request: NextRequest) {
 
     const outputFilename = path.basename(finalOutput);
 
+    // Upload processed video to R2 if S3 is configured
+    let processedUrl: string;
+    if (isS3Configured()) {
+      logger.info('Uploading processed video to R2');
+      const processedS3Key = await uploadProcessedVideo(finalOutput, outputFilename);
+      processedUrl = processedS3Key; // Store S3 key in database
+
+      // Delete local processed file after upload
+      try {
+        await fs.unlink(finalOutput);
+        logger.debug('Cleaned up local processed file after R2 upload');
+      } catch (cleanupErr) {
+        logger.warn('Failed to clean up local processed file', { error: String(cleanupErr) });
+      }
+    } else {
+      // Fallback to local storage if S3 not configured
+      processedUrl = `/api/download/${outputFilename}`;
+    }
+
     // Track usage and update video record if user is authenticated
     if (dbUserId) {
       await incrementVideoCount(dbUserId);
 
-      // Update video record to COMPLETED with the processed URL
-      await updateVideoStatus('COMPLETED', { processedUrl: `/api/download/${outputFilename}` });
+      // Update video record to COMPLETED with the processed URL (S3 key or local path)
+      await updateVideoStatus('COMPLETED', { processedUrl });
     }
 
     // Clean up the original uploaded file
@@ -505,21 +464,22 @@ export async function POST(request: NextRequest) {
       logger.warn('Failed to clean up local file', { error: String(cleanupErr) });
     }
 
-    // Clean up S3 file if it was downloaded from there
+    // Clean up S3 source file if it was downloaded from there
     if (s3Key && downloadedFromS3 && isS3Configured()) {
       try {
         await deleteS3Object(s3Key);
-        logger.debug('Cleaned up S3 file');
+        logger.debug('Cleaned up S3 source file');
       } catch (s3CleanupErr) {
         logger.warn('Failed to clean up S3 file', { error: String(s3CleanupErr) });
       }
     }
 
-    logger.info('Processing complete', { outputFilename });
+    logger.info('Processing complete', { outputFilename, processedUrl });
     return NextResponse.json({
       success: true,
       outputFilename,
       downloadUrl: `/api/download/${outputFilename}`,
+      processedUrl, // Include S3 key or local path for client
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

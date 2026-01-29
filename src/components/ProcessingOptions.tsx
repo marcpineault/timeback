@@ -38,9 +38,6 @@ export interface ProcessingConfig {
   generateBRoll: boolean;
   bRollConfig: BRollConfig;
   normalizeAudio: boolean;
-  colorGrade: 'none' | 'warm' | 'cool' | 'cinematic' | 'vibrant' | 'vintage';
-  autoZoom: boolean;
-  autoZoomIntensity: number;
   aspectRatio: AspectRatioPreset;
   // Speech correction options
   speechCorrection: boolean;
@@ -147,9 +144,6 @@ export default function ProcessingOptions({
       maxMoments: 3,
     },
     normalizeAudio: true,
-    colorGrade: 'none',
-    autoZoom: false,
-    autoZoomIntensity: 5,
     aspectRatio: 'original',
     speechCorrection: false,
     speechCorrectionConfig: {

@@ -4,8 +4,9 @@ import fs from 'fs';
 import { createReadStream } from 'fs';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
+import { isS3Configured, getProcessedVideoUrl } from '@/lib/s3';
 
-// Cleanup registry: Map of filepath -> scheduled deletion timestamp
+// Cleanup registry for local files: Map of filepath -> scheduled deletion timestamp
 // Uses a single interval instead of unbounded setTimeouts to prevent memory leaks
 const cleanupRegistry = new Map<string, number>();
 let cleanupIntervalStarted = false;
@@ -69,22 +70,51 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Use exact match on processedUrl for O(1) indexed lookup instead of O(n) scan
-    const expectedUrl = `/api/download/${sanitizedFilename}`;
-    const video = await prisma.video.findFirst({
+    // Find video by looking for either:
+    // 1. Local path format: /api/download/{filename}
+    // 2. S3 key format: processed/{timestamp}-{id}-{filename}
+    const expectedLocalUrl = `/api/download/${sanitizedFilename}`;
+
+    // First try exact match on local URL format
+    let video = await prisma.video.findFirst({
       where: {
         userId: user.id,
-        processedUrl: expectedUrl,
+        processedUrl: expectedLocalUrl,
       },
     });
 
+    // If not found, try finding by S3 key that ends with the filename
     if (!video) {
+      video = await prisma.video.findFirst({
+        where: {
+          userId: user.id,
+          processedUrl: {
+            endsWith: sanitizedFilename,
+          },
+        },
+      });
+    }
+
+    if (!video || !video.processedUrl) {
       return NextResponse.json(
         { error: 'Video not found or access denied' },
         { status: 403 }
       );
     }
 
+    // Check if the processedUrl is an S3 key (starts with "processed/")
+    const isS3Key = video.processedUrl.startsWith('processed/');
+
+    if (isS3Key && isS3Configured()) {
+      // Serve from R2 via presigned URL redirect
+      console.log(`[Download] Serving from R2: ${video.processedUrl}`);
+      const presignedUrl = await getProcessedVideoUrl(video.processedUrl);
+
+      // Redirect to the presigned URL for fast CDN download
+      return NextResponse.redirect(presignedUrl);
+    }
+
+    // Fallback: Serve from local filesystem
     const processedDir = process.env.PROCESSED_DIR || path.join(process.cwd(), 'processed');
     const filepath = path.join(processedDir, sanitizedFilename);
 
