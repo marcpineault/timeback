@@ -90,11 +90,12 @@ export async function getVideoDuration(inputPath: string): Promise<number> {
 export function getNonSilentSegments(
   silences: SilenceInterval[],
   totalDuration: number,
-  options: { padding?: number; minSegmentDuration?: number; mergeGap?: number } = {}
+  options: { padding?: number; minSegmentDuration?: number; mergeGap?: number; timebackPadding?: number } = {}
 ): SilenceInterval[] {
   const padding = options.padding ?? 0.05; // 50ms padding around speech
   const minSegmentDuration = options.minSegmentDuration ?? 0.15; // Ignore segments shorter than 150ms
   const mergeGap = options.mergeGap ?? 0.1; // Merge segments less than 100ms apart
+  const timebackPadding = options.timebackPadding ?? 0.15; // 150ms extra padding to make cuts less harsh
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
@@ -143,7 +144,32 @@ export function getNonSilentSegments(
     segments = mergedSegments;
   }
 
-  logger.debug(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s)`);
+  // Apply timeback padding to expand segments (makes cuts less harsh)
+  if (timebackPadding > 0) {
+    const expandedSegments = segments.map(seg => ({
+      start: Math.max(0, seg.start - timebackPadding),
+      end: Math.min(totalDuration, seg.end + timebackPadding),
+    }));
+
+    // Re-merge any segments that now overlap after expansion
+    const finalSegments: SilenceInterval[] = [];
+    for (const seg of expandedSegments) {
+      if (finalSegments.length === 0) {
+        finalSegments.push({ ...seg });
+      } else {
+        const last = finalSegments[finalSegments.length - 1];
+        if (seg.start <= last.end) {
+          // Segments overlap, merge them
+          last.end = Math.max(last.end, seg.end);
+        } else {
+          finalSegments.push({ ...seg });
+        }
+      }
+    }
+    segments = finalSegments;
+  }
+
+  logger.debug(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s, timebackPadding=${timebackPadding}s)`);
 
   return segments;
 }
