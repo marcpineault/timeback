@@ -55,6 +55,33 @@ export interface PresignedUploadUrl {
 }
 
 /**
+ * Sanitize a filename to prevent path traversal and other attacks
+ */
+function sanitizeFilename(filename: string): string {
+  // Extract just the filename without any path components
+  const basename = filename.split(/[/\\]/).pop() || 'file';
+  // Remove any remaining path traversal attempts and dangerous characters
+  return basename
+    .replace(/\.\./g, '')  // Remove path traversal
+    .replace(/[<>:"|?*\x00-\x1f]/g, '')  // Remove invalid filename chars
+    .trim();
+}
+
+/**
+ * Validate and extract file extension
+ */
+function getValidExtension(filename: string): string {
+  const sanitized = sanitizeFilename(filename);
+  const parts = sanitized.split('.');
+  if (parts.length < 2) return 'mp4';
+
+  const ext = parts.pop()?.toLowerCase() || 'mp4';
+  // Only allow known safe video/audio extensions
+  const allowedExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'mp3', 'wav', 'm4a', 'aac'];
+  return allowedExtensions.includes(ext) ? ext : 'mp4';
+}
+
+/**
  * Generate a presigned PUT URL for direct browser-to-R2/S3 uploads
  * This completely bypasses server size limits
  * Using PUT instead of POST for better R2 compatibility
@@ -67,9 +94,10 @@ export async function createUploadUrl(
   const bucket = getS3Bucket();
 
   // Generate a unique key for the file using cryptographic randomness
+  // Sanitize filename to prevent path traversal attacks
   const timestamp = Date.now();
   const randomId = randomBytes(16).toString('hex');
-  const ext = filename.split('.').pop() || 'mp4';
+  const ext = getValidExtension(filename);
   const key = `uploads/${timestamp}-${randomId}.${ext}`;
 
   const command = new PutObjectCommand({

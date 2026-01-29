@@ -89,9 +89,21 @@ async function detectFillerSoundsFromAudio(
     // Use FFmpeg's silencedetect to find speech segments
     // Use lower noise threshold (-40dB) to detect quieter fillers
     // Use shorter minimum silence duration (0.08s) to catch brief pauses around fillers
-    const { stdout } = await execAsync(
-      `ffmpeg -i "${audioPath}" -af "silencedetect=noise=-40dB:d=0.08" -f null - 2>&1`
-    );
+    // Use spawn with array args to prevent command injection (audioPath could contain malicious characters)
+    const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
+      const { spawn } = require('child_process');
+      const ffmpegArgs = ['-i', audioPath, '-af', 'silencedetect=noise=-40dB:d=0.08', '-f', 'null', '-'];
+      const proc = spawn('ffmpeg', ffmpegArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
+      let stdout = '';
+      let stderr = '';
+      proc.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
+      proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+      proc.on('close', (code: number) => {
+        // FFmpeg outputs silencedetect info to stderr, so combine them
+        resolve({ stdout: stdout + stderr });
+      });
+      proc.on('error', reject);
+    });
 
     // Parse silence detection output
     const silenceStarts: number[] = [];

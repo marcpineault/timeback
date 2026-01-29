@@ -101,18 +101,26 @@ export function getNonSilentSegments(
 
   for (const silence of silences) {
     if (silence.start > lastEnd) {
-      // Add padding: start slightly earlier, end slightly later
-      const paddedStart = Math.max(0, lastEnd - padding);
-      const paddedEnd = Math.min(totalDuration, silence.start + padding);
-      segments.push({ start: paddedStart, end: paddedEnd });
+      // Add padding WITHIN the speech segment to ensure clean cuts
+      // paddedStart: start slightly after silence ends (skip any residual silence)
+      // paddedEnd: end slightly before silence starts (avoid capturing silence)
+      const paddedStart = Math.max(0, lastEnd + padding);
+      const paddedEnd = Math.min(totalDuration, silence.start - padding);
+      // Only add segment if it's still valid after padding
+      if (paddedEnd > paddedStart) {
+        segments.push({ start: paddedStart, end: paddedEnd });
+      }
     }
     lastEnd = silence.end;
   }
 
   // Add final segment if there's content after last silence
   if (lastEnd < totalDuration) {
-    const paddedStart = Math.max(0, lastEnd - padding);
-    segments.push({ start: paddedStart, end: totalDuration });
+    const paddedStart = Math.max(0, lastEnd + padding);
+    // Only add if there's meaningful content after padding
+    if (paddedStart < totalDuration) {
+      segments.push({ start: paddedStart, end: totalDuration });
+    }
   }
 
   // Filter out segments that are too short
