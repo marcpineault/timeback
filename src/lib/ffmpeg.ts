@@ -150,11 +150,13 @@ export function getNonSilentSegments(
 
 /**
  * Remove silent parts from video by concatenating non-silent segments
+ * Optionally normalizes audio in the same pass for efficiency
  */
 export async function removeSilence(
   inputPath: string,
   outputPath: string,
-  options: ProcessingOptions = {}
+  options: ProcessingOptions = {},
+  normalizeAudioLevel: boolean = false
 ): Promise<string> {
   const threshold = options.silenceThreshold ?? -20;
   const minDuration = options.silenceDuration ?? 0.5;
@@ -195,10 +197,22 @@ export async function removeSilence(
     concatInputs.push(`[v${index}][a${index}]`);
   });
 
-  const filterComplex = [
-    ...filterParts,
-    `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`,
-  ].join(';');
+  // Build filter complex - optionally include audio normalization
+  let filterComplex: string;
+  if (normalizeAudioLevel) {
+    // Concatenate then normalize audio in one pass
+    filterComplex = [
+      ...filterParts,
+      `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa_raw]`,
+      `[outa_raw]loudnorm=I=-14:TP=-1:LRA=11[outa]`,
+    ].join(';');
+    logger.debug(`[Silence Removal] Including audio normalization in same pass`);
+  } else {
+    filterComplex = [
+      ...filterParts,
+      `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`,
+    ].join(';');
+  }
 
   logger.debug(`[Silence Removal] Processing ${segments.length} segments...`);
 
@@ -894,12 +908,18 @@ export interface CombinedProcessingOptions {
   headlinePosition?: 'top' | 'center' | 'bottom';
   headlineStyle?: HeadlineStyle;
   captionStyle?: string;
+  // Captions support
+  srtPath?: string;
+  // Aspect ratio support
+  aspectRatio?: AspectRatioPreset;
+  inputWidth?: number;
+  inputHeight?: number;
 }
 
 /**
  * Apply multiple video filters in a single FFmpeg pass
  * This is more efficient than running separate passes for each filter
- * Combines color grading and headline into one re-encode
+ * Combines color grading, headline, captions, and aspect ratio into one re-encode
  */
 export async function applyCombinedFilters(
   inputPath: string,
@@ -907,6 +927,29 @@ export async function applyCombinedFilters(
   options: CombinedProcessingOptions
 ): Promise<string> {
   const filters: string[] = [];
+  const needsAspectRatio = options.aspectRatio && options.aspectRatio !== 'original';
+  let tempSubPath: string | null = null;
+
+  // Add captions filter first if specified (needs to be applied before other filters)
+  if (options.srtPath && fs.existsSync(options.srtPath)) {
+    const isAnimated = options.captionStyle === 'animated' || options.srtPath.endsWith('.ass');
+
+    // Copy subtitle to a temp file with simple name to avoid FFmpeg path escaping issues
+    const tempSubName = isAnimated ? 'temp_subs_combined.ass' : 'temp_subs_combined.srt';
+    const subDir = path.dirname(options.srtPath);
+    tempSubPath = path.join(subDir, tempSubName);
+    fs.copyFileSync(options.srtPath, tempSubPath);
+
+    const escapedPath = tempSubPath.replace(/:/g, '\\:').replace(/'/g, "'\\''");
+
+    if (isAnimated) {
+      filters.push(`ass='${escapedPath}'`);
+    } else {
+      const subtitleStyle = 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=85,MarginL=28,MarginR=53';
+      filters.push(`subtitles='${escapedPath}':force_style='${subtitleStyle}'`);
+    }
+    logger.debug('[Combined] Including captions in combined pass');
+  }
 
   // Add color grading filter if specified
   if (options.colorGrade && options.colorGrade !== 'none') {
@@ -948,16 +991,13 @@ export async function applyCombinedFilters(
     const baseY = baseYPositions[position];
     const fontSize = 54;
     const lineHeight = 70;
-    const boxPadding = 15;  // Padding around text in the auto-sized box
+    const boxPadding = 15;
 
     if (style === 'speech-bubble') {
-      // Speech bubble style: white background box (auto-sized), black bold text
       const textColor = 'black';
       const boxColor = 'white@0.98';
 
-      // Line 1 text with auto-sized background box
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
-      // Bold overlay (no box)
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
 
       if (hasSecondLine) {
@@ -966,10 +1006,8 @@ export async function applyCombinedFilters(
         filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
       }
     } else {
-      // Classic style: semi-transparent dark background box (auto-sized), white bold text
       const boxColor = 'black@0.7';
 
-      // Line 1 text with auto-sized background box and shadow
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
       filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
 
@@ -981,13 +1019,81 @@ export async function applyCombinedFilters(
     }
   }
 
-  // If no filters to apply, just copy the file
-  if (filters.length === 0) {
+  // If no filters and no aspect ratio change, just copy the file
+  if (filters.length === 0 && !needsAspectRatio) {
     logger.debug('[Combined] No filters to apply, copying file');
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
 
+  // Handle aspect ratio conversion - requires complex filter approach
+  if (needsAspectRatio && options.inputWidth && options.inputHeight) {
+    const currentRatio = options.inputWidth / options.inputHeight;
+    const targetRatioValue = ASPECT_RATIOS[options.aspectRatio!].ratio;
+
+    let targetWidth: number;
+    let targetHeight: number;
+
+    if (targetRatioValue > currentRatio) {
+      targetHeight = options.inputHeight;
+      targetWidth = Math.round(targetHeight * targetRatioValue);
+    } else {
+      targetWidth = options.inputWidth;
+      targetHeight = Math.round(targetWidth / targetRatioValue);
+    }
+
+    // Ensure dimensions are even
+    targetWidth = targetWidth + (targetWidth % 2);
+    targetHeight = targetHeight + (targetHeight % 2);
+
+    logger.debug(`[Combined] Including aspect ratio conversion: ${options.inputWidth}x${options.inputHeight} -> ${targetWidth}x${targetHeight}`);
+
+    // Use filter_complex for aspect ratio with blur background
+    const baseFilter = filters.length > 0 ? filters.join(',') + ',' : '';
+    const filterComplex = [
+      `[0:v]${baseFilter}split=2[main][blur]`,
+      `[blur]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=increase,crop=${targetWidth}:${targetHeight},boxblur=20:5[bg]`,
+      `[main]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease[fg]`,
+      `[bg][fg]overlay=(W-w)/2:(H-h)/2[out]`
+    ].join(';');
+
+    return new Promise((resolve, reject) => {
+      let stderrOutput = '';
+
+      ffmpeg(inputPath)
+        .complexFilter(filterComplex, 'out')
+        .outputOptions([
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '0',
+          '-max_muxing_queue_size', '512',
+          '-c:a', 'copy',
+        ])
+        .output(outputPath)
+        .on('stderr', (line: string) => {
+          stderrOutput += line + '\n';
+          if (line.includes('Error') || line.includes('error') || line.includes('Invalid')) {
+            logger.debug(`[Combined FFmpeg] ${line}`);
+          }
+        })
+        .on('end', () => {
+          logger.debug(`[Combined] Processing complete with aspect ratio!`);
+          if (tempSubPath) try { fs.unlinkSync(tempSubPath); } catch {}
+          resolve(outputPath);
+        })
+        .on('error', (err: Error) => {
+          const errorDetails = stderrOutput.slice(-1000);
+          logger.error(`[Combined] Error:`, err);
+          logger.error(`[Combined] FFmpeg stderr: ${errorDetails}`);
+          if (tempSubPath) try { fs.unlinkSync(tempSubPath); } catch {}
+          reject(new Error(`${err.message}\nFFmpeg details: ${errorDetails}`));
+        })
+        .run();
+    });
+  }
+
+  // Simple filter chain (no aspect ratio change)
   const filterString = filters.join(',');
   logger.debug(`[Combined] Applying ${filters.length} filters in single pass`);
 
@@ -1014,12 +1120,14 @@ export async function applyCombinedFilters(
       })
       .on('end', () => {
         logger.debug(`[Combined] Processing complete!`);
+        if (tempSubPath) try { fs.unlinkSync(tempSubPath); } catch {}
         resolve(outputPath);
       })
       .on('error', (err: Error) => {
         const errorDetails = stderrOutput.slice(-1000);
         logger.error(`[Combined] Error:`, err);
         logger.error(`[Combined] FFmpeg stderr: ${errorDetails}`);
+        if (tempSubPath) try { fs.unlinkSync(tempSubPath); } catch {}
         reject(new Error(`${err.message}\nFFmpeg details: ${errorDetails}`));
       })
       .run();

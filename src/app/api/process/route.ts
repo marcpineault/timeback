@@ -3,8 +3,9 @@ import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, applyColorGrade, applyAutoZoom, ColorGradePreset, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
-import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
+import ffmpeg from 'fluent-ffmpeg';
+import { removeSilence, ProcessingOptions, applyColorGrade, applyAutoZoom, ColorGradePreset, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
+import { transcribeVideo, extractHook, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
 import { correctSpeechMistakes, SpeechCorrectionConfig, DEFAULT_SPEECH_CORRECTION_CONFIG } from '@/lib/speechCorrection';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
@@ -13,6 +14,20 @@ import { cleanupOldFiles } from '@/lib/cleanup';
 import { isS3Configured, getS3ObjectStream, deleteS3Object } from '@/lib/s3';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
+
+// Helper to get video dimensions
+async function getVideoDimensions(inputPath: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return reject(err);
+      const video = metadata.streams.find(s => s.codec_type === 'video');
+      resolve({
+        width: video?.width || 1080,
+        height: video?.height || 1920,
+      });
+    });
+  });
+}
 
 export async function POST(request: NextRequest) {
   // Run cleanup of old files in background (non-blocking)
@@ -185,27 +200,15 @@ export async function POST(request: NextRequest) {
       }).then(t => ({ text: t.text, segments: t.segments }));
     }
 
-    // Step 1: Remove silence (runs in parallel with early transcription if applicable)
-    logger.info('Step 1: Removing silence');
+    // Step 1: Remove silence (with optional audio normalization in same pass for efficiency)
+    logger.info('Step 1: Removing silence' + (shouldNormalizeAudio ? ' + normalizing audio' : ''));
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
-    await removeSilence(currentInput, stepOutput, options);
+    await removeSilence(currentInput, stepOutput, options, shouldNormalizeAudio);
     // Clean up intermediate file
     if (currentInput !== inputPath) {
       await fs.unlink(currentInput).catch(() => {})
     }
     currentInput = stepOutput;
-
-    // Step 1.5: Normalize audio levels if enabled
-    if (shouldNormalizeAudio) {
-      logger.info('Step 1.5: Normalizing audio levels');
-      stepOutput = path.join(processedDir, `${baseName}_normalized.mp4`);
-      await normalizeAudio(currentInput, stepOutput);
-      // Clean up intermediate file
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
-      }
-      currentInput = stepOutput;
-    }
 
     // Get early transcription result if we started one
     let earlyTranscription: { text: string; segments: { start: number; end: number; text: string }[] } | null = null;
@@ -326,80 +329,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Step 3: Burn captions if enabled
-      if (generateCaptions && srtPath) {
-        logger.info('Step 3: Burning captions');
-        stepOutput = path.join(processedDir, `${baseName}_captioned.mp4`);
-        await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
-        // Clean up intermediate file
-        if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
-        }
-        currentInput = stepOutput;
-      }
-
-      // Clean up SRT file
-      if (srtPath && existsSync(srtPath)) {
-        await fs.unlink(srtPath).catch(() => {});
-      }
+      // Note: Don't clean up srtPath yet - we'll use it in combined filters
     }
 
-    // Step 3.2: Apply color grading if selected
-    // Use combined filter if both colorGrade and headline are enabled (saves one FFmpeg pass)
-    // Priority: AI headline > Hook from video > Manual headline
-    const finalHeadline = shouldGenerateAIHeadline ? aiHeadlineText : (useHookAsHeadline ? hookText : options.headline);
-    const canUseCombinedFilters = (colorGrade && colorGrade !== 'none') && finalHeadline && !autoZoom;
-
-    if (colorGrade && colorGrade !== 'none' && !canUseCombinedFilters) {
-      logger.info('Step 3.2: Applying color grade', { colorGrade });
-      stepOutput = path.join(processedDir, `${baseName}_graded.mp4`);
-      await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
-      // Clean up intermediate file
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
-      }
-      currentInput = stepOutput;
-    }
-
-    // Step 3.5: AI B-Roll - TEMPORARILY DISABLED
-    // TODO: Re-enable once animation generation is stable
-    // The B-roll feature is disabled while we improve the animation quality
-    /*
-    const bRollStyle = bRollConfig?.style || 'dynamic';
-    const bRollMaxMoments = bRollConfig?.maxMoments || 3;
-
-    logger.debug('B-Roll check', { enabled: generateBRoll, segmentCount: transcriptionSegments.length, style: bRollStyle, maxMoments: bRollMaxMoments });
-    if (generateBRoll && transcriptionSegments.length > 0) {
-      logger.info('Step 3.5: Generating AI B-Roll animations');
-
-      // Identify key moments for B-roll using configured style and count
-      const moments = await identifyBRollMoments(transcriptionSegments, bRollMaxMoments, bRollStyle);
-      logger.info('Identified B-roll moments', { count: moments.length, style: bRollStyle });
-
-      if (moments.length > 0) {
-        // Create cutaways from identified moments - pass context for animation generation
-        const cutaways: BRollCutaway[] = moments.map(moment => ({
-          timestamp: moment.timestamp,
-          duration: moment.duration,
-          context: moment.context, // Pass context for contextual animation
-        }));
-
-        // Insert animated cutaways into video with configured style
-        stepOutput = path.join(processedDir, `${baseName}_broll.mp4`);
-        await insertBRollCutaways(currentInput, stepOutput, cutaways, processedDir, bRollStyle);
-
-        // Clean up intermediate file
-        if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
-        }
-        currentInput = stepOutput;
-      }
-    }
-    */
-
-    // Step 3.8: Apply auto-zoom on speech if enabled
+    // Step 3: Apply auto-zoom on speech if enabled (must be done before combined filters)
     if (autoZoom && transcriptionSegments.length > 0) {
-      logger.info('Step 3.8: Applying auto-zoom on speech');
+      logger.info('Step 3: Applying auto-zoom on speech');
       const zoomIntensity = 1 + (autoZoomIntensity || 5) / 100; // Convert percentage to multiplier (e.g., 5% -> 1.05)
       stepOutput = path.join(processedDir, `${baseName}_zoomed.mp4`);
       await applyAutoZoom(currentInput, stepOutput, transcriptionSegments, zoomIntensity);
@@ -410,63 +345,72 @@ export async function POST(request: NextRequest) {
       currentInput = stepOutput;
     }
 
-    // Step 4: Add headline if provided or using hook
-    // If combined filters are used, apply color grade + headline in one pass
-    // Wrapped in try-catch so headline failures don't crash the entire pipeline
-    if (canUseCombinedFilters) {
-      logger.info('Step 4: Applying combined filters (color grade + headline)');
+    // Step 4: Apply all visual filters in a SINGLE PASS for efficiency
+    // This combines: captions, color grading, headline, and aspect ratio
+    // Priority: AI headline > Hook from video > Manual headline
+    const finalHeadline = shouldGenerateAIHeadline ? aiHeadlineText : (useHookAsHeadline ? hookText : options.headline);
+    const hasVisualFilters = (generateCaptions && srtPath) ||
+                             (colorGrade && colorGrade !== 'none') ||
+                             finalHeadline ||
+                             (aspectRatio && aspectRatio !== 'original');
+
+    if (hasVisualFilters) {
+      // Get video dimensions for aspect ratio conversion
+      let videoDimensions = { width: 1080, height: 1920 };
+      if (aspectRatio && aspectRatio !== 'original') {
+        try {
+          videoDimensions = await getVideoDimensions(currentInput);
+        } catch (dimErr) {
+          logger.warn('Could not get video dimensions, using defaults', { error: String(dimErr) });
+        }
+      }
+
+      const filterOptions = [];
+      if (generateCaptions && srtPath) filterOptions.push('captions');
+      if (colorGrade && colorGrade !== 'none') filterOptions.push('color grade');
+      if (finalHeadline) filterOptions.push('headline');
+      if (aspectRatio && aspectRatio !== 'original') filterOptions.push('aspect ratio');
+
+      logger.info(`Step 4: Applying combined filters in single pass (${filterOptions.join(', ')})`);
       stepOutput = path.join(processedDir, `${baseName}_combined.mp4`);
+
       try {
         await applyCombinedFilters(currentInput, stepOutput, {
+          srtPath: generateCaptions ? srtPath : undefined,
           colorGrade: colorGrade as ColorGradePreset,
           headline: finalHeadline,
           headlinePosition: options.headlinePosition,
           headlineStyle: options.headlineStyle,
-          captionStyle,
+          captionStyle: options.captionStyle,
+          aspectRatio: aspectRatio as AspectRatioPreset,
+          inputWidth: videoDimensions.width,
+          inputHeight: videoDimensions.height,
         });
         // Clean up intermediate file
         if (currentInput !== inputPath) {
           await fs.unlink(currentInput).catch(() => {})
         }
         currentInput = stepOutput;
-      } catch (headlineErr) {
-        logger.error('Step 4: Combined filters failed, falling back to color grade only', { error: String(headlineErr) });
-        // Fall back to just color grade without headline
-        try {
-          await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
-          if (currentInput !== inputPath) {
-            await fs.unlink(currentInput).catch(() => {})
+      } catch (filterErr) {
+        logger.error('Step 4: Combined filters failed, falling back to individual steps', { error: String(filterErr) });
+        // Fall back to color grade only if available
+        if (colorGrade && colorGrade !== 'none') {
+          try {
+            await applyColorGrade(currentInput, stepOutput, colorGrade as ColorGradePreset);
+            if (currentInput !== inputPath) {
+              await fs.unlink(currentInput).catch(() => {})
+            }
+            currentInput = stepOutput;
+          } catch (fallbackErr) {
+            logger.error('Step 4: Color grade fallback also failed, continuing without filters', { error: String(fallbackErr) });
           }
-          currentInput = stepOutput;
-        } catch (fallbackErr) {
-          logger.error('Step 4: Color grade fallback also failed, continuing without filters', { error: String(fallbackErr) });
         }
-      }
-    } else if (finalHeadline) {
-      logger.info('Step 4: Adding headline', { headline: finalHeadline });
-      stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
-      try {
-        await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle, options.headlineStyle);
-        // Clean up intermediate file
-        if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
-        }
-        currentInput = stepOutput;
-      } catch (headlineErr) {
-        logger.error('Step 4: Headline failed, continuing without headline', { error: String(headlineErr) });
       }
     }
 
-    // Step 5: Convert aspect ratio if specified
-    if (aspectRatio && aspectRatio !== 'original') {
-      logger.info('Step 5: Converting aspect ratio', { aspectRatio });
-      stepOutput = path.join(processedDir, `${baseName}_aspect.mp4`);
-      await convertAspectRatio(currentInput, stepOutput, aspectRatio as AspectRatioPreset);
-      // Clean up intermediate file
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
-      }
-      currentInput = stepOutput;
+    // Clean up SRT file
+    if (srtPath && existsSync(srtPath)) {
+      await fs.unlink(srtPath).catch(() => {});
     }
 
     // Rename to final output - use headline as filename if available
