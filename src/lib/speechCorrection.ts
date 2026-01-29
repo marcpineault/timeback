@@ -5,6 +5,7 @@ import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { TranscriptionWord } from './whisper';
+import { logger } from './logger';
 
 const execAsync = promisify(exec);
 
@@ -68,7 +69,7 @@ async function detectFillerSoundsFromAudio(
   videoPath: string,
   outputDir: string
 ): Promise<Array<{ start: number; end: number; duration: number }>> {
-  console.log('[Speech Correction] Analyzing audio for filler sounds...');
+  logger.info('Analyzing audio for filler sounds');
 
   const audioPath = path.join(outputDir, `temp_audio_analysis_${Date.now()}.wav`);
 
@@ -122,7 +123,7 @@ async function detectFillerSoundsFromAudio(
       }
     }
 
-    console.log(`[Speech Correction] Found ${silenceStarts.length} silence starts, ${silenceEnds.length} silence ends`);
+    logger.debug('Silence detection complete', { silenceStarts: silenceStarts.length, silenceEnds: silenceEnds.length });
 
     // Find short speech segments between silences
     // These could be filler sounds
@@ -175,9 +176,9 @@ async function detectFillerSoundsFromAudio(
       index === self.findIndex(f => Math.abs(f.start - filler.start) < 0.05)
     );
 
-    console.log(`[Speech Correction] Found ${uniqueFillers.length} potential filler sounds from audio analysis`);
+    logger.debug('Audio analysis found potential fillers', { count: uniqueFillers.length });
     uniqueFillers.slice(0, 20).forEach((f, i) => {
-      console.log(`  Audio filler ${i + 1}: ${f.start.toFixed(2)}s - ${f.end.toFixed(2)}s (${f.duration.toFixed(2)}s)`);
+      logger.debug(`Audio filler ${i + 1}`, { start: f.start.toFixed(2), end: f.end.toFixed(2), duration: f.duration.toFixed(2) });
     });
 
     // Clean up
@@ -187,7 +188,7 @@ async function detectFillerSoundsFromAudio(
 
     return uniqueFillers;
   } catch (error) {
-    console.error('[Speech Correction] Audio analysis failed:', error);
+    logger.error('Audio analysis failed', error instanceof Error ? error : { error: String(error) });
     // Clean up on error
     if (fs.existsSync(audioPath)) {
       fs.unlinkSync(audioPath);
@@ -295,7 +296,7 @@ function preDetectMistakes(
 ): SpeechMistake[] {
   const mistakes: SpeechMistake[] = [];
 
-  console.log('[Speech Correction] Running programmatic pre-detection...');
+  logger.debug('Running programmatic pre-detection');
 
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
@@ -341,7 +342,7 @@ function preDetectMistakes(
         reason: 'Filler word detected',
       });
 
-      console.log(`  [Pre-detect] Filler word: "${word.word}" at ${word.start.toFixed(2)}s`);
+      logger.debug('Pre-detected filler word', { word: word.word, start: word.start.toFixed(2) });
     }
 
     // 2. Detect repeated consecutive words
@@ -364,7 +365,7 @@ function preDetectMistakes(
             reason: 'Repeated word - removing first occurrence',
           });
 
-          console.log(`  [Pre-detect] Repeated word: "${words[i - 1].word}" at ${words[i - 1].start.toFixed(2)}s`);
+          logger.debug('Pre-detected repeated word', { word: words[i - 1].word, start: words[i - 1].start.toFixed(2) });
         }
       }
     }
@@ -385,7 +386,7 @@ function preDetectMistakes(
             reason: `Stutter before "${word.word}"`,
           });
 
-          console.log(`  [Pre-detect] Stutter: "${words[i - 1].word}" before "${word.word}" at ${words[i - 1].start.toFixed(2)}s`);
+          logger.debug('Pre-detected stutter', { word: words[i - 1].word, before: word.word, start: words[i - 1].start.toFixed(2) });
         }
       }
     }
@@ -439,7 +440,7 @@ function preDetectMistakes(
               reason: `Filler phrase: "${phrase}"`,
             });
 
-            console.log(`  [Pre-detect] Filler phrase: "${phraseText}" at ${words[startWordIndex].start.toFixed(2)}s`);
+            logger.debug('Pre-detected filler phrase', { phrase: phraseText, start: words[startWordIndex].start.toFixed(2) });
           }
         }
 
@@ -448,7 +449,7 @@ function preDetectMistakes(
     }
   }
 
-  console.log(`[Speech Correction] Pre-detection found ${mistakes.length} mistakes`);
+  logger.debug('Pre-detection complete', { mistakesFound: mistakes.length });
   return mistakes;
 }
 
@@ -461,7 +462,7 @@ export async function detectSpeechMistakesWithGPT(
   config: SpeechCorrectionConfig = DEFAULT_SPEECH_CORRECTION_CONFIG
 ): Promise<SpeechMistake[]> {
   if (!words || words.length === 0) {
-    console.log('[Speech Correction] No words provided for analysis');
+    logger.debug('No words provided for analysis');
     return [];
   }
 
@@ -478,7 +479,7 @@ export async function detectSpeechMistakesWithGPT(
   // Create transcript text for context
   const transcriptText = words.map(w => w.word).join(' ');
 
-  console.log(`[Speech Correction] Analyzing ${words.length} words with GPT...`);
+  logger.info('Analyzing words with GPT', { wordCount: words.length });
 
   const aggressivenessInstructions = {
     conservative: 'Be conservative - only flag clear, obvious mistakes that definitely disrupt the flow.',
@@ -569,7 +570,7 @@ Return a JSON object with all mistakes found. Check every single word!`;
     });
 
     const content = response.choices[0].message.content || '{"mistakes": []}';
-    console.log(`[Speech Correction] GPT response: ${content.substring(0, 1000)}...`);
+    logger.debug('GPT response received', { responsePreview: content.substring(0, 500) });
 
     const parsed = JSON.parse(content);
     const rawMistakes = parsed.mistakes || [];
@@ -591,10 +592,10 @@ Return a JSON object with all mistakes found. Check every single word!`;
         reason: m.reason || 'Detected by AI',
       }));
 
-    console.log(`[Speech Correction] GPT detected ${mistakes.length} additional mistakes`);
+    logger.debug('GPT detection complete', { mistakesFound: mistakes.length });
     return mistakes;
   } catch (error) {
-    console.error('[Speech Correction] Error in GPT detection:', error);
+    logger.error('Error in GPT detection', error instanceof Error ? error : { error: String(error) });
     return [];
   }
 }
@@ -610,8 +611,8 @@ export async function detectSpeechMistakes(
     return [];
   }
 
-  console.log(`[Speech Correction] Starting combined detection for ${words.length} words...`);
-  console.log(`[Speech Correction] Transcript: "${words.map(w => w.word).join(' ')}"`);
+  logger.info('Starting combined detection', { wordCount: words.length });
+  logger.debug('Transcript for detection', { transcript: words.map(w => w.word).join(' ') });
 
   // Step 1: Programmatic pre-detection (fast, reliable for obvious patterns)
   const programmaticMistakes = preDetectMistakes(words, config);
@@ -638,9 +639,9 @@ export async function detectSpeechMistakes(
   // Sort by start time
   allMistakes.sort((a, b) => a.startTime - b.startTime);
 
-  console.log(`[Speech Correction] Total combined mistakes: ${allMistakes.length}`);
+  logger.info('Combined detection complete', { totalMistakes: allMistakes.length });
   allMistakes.forEach((m, i) => {
-    console.log(`  ${i + 1}. [${m.type}] "${m.text}" (${m.startTime.toFixed(2)}s - ${m.endTime.toFixed(2)}s): ${m.reason}`);
+    logger.debug(`Mistake ${i + 1}`, { type: m.type, text: m.text, start: m.startTime.toFixed(2), end: m.endTime.toFixed(2), reason: m.reason });
   });
 
   return allMistakes;
@@ -683,7 +684,7 @@ export function calculateSegmentsToKeep(
     }
   }
 
-  console.log(`[Speech Correction] Merged ${mistakes.length} mistakes into ${mergedCuts.length} cuts`);
+  logger.debug('Merged mistakes into cuts', { mistakes: mistakes.length, cuts: mergedCuts.length });
 
   // Calculate segments to keep (inverse of cuts)
   const segmentsToKeep: Array<{ start: number; end: number }> = [];
@@ -704,14 +705,14 @@ export function calculateSegmentsToKeep(
   // Filter out very short segments (less than 50ms)
   const filteredSegments = segmentsToKeep.filter(seg => (seg.end - seg.start) >= 0.05);
 
-  console.log(`[Speech Correction] Keeping ${filteredSegments.length} segments:`);
+  logger.debug('Segments to keep', { count: filteredSegments.length });
   filteredSegments.forEach((seg, i) => {
-    console.log(`  Segment ${i + 1}: ${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s (${(seg.end - seg.start).toFixed(2)}s)`);
+    logger.debug(`Segment ${i + 1}`, { start: seg.start.toFixed(2), end: seg.end.toFixed(2), duration: (seg.end - seg.start).toFixed(2) });
   });
 
   const totalKept = filteredSegments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
   const totalCut = totalDuration - totalKept;
-  console.log(`[Speech Correction] Total duration: ${totalDuration.toFixed(2)}s, Keeping: ${totalKept.toFixed(2)}s, Cutting: ${totalCut.toFixed(2)}s`);
+  logger.debug('Duration summary', { total: totalDuration.toFixed(2), keeping: totalKept.toFixed(2), cutting: totalCut.toFixed(2) });
 
   return filteredSegments;
 }
@@ -733,7 +734,7 @@ export async function applySpeechCorrections(
     });
   });
 
-  console.log(`[Speech Correction] Applying corrections to video (duration: ${duration.toFixed(2)}s)`);
+  logger.info('Applying corrections to video', { duration: duration.toFixed(2) });
 
   // Calculate segments to keep
   const segments = calculateSegmentsToKeep(mistakes, duration);
@@ -744,7 +745,7 @@ export async function applySpeechCorrections(
 
   // If no corrections needed, just copy the file
   if (segments.length === 1 && segments[0].start === 0 && Math.abs(segments[0].end - duration) < 0.1) {
-    console.log('[Speech Correction] No corrections needed, copying file');
+    logger.info('No corrections needed, copying file');
     fs.copyFileSync(inputPath, outputPath);
     return { outputPath, segmentsRemoved: 0, timeRemoved: 0 };
   }
@@ -768,7 +769,7 @@ export async function applySpeechCorrections(
     `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`,
   ].join(';');
 
-  console.log(`[Speech Correction] Processing ${segments.length} segments...`);
+  logger.debug('Processing segments', { count: segments.length });
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
@@ -789,7 +790,7 @@ export async function applySpeechCorrections(
       .on('end', () => {
         const totalKept = segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
         const timeRemoved = duration - totalKept;
-        console.log(`[Speech Correction] Complete! Removed ${timeRemoved.toFixed(2)}s of mistakes`);
+        logger.info('Speech correction complete', { timeRemoved: timeRemoved.toFixed(2) });
         resolve({
           outputPath,
           segmentsRemoved: mistakes.length,
@@ -797,7 +798,7 @@ export async function applySpeechCorrections(
         });
       })
       .on('error', (err) => {
-        console.error(`[Speech Correction] Error:`, err);
+        logger.error('Speech correction FFmpeg error', err instanceof Error ? err : { error: String(err) });
         reject(err);
       })
       .run();
@@ -834,7 +835,7 @@ function correlateAudioFillersWithTranscript(
           text: fillerWord.word,
           reason: 'Audio-confirmed filler word',
         });
-        console.log(`  [Audio+Transcript] Confirmed filler: "${fillerWord.word}" at ${fillerWord.start.toFixed(2)}s`);
+        logger.debug('Audio+Transcript confirmed filler', { word: fillerWord.word, start: fillerWord.start.toFixed(2) });
       } else {
         // No filler word in transcript, but audio detected something
         // This might be a filler that Whisper cleaned up
@@ -850,7 +851,7 @@ function correlateAudioFillersWithTranscript(
             text: text || '[hesitation]',
             reason: 'Audio-detected hesitation sound',
           });
-          console.log(`  [Audio] Detected hesitation at ${filler.start.toFixed(2)}s (transcript: "${text}")`);
+          logger.debug('Audio detected hesitation', { start: filler.start.toFixed(2), transcript: text });
         }
       }
     } else {
@@ -864,7 +865,7 @@ function correlateAudioFillersWithTranscript(
           text: '[filler sound]',
           reason: 'Audio-detected filler (not in transcript)',
         });
-        console.log(`  [Audio Only] Detected filler at ${filler.start.toFixed(2)}s (${filler.duration.toFixed(2)}s)`);
+        logger.debug('Audio-only filler detected', { start: filler.start.toFixed(2), duration: filler.duration.toFixed(2) });
       }
     }
   }
@@ -886,8 +887,8 @@ export async function correctSpeechMistakes(
   segmentsRemoved: number;
   timeRemoved: number;
 }> {
-  console.log('[Speech Correction] Starting full speech correction pipeline...');
-  console.log(`[Speech Correction] Config: ${JSON.stringify(config)}`);
+  logger.info('Starting full speech correction pipeline');
+  logger.debug('Speech correction config', { config });
 
   // Get output directory for temp files
   const outputDir = path.dirname(outputPath);
@@ -895,18 +896,18 @@ export async function correctSpeechMistakes(
   // Step 1: Run audio-level filler detection (independent of transcript)
   let audioFillerMistakes: SpeechMistake[] = [];
   if (config.removeFillerWords) {
-    console.log('[Speech Correction] Step 1: Audio-level filler detection...');
+    logger.info('Step 1: Audio-level filler detection');
     const audioFillers = await detectFillerSoundsFromAudio(inputPath, outputDir);
     audioFillerMistakes = correlateAudioFillersWithTranscript(audioFillers, words);
-    console.log(`[Speech Correction] Audio detection found ${audioFillerMistakes.length} potential fillers`);
+    logger.debug('Audio detection complete', { potentialFillers: audioFillerMistakes.length });
   }
 
   // Step 2: Detect mistakes from transcript (programmatic + GPT)
-  console.log('[Speech Correction] Step 2: Transcript-based detection...');
+  logger.info('Step 2: Transcript-based detection');
   const transcriptMistakes = await detectSpeechMistakes(words, config);
 
   // Step 3: Merge audio-detected and transcript-detected mistakes
-  console.log('[Speech Correction] Step 3: Merging detections...');
+  logger.info('Step 3: Merging detections');
   const allMistakes = [...transcriptMistakes];
 
   for (const audioMistake of audioFillerMistakes) {
@@ -918,23 +919,23 @@ export async function correctSpeechMistakes(
 
     if (!overlaps) {
       allMistakes.push(audioMistake);
-      console.log(`  Added audio-only detection: "${audioMistake.text}" at ${audioMistake.startTime.toFixed(2)}s`);
+      logger.debug('Added audio-only detection', { text: audioMistake.text, start: audioMistake.startTime.toFixed(2) });
     }
   }
 
   // Sort by start time
   allMistakes.sort((a, b) => a.startTime - b.startTime);
 
-  console.log(`[Speech Correction] Total combined mistakes: ${allMistakes.length}`);
+  logger.info('Total combined mistakes', { count: allMistakes.length });
 
   if (allMistakes.length === 0) {
-    console.log('[Speech Correction] No mistakes detected, copying file');
+    logger.info('No mistakes detected, copying file');
     fs.copyFileSync(inputPath, outputPath);
     return { outputPath, mistakes: [], segmentsRemoved: 0, timeRemoved: 0 };
   }
 
   // Step 4: Apply corrections
-  console.log('[Speech Correction] Step 4: Applying corrections...');
+  logger.info('Step 4: Applying corrections');
   const result = await applySpeechCorrections(inputPath, outputPath, allMistakes);
 
   return {
