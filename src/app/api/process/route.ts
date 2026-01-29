@@ -293,6 +293,7 @@ export async function POST(request: NextRequest) {
         const correctionConfig: SpeechCorrectionConfig = speechCorrectionConfig ? {
           removeFillerWords: speechCorrectionConfig.removeFillerWords ?? true,
           removeRepeatedWords: speechCorrectionConfig.removeRepeatedWords ?? true,
+          removeRepeatedPhrases: speechCorrectionConfig.removeRepeatedPhrases ?? true,
           removeFalseStarts: speechCorrectionConfig.removeFalseStarts ?? true,
           removeSelfCorrections: speechCorrectionConfig.removeSelfCorrections ?? true,
           aggressiveness: speechCorrectionConfig.aggressiveness || 'moderate',
