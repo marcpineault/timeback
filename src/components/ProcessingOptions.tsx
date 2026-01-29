@@ -211,7 +211,7 @@ export default function ProcessingOptions({
               onChange={(e) => setConfig({ ...config, silenceThreshold: Number(e.target.value) })}
               className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
               min="-50"
-              max="-20"
+              max="-15"
               step="1"
             />
             <div className="flex justify-between text-xs text-gray-500 mt-1">
