@@ -92,7 +92,9 @@ export function getNonSilentSegments(
   totalDuration: number,
   options: { padding?: number; minSegmentDuration?: number; mergeGap?: number } = {}
 ): SilenceInterval[] {
-  const padding = options.padding ?? 0.05; // 50ms padding around speech
+  // Extension padding: extend speech segments into silence to avoid cutting off words
+  // 150ms before speech starts and 150ms after speech ends
+  const extensionPadding = options.padding ?? 0.15;
   const minSegmentDuration = options.minSegmentDuration ?? 0.15; // Ignore segments shorter than 150ms
   const mergeGap = options.mergeGap ?? 0.1; // Merge segments less than 100ms apart
 
@@ -101,11 +103,11 @@ export function getNonSilentSegments(
 
   for (const silence of silences) {
     if (silence.start > lastEnd) {
-      // Add padding WITHIN the speech segment to ensure clean cuts
-      // paddedStart: start slightly after silence ends (skip any residual silence)
-      // paddedEnd: end slightly before silence starts (avoid capturing silence)
-      const paddedStart = Math.max(0, lastEnd + padding);
-      const paddedEnd = Math.min(totalDuration, silence.start - padding);
+      // Extend speech segments into silence for smoother cuts:
+      // - Start slightly BEFORE silence ends (capture trailing audio)
+      // - End slightly AFTER silence starts (capture leading audio)
+      const paddedStart = Math.max(0, lastEnd - extensionPadding);
+      const paddedEnd = Math.min(totalDuration, silence.start + extensionPadding);
       // Only add segment if it's still valid after padding
       if (paddedEnd > paddedStart) {
         segments.push({ start: paddedStart, end: paddedEnd });
@@ -116,7 +118,7 @@ export function getNonSilentSegments(
 
   // Add final segment if there's content after last silence
   if (lastEnd < totalDuration) {
-    const paddedStart = Math.max(0, lastEnd + padding);
+    const paddedStart = Math.max(0, lastEnd - extensionPadding);
     // Only add if there's meaningful content after padding
     if (paddedStart < totalDuration) {
       segments.push({ start: paddedStart, end: totalDuration });
@@ -126,16 +128,16 @@ export function getNonSilentSegments(
   // Filter out segments that are too short
   segments = segments.filter(seg => (seg.end - seg.start) >= minSegmentDuration);
 
-  // Merge segments that are very close together
+  // Merge segments that are very close together (or overlapping due to extension)
   if (segments.length > 1) {
     const mergedSegments: SilenceInterval[] = [segments[0]];
     for (let i = 1; i < segments.length; i++) {
       const prev = mergedSegments[mergedSegments.length - 1];
       const curr = segments[i];
 
-      // If gap between segments is small, merge them
-      if (curr.start - prev.end <= mergeGap) {
-        prev.end = curr.end;
+      // If segments overlap or gap is small, merge them
+      if (curr.start <= prev.end + mergeGap) {
+        prev.end = Math.max(prev.end, curr.end);
       } else {
         mergedSegments.push(curr);
       }
@@ -143,7 +145,7 @@ export function getNonSilentSegments(
     segments = mergedSegments;
   }
 
-  logger.debug(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s)`);
+  logger.debug(`[Segments] After filtering: ${segments.length} segments (extensionPadding=${extensionPadding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s)`);
 
   return segments;
 }
