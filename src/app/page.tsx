@@ -14,7 +14,10 @@ export default async function LandingPage() {
       {/* Header - Minimal, clean */}
       <header className="border-b border-gray-800/50">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <span className="text-xl font-bold text-white">TimeBack</span>
+          <span className="flex items-center gap-2">
+            <img src="/logo.svg" alt="TimeBack" className="w-8 h-8" />
+            <span className="text-xl font-bold text-white">TimeBack</span>
+          </span>
           <div className="flex items-center gap-2 sm:gap-4">
             <Link href="/pricing" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">
               Pricing
@@ -379,8 +382,9 @@ export default async function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="TimeBack" className="w-6 h-6" />
               <span className="text-white font-semibold">TimeBack</span>
-              <span className="text-gray-500 text-sm">- Video editing made simple</span>
+              <span className="text-gray-500 text-sm hidden sm:inline">- Video editing made simple</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-500">
               <Link href="/pricing" className="hover:text-gray-300 transition-colors">Pricing</Link>
