@@ -595,8 +595,8 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         className={`
           border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all cursor-pointer
           ${isDragging
-            ? 'border-blue-500 bg-blue-500/10'
-            : 'border-gray-600 hover:border-gray-500 bg-gray-800/50'
+            ? 'border-violet-500 bg-violet-500/10'
+            : 'border-gray-600 hover:border-gray-500 bg-[#1A1A24]/50'
           }
           ${isUploading || disabled || isPreparing ? 'pointer-events-none opacity-75' : ''}
         `}
@@ -614,14 +614,14 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           <div className="flex flex-col items-center gap-3 sm:gap-4">
             {isPreparing ? (
               <>
-                <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
                 <p className="text-lg sm:text-xl text-gray-300">Preparing videos...</p>
                 <p className="text-gray-500 text-sm sm:text-base">This may take a moment on mobile</p>
               </>
             ) : (
               <>
                 <svg
-                  className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-blue-500' : 'text-gray-500'}`}
+                  className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-violet-500' : 'text-gray-500'}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -647,7 +647,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
       {/* Upload Progress List */}
       {uploadingFiles.length > 0 && (
-        <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+        <div className="bg-[#1A1A24] rounded-xl p-4 space-y-3">
           <div className="flex justify-between items-center text-sm text-gray-400">
             <span>Uploading files</span>
             <span>{completedCount} / {totalCount} complete</span>
@@ -669,7 +669,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
                     </svg>
                   )}
                   {(item.status === 'uploading' || item.status === 'pending') && (
-                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
                   )}
                 </div>
 
@@ -686,7 +686,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
                   <div className="flex items-center gap-2">
                     <div className="w-20 bg-gray-600 rounded-full h-1.5">
                       <div
-                        className="bg-blue-500 h-1.5 rounded-full transition-all"
+                        className="bg-violet-500 h-1.5 rounded-full transition-all"
                         style={{ width: `${item.progress}%` }}
                       />
                     </div>

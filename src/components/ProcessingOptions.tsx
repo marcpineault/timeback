@@ -180,7 +180,7 @@ export default function ProcessingOptions({
   if (!uploadedFile) return null;
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl p-4 sm:p-6 space-y-5 sm:space-y-6">
+    <form onSubmit={handleSubmit} className="bg-[#1A1A24] rounded-xl p-4 sm:p-6 space-y-5 sm:space-y-6">
       <div className="flex items-center gap-3 pb-3 sm:pb-4 border-b border-gray-700">
         <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -254,7 +254,7 @@ export default function ProcessingOptions({
             type="checkbox"
             checked={config.normalizeAudio}
             onChange={(e) => setConfig({ ...config, normalizeAudio: e.target.checked })}
-            className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+            className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
           />
           <span className="text-gray-400">Normalize audio levels</span>
         </label>
@@ -267,13 +267,13 @@ export default function ProcessingOptions({
       {enabledFeatures.speechCorrection && (
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-white">Speech Correction <span className="text-xs text-blue-400 ml-2">Beta</span></h3>
+          <h3 className="text-base sm:text-lg font-medium text-white">Speech Correction <span className="text-xs text-cyan-400 ml-2">Beta</span></h3>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={config.speechCorrection}
               onChange={(e) => setConfig({ ...config, speechCorrection: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
             />
             <span className="text-gray-400">Enable</span>
           </label>
@@ -295,7 +295,7 @@ export default function ProcessingOptions({
                     removeFillerWords: e.target.checked
                   }
                 })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
               />
               <div>
                 <span className="text-gray-300 text-sm">Remove filler words</span>
@@ -314,7 +314,7 @@ export default function ProcessingOptions({
                     removeRepeatedWords: e.target.checked
                   }
                 })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
               />
               <div>
                 <span className="text-gray-300 text-sm">Remove repeated words</span>
@@ -333,7 +333,7 @@ export default function ProcessingOptions({
                     removeRepeatedPhrases: e.target.checked
                   }
                 })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
               />
               <div>
                 <span className="text-gray-300 text-sm">Remove repeated phrases</span>
@@ -352,7 +352,7 @@ export default function ProcessingOptions({
                     removeFalseStarts: e.target.checked
                   }
                 })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
               />
               <div>
                 <span className="text-gray-300 text-sm">Remove false starts</span>
@@ -371,7 +371,7 @@ export default function ProcessingOptions({
                     removeSelfCorrections: e.target.checked
                   }
                 })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
               />
               <div>
                 <span className="text-gray-300 text-sm">Remove self-corrections</span>
@@ -395,7 +395,7 @@ export default function ProcessingOptions({
                     })}
                     className={`flex-1 py-2 px-3 rounded-lg capitalize text-sm transition-colors ${
                       config.speechCorrectionConfig.aggressiveness === level
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'
                         : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                     }`}
                   >
@@ -423,7 +423,7 @@ export default function ProcessingOptions({
               type="checkbox"
               checked={config.generateCaptions}
               onChange={(e) => setConfig({ ...config, generateCaptions: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
             />
             <span className="text-gray-400">Generate captions</span>
           </label>
@@ -453,7 +453,7 @@ export default function ProcessingOptions({
                 generateAIHeadline: false,
                 headline: ''
               })}
-              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
+              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
             />
             <div>
               <span className="text-gray-300">No headline</span>
@@ -471,7 +471,7 @@ export default function ProcessingOptions({
                 generateAIHeadline: true,
                 headline: ''
               })}
-              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
+              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
             />
             <div>
               <span className="text-gray-300">AI-generated headline</span>
@@ -490,7 +490,7 @@ export default function ProcessingOptions({
                 generateAIHeadline: false,
                 headline: ''
               })}
-              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
+              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
             />
             <div>
               <span className="text-gray-300">Use hook from video</span>
@@ -509,7 +509,7 @@ export default function ProcessingOptions({
                 generateAIHeadline: false,
                 headline: config.headline || ' '  // Set a space to trigger custom mode
               })}
-              className="w-4 h-4 text-blue-500 bg-gray-700 border-gray-600 focus:ring-blue-500"
+              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
             />
             <div>
               <span className="text-gray-300">Custom headline</span>
@@ -543,7 +543,7 @@ export default function ProcessingOptions({
                   onClick={() => setConfig({ ...config, headlinePosition: pos })}
                   className={`flex-1 py-2 px-4 rounded-lg capitalize transition-colors ${
                     config.headlinePosition === pos
-                      ? 'bg-blue-500 text-white'
+                      ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'
                       : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                   }`}
                 >
@@ -564,7 +564,7 @@ export default function ProcessingOptions({
                 onClick={() => setConfig({ ...config, headlineStyle: 'speech-bubble' })}
                 className={`p-3 rounded-lg border-2 transition-colors ${
                   config.headlineStyle === 'speech-bubble'
-                    ? 'border-blue-500 bg-blue-500/10'
+                    ? 'border-violet-500 bg-violet-500/10'
                     : 'border-gray-600 hover:border-gray-500'
                 }`}
               >
@@ -576,7 +576,7 @@ export default function ProcessingOptions({
                     </div>
                     <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white mx-auto" />
                   </div>
-                  <span className={`text-xs ${config.headlineStyle === 'speech-bubble' ? 'text-blue-400' : 'text-gray-400'}`}>
+                  <span className={`text-xs ${config.headlineStyle === 'speech-bubble' ? 'text-cyan-400' : 'text-gray-400'}`}>
                     Speech Bubble
                   </span>
                 </div>
@@ -587,7 +587,7 @@ export default function ProcessingOptions({
                 onClick={() => setConfig({ ...config, headlineStyle: 'classic' })}
                 className={`p-3 rounded-lg border-2 transition-colors ${
                   config.headlineStyle === 'classic'
-                    ? 'border-blue-500 bg-blue-500/10'
+                    ? 'border-violet-500 bg-violet-500/10'
                     : 'border-gray-600 hover:border-gray-500'
                 }`}
               >
@@ -596,7 +596,7 @@ export default function ProcessingOptions({
                   <div className="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded shadow-lg">
                     Headline
                   </div>
-                  <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-blue-400' : 'text-gray-400'}`}>
+                  <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-cyan-400' : 'text-gray-400'}`}>
                     Classic
                   </span>
                 </div>
@@ -626,7 +626,7 @@ export default function ProcessingOptions({
               type="checkbox"
               checked={config.generateBRoll}
               onChange={(e) => setConfig({ ...config, generateBRoll: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
             />
             <span className="text-gray-400">Enable B-Roll</span>
           </label>
@@ -655,12 +655,12 @@ export default function ProcessingOptions({
                     })}
                     className={`p-2 rounded-lg border-2 transition-colors text-center ${
                       config.bRollConfig.style === style.value
-                        ? 'border-blue-500 bg-blue-500/10'
+                        ? 'border-violet-500 bg-violet-500/10'
                         : 'border-gray-600 hover:border-gray-500'
                     }`}
                   >
                     <span className={`text-xs font-medium ${
-                      config.bRollConfig.style === style.value ? 'text-blue-400' : 'text-gray-300'
+                      config.bRollConfig.style === style.value ? 'text-cyan-400' : 'text-gray-300'
                     }`}>
                       {style.label}
                     </span>
@@ -690,7 +690,7 @@ export default function ProcessingOptions({
                     })}
                     className={`flex-1 py-2 px-3 rounded-lg capitalize text-sm transition-colors ${
                       config.bRollConfig.intensity === intensity
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'
                         : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                     }`}
                   >
@@ -722,7 +722,7 @@ export default function ProcessingOptions({
         className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
           isProcessing
             ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-            : 'bg-blue-500 hover:bg-blue-600 text-white'
+            : 'bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white'
         }`}
       >
         {isProcessing ? (

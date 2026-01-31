@@ -15,7 +15,7 @@ export default async function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-[#0F0F14]">
       {/* Header */}
       <header className="border-b border-gray-800">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -32,7 +32,7 @@ export default async function PricingPage() {
             {userId ? (
               <Link
                 href="/dashboard"
-                className="px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                className="px-3 sm:px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
               >
                 Dashboard
               </Link>
@@ -43,7 +43,7 @@ export default async function PricingPage() {
                 </Link>
                 <Link
                   href="/sign-up"
-                  className="px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                  className="px-3 sm:px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                 >
                   Get Started
                 </Link>
@@ -67,9 +67,9 @@ export default async function PricingPage() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-6xl mx-auto">
           {/* Free Plan */}
-          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'FREE' ? 'border-blue-500' : 'border-transparent'}`}>
+          <div className={`bg-[#1A1A24] rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'FREE' ? 'border-violet-500' : 'border-transparent'}`}>
             {currentPlan === 'FREE' && (
-              <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
+              <span className="inline-block px-3 py-1 bg-violet-500/20 text-violet-400 text-xs font-medium rounded-full mb-4">
                 Current Plan
               </span>
             )}
@@ -109,12 +109,12 @@ export default async function PricingPage() {
           </div>
 
           {/* Pro Plan */}
-          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'PRO' ? 'border-blue-500' : 'border-blue-500/50'} relative`}>
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
+          <div className={`bg-[#1A1A24] rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'PRO' ? 'border-violet-500' : 'border-violet-500/50'} relative`}>
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-xs font-medium rounded-full">
               Most Popular
             </span>
             {currentPlan === 'PRO' && (
-              <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
+              <span className="inline-block px-3 py-1 bg-violet-500/20 text-violet-400 text-xs font-medium rounded-full mb-4">
                 Current Plan
               </span>
             )}
@@ -143,7 +143,7 @@ export default async function PricingPage() {
                   <input type="hidden" name="plan" value="PRO" />
                   <button
                     type="submit"
-                    className="block w-full text-center py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+                    className="block w-full text-center py-3 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg font-medium transition-colors"
                   >
                     {currentPlan === 'CREATOR' ? 'Downgrade to Pro' : 'Upgrade to Pro'}
                   </button>
@@ -152,7 +152,7 @@ export default async function PricingPage() {
             ) : (
               <Link
                 href="/sign-up"
-                className="block w-full text-center py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+                className="block w-full text-center py-3 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg font-medium transition-colors"
               >
                 Start Free Trial
               </Link>
@@ -160,9 +160,9 @@ export default async function PricingPage() {
           </div>
 
           {/* Creator Plan */}
-          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'CREATOR' ? 'border-blue-500' : 'border-transparent'}`}>
+          <div className={`bg-[#1A1A24] rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'CREATOR' ? 'border-violet-500' : 'border-transparent'}`}>
             {currentPlan === 'CREATOR' && (
-              <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
+              <span className="inline-block px-3 py-1 bg-violet-500/20 text-violet-400 text-xs font-medium rounded-full mb-4">
                 Current Plan
               </span>
             )}
@@ -208,9 +208,9 @@ export default async function PricingPage() {
           </div>
 
           {/* Enterprise Plan */}
-          <div className={`bg-gray-800 rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'ENTERPRISE' ? 'border-blue-500' : 'border-transparent'}`}>
+          <div className={`bg-[#1A1A24] rounded-xl p-4 sm:p-6 border-2 ${currentPlan === 'ENTERPRISE' ? 'border-violet-500' : 'border-transparent'}`}>
             {currentPlan === 'ENTERPRISE' && (
-              <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full mb-4">
+              <span className="inline-block px-3 py-1 bg-violet-500/20 text-violet-400 text-xs font-medium rounded-full mb-4">
                 Current Plan
               </span>
             )}
@@ -241,15 +241,15 @@ export default async function PricingPage() {
         <div className="mt-12 sm:mt-20 max-w-3xl mx-auto">
           <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-6 sm:mb-8">Frequently Asked Questions</h2>
           <div className="space-y-3 sm:space-y-4">
-            <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+            <div className="bg-[#1A1A24] rounded-lg p-4 sm:p-6">
               <h3 className="text-base sm:text-lg font-semibold text-white mb-2">What happens when I reach my video limit?</h3>
               <p className="text-gray-400 text-sm sm:text-base">You can upgrade anytime to process more videos. Your processed videos remain available.</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+            <div className="bg-[#1A1A24] rounded-lg p-4 sm:p-6">
               <h3 className="text-base sm:text-lg font-semibold text-white mb-2">Can I cancel anytime?</h3>
               <p className="text-gray-400 text-sm sm:text-base">Yes, you can cancel your subscription anytime. Your plan stays active until the end of your billing period.</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
+            <div className="bg-[#1A1A24] rounded-lg p-4 sm:p-6">
               <h3 className="text-base sm:text-lg font-semibold text-white mb-2">What video formats are supported?</h3>
               <p className="text-gray-400 text-sm sm:text-base">We support MP4, MOV, AVI, MKV, and most common video formats.</p>
             </div>

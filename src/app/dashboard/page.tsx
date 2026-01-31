@@ -36,15 +36,15 @@ export default async function DashboardPage() {
     console.error('Dashboard error:', error)
     // Show a helpful error page instead of crashing
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="bg-gray-800 rounded-xl p-8 max-w-md text-center">
+      <div className="min-h-screen bg-[#0F0F14] flex items-center justify-center">
+        <div className="bg-[#1A1A24] rounded-xl p-8 max-w-md text-center">
           <h1 className="text-xl font-semibold text-white mb-2">Something went wrong</h1>
           <p className="text-gray-400 mb-4">
             There was an issue loading your dashboard. Please try signing out and back in.
           </p>
           <a
             href="/sign-in"
-            className="inline-block px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+            className="inline-block px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg font-medium transition-colors"
           >
             Sign In Again
           </a>
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
     : 0
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-[#0F0F14]">
       {/* Header */}
       <header className="border-b border-gray-800">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -87,7 +87,7 @@ export default async function DashboardPage() {
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Usage Card */}
-        <div className="bg-gray-800 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+        <div className="bg-[#1A1A24] rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h2 className="text-base sm:text-lg font-semibold text-white">
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
             {usage.plan === 'FREE' && (
               <Link
                 href="/pricing"
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors text-center"
+                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg text-sm font-medium transition-colors text-center"
               >
                 Upgrade to Pro
               </Link>
@@ -110,7 +110,7 @@ export default async function DashboardPage() {
           </div>
           <div className="w-full bg-gray-700 rounded-full h-2">
             <div
-              className="bg-blue-500 h-2 rounded-full transition-all"
+              className="bg-gradient-to-r from-indigo-500 to-violet-500 h-2 rounded-full transition-all"
               style={{ width: `${Math.min(usagePercentage, 100)}%` }}
             />
           </div>
@@ -138,12 +138,12 @@ export default async function DashboardPage() {
             {/* Mobile card view */}
             <div className="sm:hidden space-y-3">
               {usage.recentVideos.map((video: Video) => (
-                <div key={video.id} className="bg-gray-800 rounded-xl p-4">
+                <div key={video.id} className="bg-[#1A1A24] rounded-xl p-4">
                   <div className="flex justify-between items-start mb-2">
                     <p className="text-white text-sm font-medium truncate flex-1 mr-2">{video.originalName}</p>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
                       video.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                      video.status === 'PROCESSING' ? 'bg-blue-500/20 text-blue-400' :
+                      video.status === 'PROCESSING' ? 'bg-violet-500/20 text-violet-400' :
                       video.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
                       'bg-gray-500/20 text-gray-400'
                     }`}>
@@ -157,7 +157,7 @@ export default async function DashboardPage() {
                     {video.status === 'COMPLETED' && video.processedUrl && (
                       <a
                         href={video.processedUrl}
-                        className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                        className="text-cyan-400 hover:text-cyan-300 text-sm font-medium"
                         download
                       >
                         Download
@@ -169,7 +169,7 @@ export default async function DashboardPage() {
             </div>
 
             {/* Desktop table view */}
-            <div className="hidden sm:block bg-gray-800 rounded-xl overflow-hidden">
+            <div className="hidden sm:block bg-[#1A1A24] rounded-xl overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-700/50">
                   <tr>
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           video.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                          video.status === 'PROCESSING' ? 'bg-blue-500/20 text-blue-400' :
+                          video.status === 'PROCESSING' ? 'bg-violet-500/20 text-violet-400' :
                           video.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
                           'bg-gray-500/20 text-gray-400'
                         }`}>
@@ -200,7 +200,7 @@ export default async function DashboardPage() {
                         {video.status === 'COMPLETED' && video.processedUrl && (
                           <a
                             href={video.processedUrl}
-                            className="text-blue-400 hover:text-blue-300 text-sm"
+                            className="text-cyan-400 hover:text-cyan-300 text-sm"
                             download
                           >
                             Download
