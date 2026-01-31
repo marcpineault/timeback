@@ -1,28 +1,28 @@
 export const PLANS = {
   FREE: {
-    name: 'Free',
+    name: 'Starter',
     price: 0,
-    videosPerMonth: 5,
+    videosPerMonth: 35,
     maxDuration: 5 * 60, // 5 minutes
     maxResolution: 720,
     watermark: true,
     features: [
-      '5 videos per month',
+      '35 videos per month',
       'Up to 5 min videos',
       '720p max resolution',
       'TimeBack watermark',
     ],
   },
   PRO: {
-    name: 'Pro',
+    name: 'Creator',
     price: 19,
     priceId: process.env.STRIPE_PRO_PRICE_ID,
-    videosPerMonth: 30,
+    videosPerMonth: 120,
     maxDuration: 5 * 60, // 5 minutes
     maxResolution: 1080,
     watermark: false,
     features: [
-      '30 videos per month',
+      '120 videos per month',
       'Up to 5 min videos',
       '1080p resolution',
       'No watermark',
@@ -30,15 +30,15 @@ export const PLANS = {
     ],
   },
   CREATOR: {
-    name: 'Creator',
+    name: 'Business',
     price: 49,
     priceId: process.env.STRIPE_CREATOR_PRICE_ID,
-    videosPerMonth: 100,
+    videosPerMonth: 250,
     maxDuration: 10 * 60, // 10 minutes
     maxResolution: 1080,
     watermark: false,
     features: [
-      '100 videos per month',
+      '250 videos per month',
       'Up to 10 min videos',
       '1080p resolution',
       'No watermark',

@@ -148,7 +148,7 @@ export default async function PricingPage() {
                     type="submit"
                     className="block w-full text-center py-3 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg font-medium transition-colors"
                   >
-                    {currentPlan === 'CREATOR' ? 'Downgrade to Pro' : 'Upgrade to Pro'}
+                    {currentPlan === 'CREATOR' ? 'Downgrade to Creator' : 'Upgrade to Creator'}
                   </button>
                 </form>
               )
@@ -196,7 +196,7 @@ export default async function PricingPage() {
                     type="submit"
                     className="block w-full text-center py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
                   >
-                    Upgrade to Creator
+                    Upgrade to Business
                   </button>
                 </form>
               )
