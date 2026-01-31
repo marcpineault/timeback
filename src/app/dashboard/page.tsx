@@ -42,12 +42,12 @@ export default async function DashboardPage() {
           <p className="text-gray-400 mb-4">
             There was an issue loading your dashboard. Please try signing out and back in.
           </p>
-          <a
+          <Link
             href="/sign-in"
             className="inline-block px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg font-medium transition-colors"
           >
             Sign In Again
-          </a>
+          </Link>
         </div>
       </div>
     )

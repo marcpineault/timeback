@@ -58,7 +58,12 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
   // Check if S3 is available and detect mobile on mount
   useEffect(() => {
-    checkS3Available().then(setS3Available);
+    checkS3Available()
+      .then(setS3Available)
+      .catch((err) => {
+        console.error('[Upload] Failed to check S3 availability:', err);
+        setS3Available(false);
+      });
     // Detect mobile device
     const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     setIsMobile(mobile);
