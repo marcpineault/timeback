@@ -19,7 +19,10 @@ export default async function PricingPage() {
       {/* Header */}
       <header className="border-b border-gray-800">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-white">TimeBack</Link>
+          <Link href="/" className="flex items-center gap-2">
+            <img src="/logo.svg" alt="TimeBack" className="w-8 h-8" />
+            <span className="text-xl font-bold text-white">TimeBack</span>
+          </Link>
           <div className="flex items-center gap-2 sm:gap-4">
             <a
               href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
