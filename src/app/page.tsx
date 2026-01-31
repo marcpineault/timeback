@@ -10,7 +10,7 @@ export default async function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-[#0F0F14]">
       {/* Header - Minimal, clean */}
       <header className="border-b border-gray-800/50">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -41,7 +41,7 @@ export default async function LandingPage() {
       <section className="py-16 sm:py-24 px-4">
         <div className="max-w-4xl mx-auto text-center">
           {/* Trust badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 border border-violet-500/20 rounded-full text-violet-400 text-sm mb-6">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
             </svg>
@@ -50,7 +50,7 @@ export default async function LandingPage() {
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
             Cut Your Video Editing Time
-            <span className="text-blue-500"> by 90%</span>
+            <span className="text-cyan-400"> by 90%</span>
           </h1>
           <p className="text-lg sm:text-xl text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
             TimeBack uses AI to automatically remove silences, filler words, and dead air from your videos.
@@ -61,7 +61,7 @@ export default async function LandingPage() {
           <div className="flex flex-col items-center gap-4">
             <Link
               href="/sign-up"
-              className="w-full sm:w-auto px-8 py-4 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-xl font-semibold text-lg transition-all hover:scale-105 shadow-lg shadow-blue-500/25"
+              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 active:from-indigo-700 active:to-violet-700 text-white rounded-xl font-semibold text-lg transition-all hover:scale-105 shadow-lg shadow-violet-500/25"
             >
               Start Editing Free
             </Link>
@@ -99,10 +99,10 @@ export default async function LandingPage() {
               </div>
             </div>
             {/* App preview */}
-            <div className="aspect-video bg-gray-900 flex items-center justify-center p-8">
+            <div className="aspect-video bg-[#0F0F14] flex items-center justify-center p-8">
               <div className="text-center">
-                <div className="w-20 h-20 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-20 h-20 bg-violet-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -116,12 +116,12 @@ export default async function LandingPage() {
       </section>
 
       {/* Features Strip */}
-      <section className="py-12 px-4 bg-gray-800/30 border-y border-gray-800">
+      <section className="py-12 px-4 bg-[#1A1A24]/50 border-y border-gray-800">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             <div className="text-center">
-              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
@@ -138,8 +138,8 @@ export default async function LandingPage() {
               <div className="text-gray-400 text-sm">AI-powered precision</div>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                 </svg>
               </div>
@@ -171,12 +171,12 @@ export default async function LandingPage() {
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="relative bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-              <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+            <div className="relative bg-[#1A1A24]/50 rounded-2xl p-6 border border-gray-700/50">
+              <div className="absolute -top-3 -left-3 w-8 h-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                 1
               </div>
-              <div className="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-violet-500/10 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-7 h-7 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
@@ -186,12 +186,12 @@ export default async function LandingPage() {
               </p>
             </div>
 
-            <div className="relative bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-              <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+            <div className="relative bg-[#1A1A24]/50 rounded-2xl p-6 border border-gray-700/50">
+              <div className="absolute -top-3 -left-3 w-8 h-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                 2
               </div>
-              <div className="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-violet-500/10 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-7 h-7 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
@@ -201,12 +201,12 @@ export default async function LandingPage() {
               </p>
             </div>
 
-            <div className="relative bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-              <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+            <div className="relative bg-[#1A1A24]/50 rounded-2xl p-6 border border-gray-700/50">
+              <div className="absolute -top-3 -left-3 w-8 h-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                 3
               </div>
-              <div className="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-violet-500/10 rounded-xl flex items-center justify-center mb-4">
+                <svg className="w-7 h-7 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
               </div>
@@ -220,7 +220,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Testimonials */}
-      <section className="py-16 sm:py-24 px-4 bg-gray-800/30">
+      <section className="py-16 sm:py-24 px-4 bg-[#1A1A24]/50">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
@@ -228,7 +228,7 @@ export default async function LandingPage() {
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <div className="bg-[#1A1A24] rounded-2xl p-6 border border-gray-700">
               <div className="flex gap-1 mb-4">
                 {[...Array(5)].map((_, i) => (
                   <svg key={i} className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
@@ -240,7 +240,7 @@ export default async function LandingPage() {
                 &ldquo;Super easy to use. I just upload my video and it removes all the awkward pauses automatically. Saves me so much time!&rdquo;
               </p>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center text-white font-semibold">
                   A
                 </div>
                 <div>
@@ -249,7 +249,7 @@ export default async function LandingPage() {
               </div>
             </div>
 
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <div className="bg-[#1A1A24] rounded-2xl p-6 border border-gray-700">
               <div className="flex gap-1 mb-4">
                 {[...Array(5)].map((_, i) => (
                   <svg key={i} className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
@@ -261,7 +261,7 @@ export default async function LandingPage() {
                 &ldquo;Finally a tool that does exactly what it promises. The silence detection is spot on and the interface is clean.&rdquo;
               </p>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-semibold">
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center text-white font-semibold">
                   M
                 </div>
                 <div>
@@ -270,7 +270,7 @@ export default async function LandingPage() {
               </div>
             </div>
 
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <div className="bg-[#1A1A24] rounded-2xl p-6 border border-gray-700">
               <div className="flex gap-1 mb-4">
                 {[...Array(5)].map((_, i) => (
                   <svg key={i} className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
@@ -282,7 +282,7 @@ export default async function LandingPage() {
                 &ldquo;Great for cleaning up recorded content. Makes my videos look way more professional without any editing skills.&rdquo;
               </p>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white font-semibold">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-violet-700 rounded-full flex items-center justify-center text-white font-semibold">
                   P
                 </div>
                 <div>
@@ -303,7 +303,7 @@ export default async function LandingPage() {
             </h2>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50 text-center">
+            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
               <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
@@ -313,9 +313,9 @@ export default async function LandingPage() {
               <p className="text-gray-400 text-sm">Publish more, edit less</p>
             </div>
 
-            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50 text-center">
-              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
+              <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </div>
@@ -323,7 +323,7 @@ export default async function LandingPage() {
               <p className="text-gray-400 text-sm">Tighter conversations</p>
             </div>
 
-            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50 text-center">
+            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
               <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -333,9 +333,9 @@ export default async function LandingPage() {
               <p className="text-gray-400 text-sm">Engaging lectures</p>
             </div>
 
-            <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700/50 text-center">
-              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
+              <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
@@ -349,7 +349,7 @@ export default async function LandingPage() {
       {/* Final CTA */}
       <section className="py-16 sm:py-24 px-4">
         <div className="max-w-3xl mx-auto">
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden">
+          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden">
             {/* Background decoration */}
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0tNiA2aC0ydi00aDJ2NHptMC02aC0ydi00aDJ2NHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-30"></div>
 
@@ -357,16 +357,16 @@ export default async function LandingPage() {
               <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
                 Start Saving Time Today
               </h2>
-              <p className="text-blue-100 text-lg mb-8 max-w-lg mx-auto">
+              <p className="text-violet-100 text-lg mb-8 max-w-lg mx-auto">
                 Stop wasting hours on manual editing. Let AI do the tedious work for you.
               </p>
               <Link
                 href="/sign-up"
-                className="inline-flex px-8 py-4 bg-white hover:bg-gray-100 text-blue-600 rounded-xl font-semibold text-lg transition-all hover:scale-105 shadow-lg"
+                className="inline-flex px-8 py-4 bg-white hover:bg-gray-100 text-violet-600 rounded-xl font-semibold text-lg transition-all hover:scale-105 shadow-lg"
               >
                 Get Started Free
               </Link>
-              <p className="text-blue-200 text-sm mt-4">
+              <p className="text-violet-200 text-sm mt-4">
                 No credit card required · 30-day money-back guarantee
               </p>
             </div>
