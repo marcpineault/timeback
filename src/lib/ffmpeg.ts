@@ -416,7 +416,7 @@ export async function addHeadline(
   };
 
   // Sanitize and escape special characters for FFmpeg drawtext filter
-  let escapedHeadline = headline
+  const escapedHeadline = headline
     .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -953,7 +953,7 @@ export async function applyCombinedFilters(
     };
 
     // Sanitize and escape special characters for FFmpeg drawtext filter
-    let escapedHeadline = options.headline
+    const escapedHeadline = options.headline
       .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')
       .replace(/\s+/g, ' ')
       .trim()

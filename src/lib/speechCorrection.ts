@@ -2,11 +2,8 @@ import OpenAI from 'openai';
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { TranscriptionWord } from './whisper';
-
-const execAsync = promisify(exec);
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -93,16 +90,15 @@ async function detectFillerSoundsFromAudio(
     // Use shorter minimum silence duration (0.08s) to catch brief pauses around fillers
     // Use spawn with array args to prevent command injection (audioPath could contain malicious characters)
     const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
-      const { spawn } = require('child_process');
       const ffmpegArgs = ['-i', audioPath, '-af', 'silencedetect=noise=-40dB:d=0.08', '-f', 'null', '-'];
       const proc = spawn('ffmpeg', ffmpegArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
-      let stdout = '';
-      let stderr = '';
-      proc.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
-      proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
-      proc.on('close', (code: number) => {
+      let stdoutData = '';
+      let stderrData = '';
+      proc.stdout?.on('data', (data: Buffer) => { stdoutData += data.toString(); });
+      proc.stderr?.on('data', (data: Buffer) => { stderrData += data.toString(); });
+      proc.on('close', () => {
         // FFmpeg outputs silencedetect info to stderr, so combine them
-        resolve({ stdout: stdout + stderr });
+        resolve({ stdout: stdoutData + stderrData });
       });
       proc.on('error', reject);
     });

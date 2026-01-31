@@ -375,7 +375,7 @@ export default function VideoSplitter({
 
             {/* Instructions */}
             <p className="text-xs text-gray-500 mt-2 text-center">
-              Seek to a position and click "Add Split Here" to mark split points. Drag markers to adjust.
+              Seek to a position and click &quot;Add Split Here&quot; to mark split points. Drag markers to adjust.
             </p>
           </div>
 
