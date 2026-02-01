@@ -80,9 +80,10 @@ export default function VideoProcessor({
           if (v.status !== 'complete' && v.file.s3Key) {
             return { ...v, status: 'pending' as const, error: undefined };
           }
-          // Clear blob previewUrl (not valid after refresh)
+          // Clear blob previewUrl (not valid after refresh) and any stale errors for completed videos
           return {
             ...v,
+            error: v.status === 'complete' ? undefined : v.error,
             file: { ...v.file, previewUrl: undefined }
           };
         });
@@ -216,6 +217,7 @@ export default function VideoProcessor({
       return {
         ...video,
         status: 'complete',
+        error: undefined, // Clear any previous error on success
         downloadUrl: data.downloadUrl,
         outputFilename: data.outputFilename,
       }
