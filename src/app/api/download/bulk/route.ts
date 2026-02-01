@@ -7,6 +7,9 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { isS3Configured, getS3ObjectStream } from '@/lib/s3';
 
+// Allow up to 10 minutes for bulk ZIP downloads of multiple videos
+export const maxDuration = 600;
+
 export async function POST(request: NextRequest) {
   try {
     // Authentication check

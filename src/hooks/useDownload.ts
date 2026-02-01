@@ -13,27 +13,41 @@ export interface DownloadState {
 export interface DownloadOptions {
   maxRetries?: number;
   retryDelayMs?: number;
+  timeoutMs?: number; // Timeout per request in milliseconds
   onSuccess?: () => void;
   onError?: (error: string) => void;
 }
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY_MS = 1000;
+// 3 minutes default timeout - generous for mobile on slow connections
+const DEFAULT_TIMEOUT_MS = 180000;
 
 /**
- * Fetch with retry logic for network resilience on mobile
+ * Fetch with retry logic and per-request timeout for network resilience on mobile
  */
 async function fetchWithRetry(
   url: string,
   maxRetries: number,
   retryDelayMs: number,
+  timeoutMs: number,
   signal?: AbortSignal
 ): Promise<Response> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Create a timeout controller for this attempt
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+    // Combine with the external signal if provided
+    const combinedSignal = signal
+      ? combineAbortSignals(signal, timeoutController.signal)
+      : timeoutController.signal;
+
     try {
-      const response = await fetch(url, { signal });
+      const response = await fetch(url, { signal: combinedSignal });
+      clearTimeout(timeoutId);
 
       // Don't retry on client errors (4xx) - these won't succeed on retry
       if (response.status >= 400 && response.status < 500) {
@@ -48,14 +62,20 @@ async function fetchWithRetry(
 
       return response;
     } catch (err) {
+      clearTimeout(timeoutId);
       lastError = err instanceof Error ? err : new Error('Unknown error');
 
-      // Don't retry if aborted
+      // Check if this was a timeout
+      if (timeoutController.signal.aborted && !signal?.aborted) {
+        lastError = new Error('Request timed out');
+      }
+
+      // Don't retry if externally aborted
       if (signal?.aborted) {
         throw lastError;
       }
 
-      // Retry network errors
+      // Retry network errors and timeouts
       if (attempt < maxRetries) {
         await new Promise((r) => setTimeout(r, retryDelayMs * (attempt + 1)));
         continue;
@@ -64,6 +84,23 @@ async function fetchWithRetry(
   }
 
   throw lastError || new Error('Download failed after retries');
+}
+
+/**
+ * Combine multiple AbortSignals into one
+ */
+function combineAbortSignals(...signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort();
+      break;
+    }
+    signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+
+  return controller.signal;
 }
 
 /**
@@ -95,6 +132,7 @@ export function useDownload(options: DownloadOptions = {}) {
   const {
     maxRetries = DEFAULT_MAX_RETRIES,
     retryDelayMs = DEFAULT_RETRY_DELAY_MS,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
     onSuccess,
     onError,
   } = options;
@@ -185,6 +223,7 @@ export function useDownload(options: DownloadOptions = {}) {
           cacheBustedUrl,
           maxRetries,
           retryDelayMs,
+          timeoutMs,
           controller.signal
         );
 
@@ -284,7 +323,7 @@ export function useDownload(options: DownloadOptions = {}) {
         abortControllerRef.current = null;
       }
     },
-    [platform, maxRetries, retryDelayMs, cancel, onSuccess, onError]
+    [platform, maxRetries, retryDelayMs, timeoutMs, cancel, onSuccess, onError]
   );
 
   return {

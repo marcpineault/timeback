@@ -204,6 +204,11 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
 
+        // Set timeout based on file size - allow 30 seconds per MB, minimum 2 minutes
+        // This accounts for slow mobile connections
+        const timeoutMs = Math.max(120000, Math.ceil(file.size / (1024 * 1024)) * 30000);
+        xhr.timeout = timeoutMs;
+
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
             const progress = Math.round((event.loaded / event.total) * 100);
@@ -223,6 +228,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
         xhr.addEventListener('error', () => {
           reject(new Error('Network error during upload'));
+        });
+
+        xhr.addEventListener('timeout', () => {
+          reject(new Error('Upload timed out. Please check your connection and try again.'));
         });
 
         xhr.open('PUT', urlResult.url!);
@@ -298,6 +307,11 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
       const xhr = new XMLHttpRequest();
 
+      // Set timeout based on file size - allow 30 seconds per MB, minimum 2 minutes
+      // This accounts for slow mobile connections
+      const timeoutMs = Math.max(120000, Math.ceil(file.size / (1024 * 1024)) * 30000);
+      xhr.timeout = timeoutMs;
+
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded / event.total) * 100);
@@ -325,6 +339,13 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       xhr.addEventListener('error', () => {
         setUploadingFiles(prev => prev.map((f, i) =>
           i === index ? { ...f, status: 'error' as const, error: 'Network error' } : f
+        ));
+        resolve(null);
+      });
+
+      xhr.addEventListener('timeout', () => {
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'error' as const, error: 'Upload timed out' } : f
         ));
         resolve(null);
       });

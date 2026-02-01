@@ -55,13 +55,18 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
         ? `${video.downloadUrl}&_t=${Date.now()}`
         : `${video.downloadUrl}?_t=${Date.now()}`;
 
-      // Fetch with retry logic for mobile reliability
+      // Fetch with retry logic and timeout for mobile reliability
+      // 3 minute timeout per attempt - generous for slow mobile connections
+      const TIMEOUT_MS = 180000;
       let response: Response | null = null;
-      let lastError: Error | null = null;
 
       for (let attempt = 0; attempt < 3; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
         try {
-          response = await fetch(cacheBustedUrl);
+          response = await fetch(cacheBustedUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
           if (response.ok) break;
 
           // Don't retry client errors
@@ -72,7 +77,8 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           }
         } catch (err) {
-          lastError = err instanceof Error ? err : new Error('Unknown error');
+          clearTimeout(timeoutId);
+          // Don't retry if it's a timeout on the last attempt
           if (attempt < 2) {
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           }

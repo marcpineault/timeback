@@ -23,6 +23,11 @@ export function getS3Client(): S3Client {
       },
       // Retry configuration for transient failures
       maxAttempts: 3,
+      // Request timeout: 5 minutes for large video files on slow connections
+      requestHandler: {
+        requestTimeout: 300000,
+        httpsAgent: { timeout: 300000 },
+      } as never, // Type assertion needed for SDK v3 config
     });
   }
   return s3Client;
