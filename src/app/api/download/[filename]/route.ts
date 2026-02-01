@@ -6,6 +6,9 @@ import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { isS3Configured, getProcessedVideoUrl } from '@/lib/s3';
 
+// Allow up to 5 minutes for large video downloads on slow mobile connections
+export const maxDuration = 300;
+
 // Cleanup registry for local files: Map of filepath -> scheduled deletion timestamp
 // Uses a single interval instead of unbounded setTimeouts to prevent memory leaks
 const cleanupRegistry = new Map<string, number>();

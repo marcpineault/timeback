@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { UploadedFile } from './VideoUploader';
+import { usePlatform } from '@/hooks/usePlatform';
 
 export interface QueuedVideo {
   file: UploadedFile;
@@ -20,63 +21,125 @@ interface VideoQueueProps {
   onEdit?: (video: QueuedVideo) => void;
 }
 
-type Platform = 'ios' | 'android' | 'desktop';
-
 export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRetry, onEdit }: VideoQueueProps) {
-  const [platform, setPlatform] = useState<Platform>('desktop');
+  const platform = usePlatform();
   const [savingVideoId, setSavingVideoId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
+  // Cleanup blob URL on unmount
   useEffect(() => {
-    const ua = navigator.userAgent;
-    if (/iPhone|iPad|iPod/i.test(ua)) {
-      setPlatform('ios');
-    } else if (/Android/i.test(ua)) {
-      setPlatform('android');
-    } else {
-      setPlatform('desktop');
-    }
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
   }, []);
 
-  const saveToDevice = async (video: QueuedVideo) => {
+  const saveToDevice = useCallback(async (video: QueuedVideo) => {
     if (!video.downloadUrl || !video.outputFilename) return;
 
+    // Cleanup previous blob URL
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+
     setSavingVideoId(video.file.fileId);
+    setSaveError(null);
 
     try {
-      const response = await fetch(video.downloadUrl);
-      if (!response.ok) {
-        console.error('Download failed:', response.status, response.statusText);
+      // Add cache-busting to prevent stale responses
+      const cacheBustedUrl = video.downloadUrl.includes('?')
+        ? `${video.downloadUrl}&_t=${Date.now()}`
+        : `${video.downloadUrl}?_t=${Date.now()}`;
+
+      // Fetch with retry logic and timeout for mobile reliability
+      // 3 minute timeout per attempt - generous for slow mobile connections
+      const TIMEOUT_MS = 180000;
+      let response: Response | null = null;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+          response = await fetch(cacheBustedUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (response.ok) break;
+
+          // Don't retry client errors
+          if (response.status >= 400 && response.status < 500) break;
+
+          // Wait before retry (exponential backoff)
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          }
+        } catch (err) {
+          clearTimeout(timeoutId);
+          // Don't retry if it's a timeout on the last attempt
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          }
+        }
+      }
+
+      if (!response || !response.ok) {
+        console.error('Download failed:', response?.status, response?.statusText);
+        setSaveError('Download failed. Please try again.');
         return;
       }
+
       const blob = await response.blob();
       const file = new File([blob], video.outputFilename, { type: 'video/mp4' });
 
       // Mobile (iOS/Android): Use Web Share API to open share sheet
       if ((platform === 'ios' || platform === 'android') && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'Save Video',
-        });
-      } else {
-        // Desktop: Trigger download
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = video.outputFilename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Save Video',
+          });
+          return;
+        } catch (err) {
+          // User cancelled is not an error
+          if (err instanceof Error && err.name === 'AbortError') {
+            return;
+          }
+          // Fall through to download fallback
+        }
       }
+
+      // Desktop/fallback: Trigger download
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = video.outputFilename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Cleanup after delay
+      setTimeout(() => {
+        if (blobUrlRef.current === url) {
+          URL.revokeObjectURL(url);
+          blobUrlRef.current = null;
+        }
+      }, 1000);
     } catch (err) {
       // User cancelled is not an error
       if (err instanceof Error && err.name !== 'AbortError') {
         console.error('Save failed:', err);
+        setSaveError('Save failed. Please try again.');
       }
     } finally {
       setSavingVideoId(null);
     }
-  };
+  }, [platform]);
 
   if (videos.length === 0) return null;
 
@@ -129,6 +192,13 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
           Clear
         </button>
       </div>
+
+      {/* Save error message */}
+      {saveError && (
+        <div className="px-3 sm:px-4 py-2 bg-red-500/10 border-b border-red-500/20">
+          <p className="text-xs text-red-400">{saveError}</p>
+        </div>
+      )}
 
       {/* Video List */}
       <div className="divide-y divide-gray-700/50 max-h-80 overflow-y-auto">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 
 interface VideoPreviewProps {
   videoUrl: string;
@@ -13,6 +13,16 @@ export default function VideoPreview({ videoUrl, videoName, onClose }: VideoPrev
   const modalRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Add cache-busting to prevent stale video content on mobile
+  const cacheBustedUrl = useMemo(() => {
+    // Don't add cache-busting to blob URLs
+    if (videoUrl.startsWith('blob:')) return videoUrl;
+
+    const separator = videoUrl.includes('?') ? '&' : '?';
+    return `${videoUrl}${separator}_t=${Date.now()}_r=${retryCount}`;
+  }, [videoUrl, retryCount]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -33,6 +43,39 @@ export default function VideoPreview({ videoUrl, videoName, onClose }: VideoPrev
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === modalRef.current) {
       onClose();
+    }
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    setIsLoading(true);
+    setRetryCount((prev) => prev + 1);
+  };
+
+  const handleError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    setIsLoading(false);
+    const video = e.currentTarget;
+    const mediaError = video.error;
+
+    if (mediaError) {
+      switch (mediaError.code) {
+        case MediaError.MEDIA_ERR_ABORTED:
+          setError('Video loading was aborted');
+          break;
+        case MediaError.MEDIA_ERR_NETWORK:
+          setError('Network error while loading video. Check your connection.');
+          break;
+        case MediaError.MEDIA_ERR_DECODE:
+          setError('Video format is not supported');
+          break;
+        case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          setError('Video source not found or not supported');
+          break;
+        default:
+          setError('An error occurred while loading the video');
+      }
+    } else {
+      setError('An error occurred while loading the video');
     }
   };
 
@@ -75,43 +118,31 @@ export default function VideoPreview({ videoUrl, videoName, onClose }: VideoPrev
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-red-400 font-medium mb-1">Failed to load video</p>
-                <p className="text-gray-500 text-sm">{error}</p>
+                <p className="text-gray-500 text-sm mb-4">{error}</p>
+                {retryCount < 3 && (
+                  <button
+                    onClick={handleRetry}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Try Again
+                  </button>
+                )}
               </div>
             )}
             <video
+              key={cacheBustedUrl}
               ref={videoRef}
-              src={videoUrl}
+              src={cacheBustedUrl}
               controls
               autoPlay
               playsInline
               className={`w-full h-full ${error ? 'hidden' : ''}`}
               controlsList="nodownload"
               onLoadedData={() => setIsLoading(false)}
-              onError={(e) => {
-                setIsLoading(false);
-                const video = e.currentTarget;
-                const mediaError = video.error;
-                if (mediaError) {
-                  switch (mediaError.code) {
-                    case MediaError.MEDIA_ERR_ABORTED:
-                      setError('Video loading was aborted');
-                      break;
-                    case MediaError.MEDIA_ERR_NETWORK:
-                      setError('Network error while loading video');
-                      break;
-                    case MediaError.MEDIA_ERR_DECODE:
-                      setError('Video format is not supported');
-                      break;
-                    case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                      setError('Video source not found or not supported');
-                      break;
-                    default:
-                      setError('An error occurred while loading the video');
-                  }
-                } else {
-                  setError('An error occurred while loading the video');
-                }
-              }}
+              onError={handleError}
             >
               Your browser does not support the video tag.
             </video>
