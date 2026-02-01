@@ -259,6 +259,35 @@ export default async function PricingPage() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="py-8 px-4 border-t border-gray-800">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="TimeBack" className="w-6 h-6" />
+              <span className="text-white font-semibold">TimeBack</span>
+              <span className="text-gray-500 text-sm hidden sm:inline">- Video editing made simple</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-500">
+              <Link href="/pricing" className="hover:text-gray-300 transition-colors">Pricing</Link>
+              <a
+                href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-gray-300 transition-colors"
+              >
+                Tutorials
+              </a>
+              <a href="mailto:support@timebackvideo.com" className="hover:text-gray-300 transition-colors">Support</a>
+              <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
+            </div>
+          </div>
+          <div className="mt-6 pt-6 border-t border-gray-800 text-center text-gray-500 text-sm">
+            &copy; {new Date().getFullYear()} TimeBack. All rights reserved.
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
