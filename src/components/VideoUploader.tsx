@@ -309,6 +309,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
+          // Mark as complete immediately when upload finishes (before batch confirm)
+          setUploadingFiles(prev => prev.map((f, i) =>
+            i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
+          ));
           resolve({ index, s3Key: urlInfo.key });
         } else {
           setUploadingFiles(prev => prev.map((f, i) =>

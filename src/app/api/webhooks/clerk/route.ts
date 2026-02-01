@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     if (id) {
       await prisma.user.delete({
         where: { clerkId: id },
-      }).catch((err) => {
+      }).catch((err: unknown) => {
         // User may not exist in database (already deleted or never created)
         console.warn('[Clerk Webhook] Failed to delete user:', id, err instanceof Error ? err.message : err)
       })
