@@ -13,6 +13,9 @@ interface EnabledFeatures {
   speechCorrection: boolean
 }
 
+// localStorage key for persisting video queue
+const QUEUE_STORAGE_KEY = 'timeback_video_queue';
+
 interface VideoProcessorProps {
   userId: string
   canProcess: boolean
@@ -49,6 +52,61 @@ export default function VideoProcessor({
     }
   }, [])
   const [videosRemaining, setVideosRemaining] = useState(initialVideosRemaining)
+  const [isQueueLoaded, setIsQueueLoaded] = useState(false)
+
+  // Restore video queue from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(QUEUE_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as QueuedVideo[];
+        // Only restore videos that can actually be used:
+        // - Completed videos (have downloadUrl)
+        // - Videos with s3Key (can be re-processed)
+        const restorable = parsed.filter(v => {
+          // Completed videos are fully restorable
+          if (v.status === 'complete' && v.downloadUrl) return true;
+          // Videos with s3Key can be re-processed (mark as pending)
+          if (v.file.s3Key) return true;
+          // Videos without s3Key and not complete cannot be restored
+          return false;
+        }).map(v => {
+          // Reset processing/error videos with s3Key back to pending
+          if (v.status !== 'complete' && v.file.s3Key) {
+            return { ...v, status: 'pending' as const, error: undefined };
+          }
+          // Clear blob previewUrl (not valid after refresh)
+          return {
+            ...v,
+            file: { ...v.file, previewUrl: undefined }
+          };
+        });
+
+        if (restorable.length > 0) {
+          setVideoQueue(restorable);
+        }
+      }
+    } catch {
+      // localStorage not available or invalid JSON
+    }
+    setIsQueueLoaded(true);
+  }, []);
+
+  // Save video queue to localStorage when it changes
+  useEffect(() => {
+    if (!isQueueLoaded) return;
+
+    try {
+      if (videoQueue.length === 0) {
+        localStorage.removeItem(QUEUE_STORAGE_KEY);
+      } else {
+        // Save queue (blob URLs won't persist but that's fine)
+        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(videoQueue));
+      }
+    } catch {
+      // localStorage not available
+    }
+  }, [videoQueue, isQueueLoaded]);
 
   const handleUploadComplete = (files: UploadedFile[]) => {
     const maxFiles = Math.min(files.length, videosRemaining)
