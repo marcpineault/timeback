@@ -6,8 +6,7 @@ import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOpti
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
 import VideoPreview from '@/components/VideoPreview'
 import MediaEditor from '@/components/MediaEditor'
-// Google Drive disabled - will be enabled later
-// import GoogleDriveUpload from '@/components/GoogleDriveUpload'
+import GoogleDriveUpload from '@/components/GoogleDriveUpload'
 
 interface EnabledFeatures {
   speechCorrection: boolean
@@ -650,14 +649,12 @@ export default function VideoProcessor({
             </div>
           </div>
 
-{/* Google Drive disabled - will be enabled later
           <GoogleDriveUpload
             files={completedVideos.map((v) => ({
               name: v.outputFilename || `video_${v.file.fileId}.mp4`,
               url: v.downloadUrl!,
             }))}
           />
-*/}
         </div>
       )}
 

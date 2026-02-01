@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
   try {
     const tokens = await getTokensFromCode(code);
 
-    // Save tokens to database
+    // Save tokens to database and mark as connected
     await prisma.user.update({
       where: { clerkId },
       data: {
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         googleDriveTokenExpiry: tokens.expiry_date
           ? new Date(tokens.expiry_date)
           : null,
+        googleDriveConnected: true,
       },
     });
 

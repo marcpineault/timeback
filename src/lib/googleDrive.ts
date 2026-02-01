@@ -1,21 +1,28 @@
 import { google, drive_v3 } from 'googleapis';
 
-// Google OAuth2 client singleton
-let oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null;
+/**
+ * Create a new OAuth2 client instance
+ * Note: We create fresh instances for Drive operations to avoid race conditions
+ * with multiple users accessing simultaneously
+ */
+export function createOAuth2Client() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/google-drive/callback`;
 
-export function getOAuth2Client() {
-  if (!oauth2Client) {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/google-drive/callback`;
-
-    if (!clientId || !clientSecret) {
-      throw new Error('Google OAuth credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
-    }
-
-    oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  if (!clientId || !clientSecret) {
+    throw new Error('Google OAuth credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.');
   }
-  return oauth2Client;
+
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
+
+/**
+ * Get OAuth2 client for generating auth URLs and token operations
+ * Uses a fresh instance each time to avoid credential conflicts
+ */
+export function getOAuth2Client() {
+  return createOAuth2Client();
 }
 
 export function isGoogleDriveConfigured(): boolean {
@@ -51,18 +58,20 @@ export async function getTokensFromCode(code: string) {
 
 /**
  * Get authenticated Drive client with provided tokens
+ * Creates a fresh OAuth2 client to avoid race conditions with concurrent requests
  */
 export function getDriveClient(accessToken: string): drive_v3.Drive {
-  const client = getOAuth2Client();
+  const client = createOAuth2Client();
   client.setCredentials({ access_token: accessToken });
   return google.drive({ version: 'v3', auth: client });
 }
 
 /**
  * Refresh access token using refresh token
+ * Creates a fresh OAuth2 client to avoid race conditions
  */
 export async function refreshAccessToken(refreshToken: string) {
-  const client = getOAuth2Client();
+  const client = createOAuth2Client();
   client.setCredentials({ refresh_token: refreshToken });
   const { credentials } = await client.refreshAccessToken();
   return credentials;
@@ -101,18 +110,41 @@ export async function uploadFileToDrive(
     body: options.data,
   };
 
-  const response = await drive.files.create({
-    requestBody: fileMetadata,
-    media,
-    fields: 'id, name, webViewLink, webContentLink',
-  });
+  try {
+    const response = await drive.files.create({
+      requestBody: fileMetadata,
+      media,
+      fields: 'id, name, webViewLink, webContentLink',
+    });
 
-  return {
-    fileId: response.data.id!,
-    name: response.data.name!,
-    webViewLink: response.data.webViewLink || undefined,
-    webContentLink: response.data.webContentLink || undefined,
-  };
+    if (!response.data.id) {
+      throw new Error('No file ID returned from Google Drive');
+    }
+
+    return {
+      fileId: response.data.id,
+      name: response.data.name || options.name,
+      webViewLink: response.data.webViewLink || undefined,
+      webContentLink: response.data.webContentLink || undefined,
+    };
+  } catch (error) {
+    // Handle specific Google Drive API errors
+    if (error instanceof Error) {
+      // Check for quota exceeded
+      if (error.message.includes('quota') || error.message.includes('storageQuotaExceeded')) {
+        throw new Error('Google Drive storage quota exceeded');
+      }
+      // Check for auth errors
+      if (error.message.includes('invalid_grant') || error.message.includes('Token has been expired')) {
+        throw new Error('Google Drive authorization expired');
+      }
+      // Check for permission errors
+      if (error.message.includes('forbidden') || error.message.includes('accessNotConfigured')) {
+        throw new Error('Google Drive access denied - please reconnect');
+      }
+    }
+    throw error;
+  }
 }
 
 export interface BulkUploadFile {
@@ -244,28 +276,52 @@ export async function bulkUploadToDrive(
 
     const batchResults = await Promise.allSettled(
       batch.map(async (file) => {
+        console.log(`[Google Drive] Processing file: ${file.name}`);
+
         // SSRF protection: validate URL before fetching
         const urlCheck = isUrlSafeForFetch(file.url, trustedOrigin);
         if (!urlCheck.safe) {
+          console.error(`[Google Drive] URL validation failed for ${file.name}: ${urlCheck.reason}`);
           throw new Error(`URL validation failed: ${urlCheck.reason}`);
         }
 
         // Fetch the file from the URL
-        const response = await fetch(file.url);
-        if (!response.ok) {
-          throw new Error('Failed to fetch file');
+        console.log(`[Google Drive] Fetching file from URL: ${file.url.substring(0, 100)}...`);
+        let response: Response;
+        try {
+          response = await fetch(file.url, {
+            // Longer timeout for large videos
+            signal: AbortSignal.timeout(5 * 60 * 1000), // 5 minute timeout
+          });
+        } catch (fetchError) {
+          const errorMessage = fetchError instanceof Error ? fetchError.message : 'Network error';
+          console.error(`[Google Drive] Failed to fetch ${file.name}: ${errorMessage}`);
+          throw new Error(`Failed to download file: ${errorMessage}`);
         }
+
+        if (!response.ok) {
+          console.error(`[Google Drive] Fetch failed for ${file.name}: HTTP ${response.status} ${response.statusText}`);
+          throw new Error(`Failed to fetch file: HTTP ${response.status} ${response.statusText}`);
+        }
+
+        const contentLength = response.headers.get('content-length');
+        console.log(`[Google Drive] Downloading ${file.name} (${contentLength ? `${Math.round(parseInt(contentLength) / 1024 / 1024)}MB` : 'unknown size'})`);
 
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
+        console.log(`[Google Drive] Uploading ${file.name} (${Math.round(buffer.length / 1024 / 1024)}MB) to Google Drive`);
+
         // Upload to Google Drive
-        return uploadFileToDrive(accessToken, {
+        const result = await uploadFileToDrive(accessToken, {
           name: file.name,
           mimeType: file.mimeType,
           data: buffer,
           folderId,
         });
+
+        console.log(`[Google Drive] Successfully uploaded ${file.name}, fileId: ${result.fileId}`);
+        return result;
       })
     );
 
