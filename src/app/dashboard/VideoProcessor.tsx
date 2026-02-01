@@ -44,6 +44,7 @@ export default function VideoProcessor({
     total: number
     savedIds: Set<string>
     failedIds: Set<string>
+    skippedIds: Set<string>
   } | null>(null)
 
   useEffect(() => {
@@ -306,12 +307,14 @@ export default function VideoProcessor({
 
     const savedIds = new Set<string>()
     const failedIds = new Set<string>()
+    const skippedIds = new Set<string>()
 
     setSaveProgress({
       current: 0,
       total: completedVideos.length,
       savedIds,
       failedIds,
+      skippedIds,
     })
 
     for (let i = 0; i < completedVideos.length; i++) {
@@ -322,6 +325,7 @@ export default function VideoProcessor({
         total: completedVideos.length,
         savedIds: new Set(savedIds),
         failedIds: new Set(failedIds),
+        skippedIds: new Set(skippedIds),
       })
 
       try {
@@ -333,10 +337,15 @@ export default function VideoProcessor({
         let response: Response | null = null
         let lastError: Error | null = null
 
-        // Retry up to 3 times with exponential backoff
+        // Retry up to 3 times with exponential backoff, with timeout
+        const TIMEOUT_MS = 180000 // 3 minutes for slow mobile connections
         for (let attempt = 0; attempt < 3; attempt++) {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
           try {
-            response = await fetch(url)
+            response = await fetch(url, { signal: controller.signal })
+            clearTimeout(timeoutId)
             if (response.ok) break
 
             if (response.status >= 400 && response.status < 500) {
@@ -346,8 +355,11 @@ export default function VideoProcessor({
             // Server error - retry
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
           } catch (err) {
+            clearTimeout(timeoutId)
             lastError = err instanceof Error ? err : new Error('Network error')
-            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+            }
           }
         }
 
@@ -361,11 +373,22 @@ export default function VideoProcessor({
         const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
 
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: 'Save Video',
-          })
-          savedIds.add(video.file.fileId)
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'Save Video',
+            })
+            savedIds.add(video.file.fileId)
+          } catch (shareErr) {
+            // User cancelled this share - continue to next video instead of stopping
+            if (shareErr instanceof Error && shareErr.name === 'AbortError') {
+              // Track as skipped so user knows what happened
+              skippedIds.add(video.file.fileId)
+              continue
+            }
+            // Other share error - mark as failed
+            failedIds.add(video.file.fileId)
+          }
         } else {
           // Fallback: try standard download on mobile
           const blobUrl = URL.createObjectURL(blob)
@@ -379,10 +402,6 @@ export default function VideoProcessor({
           savedIds.add(video.file.fileId)
         }
       } catch (err) {
-        // User cancelled - stop the loop but keep progress
-        if (err instanceof Error && err.name === 'AbortError') {
-          break
-        }
         failedIds.add(video.file.fileId)
       }
     }
@@ -393,10 +412,11 @@ export default function VideoProcessor({
       total: completedVideos.length,
       savedIds: new Set(savedIds),
       failedIds: new Set(failedIds),
+      skippedIds: new Set(skippedIds),
     })
 
-    // Clear progress after a delay if all succeeded
-    if (failedIds.size === 0) {
+    // Clear progress after a delay if all succeeded (no failures or skips)
+    if (failedIds.size === 0 && skippedIds.size === 0) {
       setTimeout(() => setSaveProgress(null), 2000)
     }
 
@@ -553,9 +573,11 @@ export default function VideoProcessor({
                     <div className="text-xs text-gray-400 text-center">
                       {isSavingAll ? (
                         <p>Tap &quot;Save Video&quot; in each share menu</p>
-                      ) : saveProgress.failedIds.size > 0 ? (
+                      ) : saveProgress.failedIds.size > 0 || saveProgress.skippedIds.size > 0 ? (
                         <p className="text-amber-400">
-                          {saveProgress.savedIds.size} saved, {saveProgress.failedIds.size} failed
+                          {saveProgress.savedIds.size} saved
+                          {saveProgress.skippedIds.size > 0 && `, ${saveProgress.skippedIds.size} skipped`}
+                          {saveProgress.failedIds.size > 0 && `, ${saveProgress.failedIds.size} failed`}
                         </p>
                       ) : (
                         <p className="text-green-400">
@@ -564,8 +586,8 @@ export default function VideoProcessor({
                       )}
                     </div>
                   )}
-                  {/* Retry failed button */}
-                  {saveProgress && saveProgress.failedIds.size > 0 && !isSavingAll && (
+                  {/* Retry skipped/failed button */}
+                  {saveProgress && (saveProgress.failedIds.size > 0 || saveProgress.skippedIds.size > 0) && !isSavingAll && (
                     <button
                       onClick={handleSaveAll}
                       className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
@@ -573,7 +595,7 @@ export default function VideoProcessor({
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      Retry Failed ({saveProgress.failedIds.size})
+                      Retry ({saveProgress.failedIds.size + saveProgress.skippedIds.size})
                     </button>
                   )}
                 </div>
