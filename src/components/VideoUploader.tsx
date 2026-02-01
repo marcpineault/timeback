@@ -43,8 +43,14 @@ interface VideoUploaderProps {
 // Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
-// Concurrent uploads - high concurrency for fast batch uploads
-const MAX_CONCURRENT_UPLOADS = 30;
+// Concurrent uploads - high concurrency for desktop, limited for mobile
+// Mobile networks struggle with many simultaneous large uploads
+const MAX_CONCURRENT_UPLOADS_DESKTOP = 30;
+const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
+
+// Retry configuration for failed uploads
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 1000; // 1 second, doubles each retry
 
 export default function VideoUploader({ onUploadComplete, disabled }: VideoUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -55,6 +61,14 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   const [isMobile, setIsMobile] = useState(false);
 
   const isUploading = uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending');
+
+  // Get max concurrent uploads based on device type
+  const getMaxConcurrentUploads = useCallback(() => {
+    return isMobile ? MAX_CONCURRENT_UPLOADS_MOBILE : MAX_CONCURRENT_UPLOADS_DESKTOP;
+  }, [isMobile]);
+
+  // Helper function to delay for retry
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   // Check if S3 is available and detect mobile on mount
   useEffect(() => {
@@ -294,66 +308,92 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
   };
 
-  // Upload a single file to S3 using presigned URL (returns promise for concurrency control)
-  const uploadSingleFileToS3 = (
+  // Upload a single file to S3 using presigned URL with retry logic (returns promise for concurrency control)
+  const uploadSingleFileToS3 = async (
     file: File,
     index: number,
     urlInfo: { url: string; key: string }
   ): Promise<{ index: number; s3Key: string } | null> => {
-    return new Promise((resolve) => {
-      setUploadingFiles(prev => prev.map((f, i) =>
-        i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
-      ));
+    let lastError = '';
 
-      const xhr = new XMLHttpRequest();
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      // If this is a retry, log and wait with exponential backoff
+      if (attempt > 0) {
+        const retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+        console.log(`[Upload] Retry ${attempt}/${MAX_RETRIES} for ${file.name} after ${retryDelay}ms`);
+        await delay(retryDelay);
 
-      // Set timeout based on file size - allow 30 seconds per MB, minimum 2 minutes
-      // This accounts for slow mobile connections
-      const timeoutMs = Math.max(120000, Math.ceil(file.size / (1024 * 1024)) * 30000);
-      xhr.timeout = timeoutMs;
-
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const progress = Math.round((event.loaded / event.total) * 100);
-          setUploadingFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, progress } : f
-          ));
-        }
-      });
-
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          // Mark as complete immediately when upload finishes (before batch confirm)
-          setUploadingFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
-          ));
-          resolve({ index, s3Key: urlInfo.key });
-        } else {
-          setUploadingFiles(prev => prev.map((f, i) =>
-            i === index ? { ...f, status: 'error' as const, error: `Upload failed: ${xhr.status}` } : f
-          ));
-          resolve(null);
-        }
-      });
-
-      xhr.addEventListener('error', () => {
+        // Update status to show we're retrying
         setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'error' as const, error: 'Network error' } : f
+          i === index ? { ...f, status: 'uploading' as const, progress: 0, error: undefined } : f
         ));
-        resolve(null);
-      });
-
-      xhr.addEventListener('timeout', () => {
+      } else {
         setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'error' as const, error: 'Upload timed out' } : f
+          i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
         ));
-        resolve(null);
+      }
+
+      const result = await new Promise<{ success: true; s3Key: string } | { success: false; error: string; shouldRetry: boolean }>((resolve) => {
+        const xhr = new XMLHttpRequest();
+
+        // Set timeout based on file size - allow 30 seconds per MB, minimum 2 minutes
+        // This accounts for slow mobile connections
+        const timeoutMs = Math.max(120000, Math.ceil(file.size / (1024 * 1024)) * 30000);
+        xhr.timeout = timeoutMs;
+
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setUploadingFiles(prev => prev.map((f, i) =>
+              i === index ? { ...f, progress } : f
+            ));
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ success: true, s3Key: urlInfo.key });
+          } else {
+            // Don't retry 4xx errors (client errors like invalid URL)
+            const shouldRetry = xhr.status >= 500 || xhr.status === 0;
+            resolve({ success: false, error: `Upload failed: ${xhr.status}`, shouldRetry });
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          resolve({ success: false, error: 'Network error', shouldRetry: true });
+        });
+
+        xhr.addEventListener('timeout', () => {
+          resolve({ success: false, error: 'Upload timed out', shouldRetry: true });
+        });
+
+        xhr.open('PUT', urlInfo.url);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
       });
 
-      xhr.open('PUT', urlInfo.url);
-      xhr.setRequestHeader('Content-Type', file.type);
-      xhr.send(file);
-    });
+      if (result.success) {
+        // Mark as complete immediately when upload finishes (before batch confirm)
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
+        ));
+        return { index, s3Key: result.s3Key };
+      }
+
+      lastError = result.error;
+
+      // Don't retry if we shouldn't
+      if (!result.shouldRetry) {
+        break;
+      }
+    }
+
+    // All retries exhausted
+    setUploadingFiles(prev => prev.map((f, i) =>
+      i === index ? { ...f, status: 'error' as const, error: lastError } : f
+    ));
+    return null;
   };
 
   // Optimized batch S3 upload - gets all URLs upfront, uploads with true parallel queue, confirms all at once
@@ -372,13 +412,15 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
     // Step 2: Upload files with true parallel queue (sliding window approach)
     // As soon as one upload completes, the next one starts immediately
+    // Use lower concurrency on mobile to prevent overwhelming the connection
+    const maxConcurrent = getMaxConcurrentUploads();
     const allResults: ({ index: number; s3Key: string } | null)[] = new Array(files.length).fill(null);
     let nextIndex = 0;
     let activeCount = 0;
 
     await new Promise<void>((resolve) => {
       const startNextUpload = () => {
-        while (activeCount < MAX_CONCURRENT_UPLOADS && nextIndex < files.length) {
+        while (activeCount < maxConcurrent && nextIndex < files.length) {
           const currentIndex = nextIndex;
           nextIndex++;
           activeCount++;
@@ -541,7 +583,9 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       }
     } else {
       // Fallback: Upload files with true parallel queue (sliding window approach)
+      // Use lower concurrency on mobile to prevent overwhelming the connection
       console.log('[Upload] Using fallback upload with parallel queue');
+      const maxConcurrent = getMaxConcurrentUploads();
       const allResults: (UploadedFile | null)[] = new Array(validFiles.length).fill(null);
 
       await new Promise<void>((resolve) => {
@@ -549,7 +593,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
         let activeCount = 0;
 
         const startNextUpload = () => {
-          while (activeCount < MAX_CONCURRENT_UPLOADS && nextIndex < validFiles.length) {
+          while (activeCount < maxConcurrent && nextIndex < validFiles.length) {
             const currentIndex = nextIndex;
             nextIndex++;
             activeCount++;
