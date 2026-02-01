@@ -6,6 +6,9 @@ import ffmpeg from 'fluent-ffmpeg';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 
+// Allow up to 3 minutes for removing sections from videos
+export const maxDuration = 180;
+
 interface Section {
   start: number;
   end: number;
