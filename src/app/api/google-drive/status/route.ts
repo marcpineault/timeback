@@ -24,6 +24,7 @@ export async function GET() {
         googleDriveAccessToken: true,
         googleDriveRefreshToken: true,
         googleDriveTokenExpiry: true,
+        googleDriveConnected: true,
       },
     });
 
@@ -35,7 +36,6 @@ export async function GET() {
     }
 
     // Check if token is expired and needs refresh
-    let accessToken = user.googleDriveAccessToken;
     const tokenExpiry = user.googleDriveTokenExpiry;
     const isExpired = tokenExpiry && tokenExpiry < new Date(Date.now() + 5 * 60 * 1000);
 
@@ -43,8 +43,6 @@ export async function GET() {
       try {
         const newCredentials = await refreshAccessToken(user.googleDriveRefreshToken);
         if (newCredentials.access_token) {
-          accessToken = newCredentials.access_token;
-
           // Update tokens in database
           await prisma.user.update({
             where: { clerkId },
@@ -53,6 +51,7 @@ export async function GET() {
               googleDriveTokenExpiry: newCredentials.expiry_date
                 ? new Date(newCredentials.expiry_date)
                 : null,
+              googleDriveConnected: true,
             },
           });
         }

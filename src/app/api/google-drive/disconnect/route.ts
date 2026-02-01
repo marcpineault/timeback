@@ -16,6 +16,7 @@ export async function POST() {
         googleDriveAccessToken: null,
         googleDriveRefreshToken: null,
         googleDriveTokenExpiry: null,
+        googleDriveConnected: false,
       },
     });
 

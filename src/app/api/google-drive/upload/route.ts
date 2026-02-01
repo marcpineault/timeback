@@ -7,11 +7,79 @@ import {
   refreshAccessToken,
   BulkUploadFile,
 } from '@/lib/googleDrive';
+import { isS3Configured, getProcessedVideoUrl } from '@/lib/s3';
 
 interface UploadRequest {
   files: BulkUploadFile[];
   createFolder?: boolean;
   folderName?: string;
+}
+
+/**
+ * Resolve video URLs by looking up in database and getting presigned S3 URLs
+ * This bypasses the authenticated download endpoint for server-side access
+ */
+async function resolveVideoUrls(
+  files: BulkUploadFile[],
+  userId: string
+): Promise<BulkUploadFile[]> {
+  const resolvedFiles: BulkUploadFile[] = [];
+
+  for (const file of files) {
+    // Check if this is a relative download URL (our internal format)
+    if (file.url.includes('/api/download/')) {
+      // Extract filename from URL
+      const urlMatch = file.url.match(/\/api\/download\/([^?]+)/);
+      if (!urlMatch) {
+        console.warn(`[Google Drive] Could not extract filename from URL: ${file.url}`);
+        resolvedFiles.push(file);
+        continue;
+      }
+
+      const filename = urlMatch[1];
+
+      // Look up the video in the database to get the S3 key
+      const video = await prisma.video.findFirst({
+        where: {
+          userId,
+          OR: [
+            { processedUrl: `/api/download/${filename}` },
+            { processedUrl: { endsWith: filename } },
+          ],
+        },
+        select: { processedUrl: true },
+      });
+
+      if (!video || !video.processedUrl) {
+        console.warn(`[Google Drive] Video not found in database: ${filename}`);
+        resolvedFiles.push(file);
+        continue;
+      }
+
+      // Check if processedUrl is an S3 key
+      const isS3Key = video.processedUrl.startsWith('processed/');
+
+      if (isS3Key && isS3Configured()) {
+        try {
+          // Get presigned URL directly from S3
+          const presignedUrl = await getProcessedVideoUrl(video.processedUrl);
+          console.log(`[Google Drive] Resolved ${filename} to S3 presigned URL`);
+          resolvedFiles.push({
+            ...file,
+            url: presignedUrl,
+          });
+          continue;
+        } catch (error) {
+          console.error(`[Google Drive] Failed to get presigned URL for ${filename}:`, error);
+        }
+      }
+    }
+
+    // Keep the original URL if we couldn't resolve it
+    resolvedFiles.push(file);
+  }
+
+  return resolvedFiles;
 }
 
 export async function POST(request: NextRequest) {
@@ -41,10 +109,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get tokens from database
+    // Get tokens and user ID from database
     const user = await prisma.user.findUnique({
       where: { clerkId },
       select: {
+        id: true, // Need internal ID for video lookup
         googleDriveAccessToken: true,
         googleDriveRefreshToken: true,
         googleDriveTokenExpiry: true,
@@ -105,9 +174,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Google Drive] Starting bulk upload of ${filesWithAbsoluteUrls.length} files for user ${clerkId}`);
 
+    // Resolve internal download URLs to direct S3 presigned URLs
+    // This is needed because server-side fetch can't access the authenticated download endpoint
+    const resolvedFiles = await resolveVideoUrls(filesWithAbsoluteUrls, user.id);
+
+    console.log(`[Google Drive] Resolved ${resolvedFiles.length} file URLs`);
+
     // Perform bulk upload with concurrency limit of 3
-    // Pass the baseUrl as trusted origin to allow same-origin requests
-    const result = await bulkUploadToDrive(accessToken, filesWithAbsoluteUrls, folderId, 3, baseUrl);
+    // Pass the baseUrl as trusted origin to allow same-origin requests (for non-S3 URLs)
+    const result = await bulkUploadToDrive(accessToken, resolvedFiles, folderId, 3, baseUrl);
 
     console.log(
       `[Google Drive] Upload complete: ${result.successful.length} succeeded, ${result.failed.length} failed`
