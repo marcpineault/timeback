@@ -5,7 +5,7 @@ import { PassThrough } from 'stream';
 import archiver from 'archiver';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
-import { isS3Configured, getS3ObjectStream } from '@/lib/s3';
+import { isS3Configured, getS3ObjectStream, findS3ObjectByFilename } from '@/lib/s3';
 
 // Allow up to 10 minutes for bulk ZIP downloads of multiple videos
 export const maxDuration = 600;
@@ -80,25 +80,45 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const isS3Key = video.processedUrl.startsWith('processed/');
+      let processedUrl = video.processedUrl;
+      let isS3Key = processedUrl.startsWith('processed/');
 
-      // For local files, verify they exist
+      // For local files, verify they exist or try to find on S3
       if (!isS3Key) {
         const filepath = path.join(processedDir, sanitizedFilename);
         if (!fs.existsSync(filepath)) {
-          console.warn(`[BulkDownload] Local file not found: ${sanitizedFilename}`);
-          continue;
-        }
-
-        // Security: Check for symlink attacks
-        const stat = fs.lstatSync(filepath);
-        if (stat.isSymbolicLink()) {
-          console.error(`[BulkDownload] Symlink attack detected: ${sanitizedFilename}`);
-          continue;
+          // Local file not found - try to find on S3 as fallback
+          if (isS3Configured()) {
+            console.log(`[BulkDownload] Local file not found, searching S3: ${sanitizedFilename}`);
+            const s3Key = await findS3ObjectByFilename(sanitizedFilename);
+            if (s3Key) {
+              console.log(`[BulkDownload] Found file on S3: ${s3Key}`);
+              // Update the database record with the correct S3 key for future downloads
+              await prisma.video.update({
+                where: { id: video.id },
+                data: { processedUrl: s3Key },
+              });
+              processedUrl = s3Key;
+              isS3Key = true;
+            } else {
+              console.warn(`[BulkDownload] File not found locally or on S3: ${sanitizedFilename}`);
+              continue;
+            }
+          } else {
+            console.warn(`[BulkDownload] Local file not found (S3 not configured): ${sanitizedFilename}`);
+            continue;
+          }
+        } else {
+          // Security: Check for symlink attacks
+          const stat = fs.lstatSync(filepath);
+          if (stat.isSymbolicLink()) {
+            console.error(`[BulkDownload] Symlink attack detected: ${sanitizedFilename}`);
+            continue;
+          }
         }
       }
 
-      validFiles.push({ name: sanitizedFilename, processedUrl: video.processedUrl });
+      validFiles.push({ name: sanitizedFilename, processedUrl });
     }
 
     if (validFiles.length === 0) {

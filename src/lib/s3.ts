@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomBytes } from 'crypto';
@@ -264,4 +264,43 @@ export async function getProcessedVideoUrl(key: string): Promise<string> {
   logger.debug('Generated presigned URL for processed video', { key });
 
   return url;
+}
+
+/**
+ * Find an S3 object by filename in the processed/ prefix
+ * Searches for files that end with the given filename (e.g., "video_processed.mp4")
+ * Returns the full S3 key if found, null otherwise
+ */
+export async function findS3ObjectByFilename(filename: string): Promise<string | null> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  try {
+    // List objects in the processed/ prefix
+    const command = new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: 'processed/',
+      MaxKeys: 1000, // Reasonable limit for search
+    });
+
+    const response = await client.send(command);
+
+    if (!response.Contents || response.Contents.length === 0) {
+      return null;
+    }
+
+    // Find an object that ends with the filename
+    const sanitized = sanitizeFilename(filename);
+    for (const obj of response.Contents) {
+      if (obj.Key && obj.Key.endsWith(sanitized)) {
+        logger.debug('Found S3 object by filename', { filename, key: obj.Key });
+        return obj.Key;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    logger.warn('Failed to search S3 for file', { filename, error: String(error) });
+    return null;
+  }
 }
