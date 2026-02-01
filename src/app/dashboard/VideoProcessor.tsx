@@ -650,10 +650,16 @@ export default function VideoProcessor({
           </div>
 
           <GoogleDriveUpload
-            files={completedVideos.map((v) => ({
-              name: v.outputFilename || `video_${v.file.fileId}.mp4`,
-              url: v.downloadUrl!,
-            }))}
+            files={completedVideos.map((v) => {
+              // Use original filename but ensure it has .mp4 extension
+              const originalName = v.file.originalName || v.file.filename;
+              const baseName = originalName.replace(/\.[^/.]+$/, ''); // Remove extension
+              const friendlyName = `${baseName}.mp4`;
+              return {
+                name: friendlyName,
+                url: v.downloadUrl!,
+              };
+            })}
           />
         </div>
       )}
