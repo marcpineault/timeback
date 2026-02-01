@@ -22,21 +22,28 @@ interface UploadRequest {
 async function resolveVideoUrls(
   files: BulkUploadFile[],
   userId: string
-): Promise<BulkUploadFile[]> {
-  const resolvedFiles: BulkUploadFile[] = [];
+): Promise<{ resolved: BulkUploadFile[]; errors: { name: string; error: string }[] }> {
+  const resolved: BulkUploadFile[] = [];
+  const errors: { name: string; error: string }[] = [];
+
+  console.log(`[Google Drive] Resolving ${files.length} file URLs for user ${userId}`);
+  console.log(`[Google Drive] S3 configured: ${isS3Configured()}`);
 
   for (const file of files) {
+    console.log(`[Google Drive] Processing file: ${file.name}, URL: ${file.url.substring(0, 80)}...`);
+
     // Check if this is a relative download URL (our internal format)
     if (file.url.includes('/api/download/')) {
       // Extract filename from URL
       const urlMatch = file.url.match(/\/api\/download\/([^?]+)/);
       if (!urlMatch) {
-        console.warn(`[Google Drive] Could not extract filename from URL: ${file.url}`);
-        resolvedFiles.push(file);
+        console.error(`[Google Drive] Could not extract filename from URL: ${file.url}`);
+        errors.push({ name: file.name, error: 'Invalid download URL format' });
         continue;
       }
 
       const filename = urlMatch[1];
+      console.log(`[Google Drive] Extracted filename: ${filename}`);
 
       // Look up the video in the database to get the S3 key
       const video = await prisma.video.findFirst({
@@ -50,36 +57,52 @@ async function resolveVideoUrls(
         select: { processedUrl: true },
       });
 
+      console.log(`[Google Drive] Database lookup result:`, video);
+
       if (!video || !video.processedUrl) {
-        console.warn(`[Google Drive] Video not found in database: ${filename}`);
-        resolvedFiles.push(file);
+        console.error(`[Google Drive] Video not found in database for filename: ${filename}`);
+        errors.push({ name: file.name, error: 'Video not found in database' });
         continue;
       }
 
       // Check if processedUrl is an S3 key
       const isS3Key = video.processedUrl.startsWith('processed/');
+      console.log(`[Google Drive] processedUrl: ${video.processedUrl}, isS3Key: ${isS3Key}`);
 
       if (isS3Key && isS3Configured()) {
         try {
           // Get presigned URL directly from S3
           const presignedUrl = await getProcessedVideoUrl(video.processedUrl);
-          console.log(`[Google Drive] Resolved ${filename} to S3 presigned URL`);
-          resolvedFiles.push({
+          console.log(`[Google Drive] Successfully resolved ${filename} to S3 presigned URL`);
+          resolved.push({
             ...file,
             url: presignedUrl,
           });
           continue;
         } catch (error) {
-          console.error(`[Google Drive] Failed to get presigned URL for ${filename}:`, error);
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[Google Drive] Failed to get presigned URL for ${filename}:`, errorMsg);
+          errors.push({ name: file.name, error: `Failed to get S3 URL: ${errorMsg}` });
+          continue;
         }
+      } else if (!isS3Key) {
+        // File is stored locally, not in S3 - this won't work for server-side fetch
+        console.error(`[Google Drive] File ${filename} is stored locally, not in S3 - cannot fetch server-side`);
+        errors.push({ name: file.name, error: 'File not available in cloud storage (stored locally)' });
+        continue;
+      } else if (!isS3Configured()) {
+        console.error(`[Google Drive] S3 is not configured but file ${filename} requires it`);
+        errors.push({ name: file.name, error: 'Cloud storage not configured' });
+        continue;
       }
+    } else {
+      // URL is already absolute (external), keep as-is
+      console.log(`[Google Drive] URL is already absolute: ${file.url.substring(0, 80)}...`);
+      resolved.push(file);
     }
-
-    // Keep the original URL if we couldn't resolve it
-    resolvedFiles.push(file);
   }
 
-  return resolvedFiles;
+  return { resolved, errors };
 }
 
 export async function POST(request: NextRequest) {
@@ -176,25 +199,40 @@ export async function POST(request: NextRequest) {
 
     // Resolve internal download URLs to direct S3 presigned URLs
     // This is needed because server-side fetch can't access the authenticated download endpoint
-    const resolvedFiles = await resolveVideoUrls(filesWithAbsoluteUrls, user.id);
+    const { resolved: resolvedFiles, errors: resolveErrors } = await resolveVideoUrls(filesWithAbsoluteUrls, user.id);
 
-    console.log(`[Google Drive] Resolved ${resolvedFiles.length} file URLs`);
+    console.log(`[Google Drive] Resolved ${resolvedFiles.length} file URLs, ${resolveErrors.length} errors`);
+
+    // If all files failed to resolve, return early with errors
+    if (resolvedFiles.length === 0 && resolveErrors.length > 0) {
+      return NextResponse.json({
+        success: false,
+        folderId,
+        uploaded: [],
+        failed: resolveErrors,
+        totalUploaded: 0,
+        totalFailed: resolveErrors.length,
+      });
+    }
 
     // Perform bulk upload with concurrency limit of 3
     // Pass the baseUrl as trusted origin to allow same-origin requests (for non-S3 URLs)
     const result = await bulkUploadToDrive(accessToken, resolvedFiles, folderId, 3, baseUrl);
 
+    // Combine resolve errors with upload errors
+    const allFailed = [...resolveErrors, ...result.failed];
+
     console.log(
-      `[Google Drive] Upload complete: ${result.successful.length} succeeded, ${result.failed.length} failed`
+      `[Google Drive] Upload complete: ${result.successful.length} succeeded, ${allFailed.length} failed`
     );
 
     return NextResponse.json({
-      success: true,
+      success: result.successful.length > 0,
       folderId,
       uploaded: result.successful,
-      failed: result.failed,
+      failed: allFailed,
       totalUploaded: result.successful.length,
-      totalFailed: result.failed.length,
+      totalFailed: allFailed.length,
     });
   } catch (error) {
     console.error('[Google Drive] Upload error:', error);

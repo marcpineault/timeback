@@ -21,6 +21,7 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
   const [uploadResult, setUploadResult] = useState<{
     uploaded: number;
     failed: number;
+    failedDetails?: { name: string; error: string }[];
     folderLink?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,10 +151,15 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
         setUploadResult({
           uploaded: result.totalUploaded,
           failed: result.totalFailed,
+          failedDetails: result.failed,
           folderLink: result.folderId
             ? `https://drive.google.com/drive/folders/${result.folderId}`
             : undefined,
         });
+        // Log any failures for debugging
+        if (result.failed && result.failed.length > 0) {
+          console.error('[Google Drive] Upload failures:', result.failed);
+        }
         onComplete?.(result.totalUploaded, result.totalFailed);
       } else {
         if (response.status === 401) {
@@ -281,15 +287,25 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
 
       {/* Upload Result */}
       {uploadResult && (
-        <div className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+        <div className={`mt-3 p-3 ${uploadResult.uploaded > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'} border rounded-lg`}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <p className="text-green-400 text-sm font-medium">
+              <p className={`${uploadResult.uploaded > 0 ? 'text-green-400' : 'text-red-400'} text-sm font-medium`}>
                 {uploadResult.uploaded} file(s) uploaded to Google Drive
                 {uploadResult.failed > 0 && (
                   <span className="text-yellow-400"> ({uploadResult.failed} failed)</span>
                 )}
               </p>
+              {/* Show error details for failed files */}
+              {uploadResult.failedDetails && uploadResult.failedDetails.length > 0 && (
+                <div className="mt-2 text-xs text-red-400">
+                  {uploadResult.failedDetails.map((f, i) => (
+                    <p key={i} className="mt-1">
+                      <span className="font-medium">{f.name}:</span> {f.error}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
             {uploadResult.folderLink && (
               <a
