@@ -151,13 +151,24 @@ export async function POST(request: NextRequest) {
         const isS3Key = file.processedUrl.startsWith('processed/');
 
         if (isS3Key && isS3Configured()) {
-          // Stream from S3/R2
+          // Download from S3/R2 and buffer before adding to archive
+          // This is more reliable than streaming, especially on mobile
           console.log(`[BulkDownload] Adding S3 file: ${file.name}`);
           try {
             const s3Stream = await getS3ObjectStream(file.processedUrl);
-            archive.append(s3Stream, { name: file.name });
+
+            // Buffer the entire file content first
+            const chunks: Buffer[] = [];
+            for await (const chunk of s3Stream) {
+              chunks.push(Buffer.from(chunk));
+            }
+            const buffer = Buffer.concat(chunks);
+            console.log(`[BulkDownload] Buffered S3 file: ${file.name} (${buffer.length} bytes)`);
+
+            // Add buffer to archive
+            archive.append(buffer, { name: file.name });
           } catch (err) {
-            console.error(`[BulkDownload] Failed to get S3 stream for ${file.name}:`, err);
+            console.error(`[BulkDownload] Failed to get S3 file ${file.name}:`, err);
           }
         } else {
           // Stream from local filesystem
@@ -167,8 +178,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      console.log(`[BulkDownload] Finalizing archive with ${validFiles.length} files`);
       // Finalize the archive
       await archive.finalize();
+      console.log(`[BulkDownload] Archive finalized`);
     })();
 
     // Handle the async file adding in background
