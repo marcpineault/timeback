@@ -21,6 +21,8 @@ export function getS3Client(): S3Client {
         accessKeyId: process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '',
         secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '',
       },
+      // Retry configuration for transient failures
+      maxAttempts: 3,
     });
   }
   return s3Client;
@@ -117,6 +119,7 @@ export async function createUploadUrl(
 /**
  * Get a readable stream for an S3 object
  * Returns a Node.js Readable stream compatible with archiver and other Node.js stream consumers
+ * Includes retry logic for large file downloads
  */
 export async function getS3ObjectStream(key: string): Promise<Readable> {
   const client = getS3Client();
@@ -127,37 +130,57 @@ export async function getS3ObjectStream(key: string): Promise<Readable> {
     Key: key,
   });
 
-  const response = await client.send(command);
+  // Retry logic for transient failures (network issues, timeouts)
+  const maxRetries = 3;
+  let lastError: Error | null = null;
 
-  if (!response.Body) {
-    throw new Error('No body in S3 response');
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logger.debug(`Downloading from S3 (attempt ${attempt}/${maxRetries})`, { key });
+      const response = await client.send(command);
+
+      if (!response.Body) {
+        throw new Error('No body in S3 response');
+      }
+
+      // AWS SDK v3 returns a web ReadableStream, convert to Node.js Readable
+      // The Body can be ReadableStream | Readable | Blob depending on environment
+      const body = response.Body;
+
+      // If it's already a Node.js Readable, return it
+      if (body instanceof Readable) {
+        return body;
+      }
+
+      // If it's a web ReadableStream, convert it to Node.js Readable
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyBody = body as any;
+      if (typeof anyBody.getReader === 'function') {
+        // It's a web ReadableStream
+        return Readable.fromWeb(anyBody as import('stream/web').ReadableStream);
+      }
+
+      // Fallback: wrap in a Readable using SDK's transformToByteArray
+      if (typeof anyBody.transformToByteArray === 'function') {
+        const bytes = await anyBody.transformToByteArray();
+        return Readable.from(Buffer.from(bytes));
+      }
+
+      // Last resort: try to iterate
+      return Readable.from(anyBody);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      logger.warn(`S3 download attempt ${attempt} failed`, { key, error: lastError.message });
+
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
   }
 
-  // AWS SDK v3 returns a web ReadableStream, convert to Node.js Readable
-  // The Body can be ReadableStream | Readable | Blob depending on environment
-  const body = response.Body;
-
-  // If it's already a Node.js Readable, return it
-  if (body instanceof Readable) {
-    return body;
-  }
-
-  // If it's a web ReadableStream, convert it to Node.js Readable
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const anyBody = body as any;
-  if (typeof anyBody.getReader === 'function') {
-    // It's a web ReadableStream
-    return Readable.fromWeb(anyBody as import('stream/web').ReadableStream);
-  }
-
-  // Fallback: wrap in a Readable using SDK's transformToByteArray
-  if (typeof anyBody.transformToByteArray === 'function') {
-    const bytes = await anyBody.transformToByteArray();
-    return Readable.from(Buffer.from(bytes));
-  }
-
-  // Last resort: try to iterate
-  return Readable.from(anyBody);
+  throw lastError || new Error('Failed to download from S3 after retries');
 }
 
 /**

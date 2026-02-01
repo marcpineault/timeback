@@ -523,7 +523,7 @@ export default function ProcessingOptions({
             <label className="block text-sm text-gray-400 mb-2">Headline Text</label>
             <input
               type="text"
-              value={config.headline.trim()}
+              value={config.headline === ' ' ? '' : config.headline}
               onChange={(e) => setConfig({ ...config, headline: e.target.value || ' ' })}
               placeholder="Enter your headline"
               className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400"
