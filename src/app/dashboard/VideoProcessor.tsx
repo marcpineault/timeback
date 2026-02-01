@@ -320,6 +320,12 @@ export default function VideoProcessor({
     for (let i = 0; i < completedVideos.length; i++) {
       const video = completedVideos[i]
 
+      // Add delay between videos to let iOS fully complete previous share operation
+      // iOS can fail if we try to open a new share sheet too quickly
+      if (i > 0) {
+        await new Promise(r => setTimeout(r, 500))
+      }
+
       setSaveProgress({
         current: i + 1,
         total: completedVideos.length,
@@ -379,6 +385,12 @@ export default function VideoProcessor({
               title: 'Save Video',
             })
             savedIds.add(video.file.fileId)
+
+            // Add delay after successful share to let iOS complete the operation
+            // before starting the next one - iOS can fail rapid successive shares
+            if (i < completedVideos.length - 1) {
+              await new Promise(r => setTimeout(r, 1000))
+            }
           } catch (shareErr) {
             // User cancelled this share - continue to next video instead of stopping
             if (shareErr instanceof Error && shareErr.name === 'AbortError') {
@@ -386,8 +398,15 @@ export default function VideoProcessor({
               skippedIds.add(video.file.fileId)
               continue
             }
+            // Log the actual error for debugging
+            console.error('Share failed:', shareErr instanceof Error ? `${shareErr.name}: ${shareErr.message}` : shareErr)
             // Other share error - mark as failed
             failedIds.add(video.file.fileId)
+
+            // Add delay before next attempt to let iOS recover
+            if (i < completedVideos.length - 1) {
+              await new Promise(r => setTimeout(r, 1500))
+            }
           }
         } else {
           // Fallback: try standard download on mobile
