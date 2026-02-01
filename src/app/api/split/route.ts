@@ -5,6 +5,9 @@ import { splitVideo } from '@/lib/ffmpeg';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 
+// Allow up to 2 minutes for video splitting operations
+export const maxDuration = 120;
+
 export async function POST(request: NextRequest) {
   try {
     // Authentication check

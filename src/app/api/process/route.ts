@@ -14,6 +14,9 @@ import { isS3Configured, getS3ObjectStream, deleteS3Object, uploadProcessedVideo
 import { logger } from '@/lib/logger';
 import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
 
+// Allow up to 10 minutes for video processing (transcription, silence removal, etc.)
+export const maxDuration = 600;
+
 export async function POST(request: NextRequest) {
   // Run cleanup of old files in background (non-blocking)
   setImmediate(() => cleanupOldFiles());
