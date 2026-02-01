@@ -32,6 +32,7 @@ export default function VideoSplitter({
   const [splitPoints, setSplitPoints] = useState<number[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isSplitting, setIsSplitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -170,8 +171,13 @@ export default function VideoSplitter({
     }
 
     setIsSplitting(true);
+    setError(null);
 
     try {
+      // 2 minute timeout for split operation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
       const response = await fetch('/api/split', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,7 +185,10 @@ export default function VideoSplitter({
           filename,
           splitPoints,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const data = await response.json();
@@ -188,9 +197,12 @@ export default function VideoSplitter({
 
       const data = await response.json();
       onSplitComplete(data.parts);
-    } catch (error) {
-      console.error('Split error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to split video');
+    } catch (err) {
+      console.error('Split error:', err);
+      const message = err instanceof Error
+        ? (err.name === 'AbortError' ? 'Split timed out. Please try again.' : err.message)
+        : 'Failed to split video';
+      setError(message);
     } finally {
       setIsSplitting(false);
     }
@@ -408,6 +420,9 @@ export default function VideoSplitter({
             </div>
 
             <div className="flex items-center gap-3">
+              {error && (
+                <p className="text-red-400 text-sm mr-2">{error}</p>
+              )}
               <button
                 onClick={onClose}
                 disabled={isSplitting}

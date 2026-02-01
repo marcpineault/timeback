@@ -34,6 +34,7 @@ export default function MediaEditor({
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Segments state
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -395,6 +396,7 @@ export default function MediaEditor({
     }
 
     setIsProcessing(true);
+    setError(null);
 
     try {
       // Merge overlapping sections and sort
@@ -411,11 +413,18 @@ export default function MediaEditor({
           return acc;
         }, []);
 
+      // 3 minute timeout for section removal
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+
       const response = await fetch('/api/remove-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename, sectionsToRemove: mergedSections }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const data = await response.json();
@@ -428,9 +437,12 @@ export default function MediaEditor({
         timeRemoved: data.stats.timeRemoved,
       });
       onClose();
-    } catch (error) {
-      console.error('Export error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to export video');
+    } catch (err) {
+      console.error('Export error:', err);
+      const message = err instanceof Error
+        ? (err.name === 'AbortError' ? 'Export timed out. Please try again.' : err.message)
+        : 'Failed to export video';
+      setError(message);
     } finally {
       setIsProcessing(false);
     }
@@ -475,17 +487,22 @@ export default function MediaEditor({
 
         <h1 className="text-white font-medium text-sm truncate max-w-[50%]">{videoName}</h1>
 
-        <button
-          onClick={handleExport}
-          disabled={isProcessing}
-          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 active:scale-95 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-all"
-        >
-          {isProcessing ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            'Export'
+        <div className="flex items-center gap-3">
+          {error && (
+            <p className="text-red-400 text-xs max-w-[200px] truncate">{error}</p>
           )}
-        </button>
+          <button
+            onClick={handleExport}
+            disabled={isProcessing}
+            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 active:scale-95 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-all"
+          >
+            {isProcessing ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              'Export'
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Video Preview */}

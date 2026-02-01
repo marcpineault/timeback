@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
@@ -8,6 +8,28 @@ import VideoPreview from '@/components/VideoPreview'
 import MediaEditor from '@/components/MediaEditor'
 // Google Drive disabled - will be enabled later
 // import GoogleDriveUpload from '@/components/GoogleDriveUpload'
+
+// Fetch with timeout for mobile reliability
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 600000 // 10 minutes default for video processing
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (err) {
+    clearTimeout(timeoutId)
+    throw err
+  }
+}
 
 interface EnabledFeatures {
   speechCorrection: boolean
@@ -131,7 +153,8 @@ export default function VideoProcessor({
 
   const processVideo = async (video: QueuedVideo, config: ProcessingConfig): Promise<QueuedVideo> => {
     try {
-      const response = await fetch('/api/process', {
+      // 10 minute timeout for video processing (transcription, effects, etc.)
+      const response = await fetchWithTimeout('/api/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -142,7 +165,7 @@ export default function VideoProcessor({
           addWatermark: hasWatermark,
           ...config,
         }),
-      })
+      }, 600000)
 
       if (!response.ok) {
         const data = await response.json()
@@ -245,11 +268,12 @@ export default function VideoProcessor({
         .map(v => v.downloadUrl?.split('/').pop())
         .filter((f): f is string => !!f)
 
-      const response = await fetch('/api/download/bulk', {
+      // 10 minute timeout for bulk ZIP creation and download
+      const response = await fetchWithTimeout('/api/download/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filenames }),
-      })
+      }, 600000)
 
       if (!response.ok) {
         throw new Error('Failed to create ZIP')
@@ -295,7 +319,8 @@ export default function VideoProcessor({
 
     for (const video of completedVideos) {
       try {
-        const response = await fetch(video.downloadUrl!)
+        // 5 minute timeout for each video download
+        const response = await fetchWithTimeout(video.downloadUrl!, {}, 300000)
         if (!response.ok) {
           console.error('Save failed:', response.status, response.statusText)
           continue
@@ -310,7 +335,7 @@ export default function VideoProcessor({
           })
         }
       } catch (err) {
-        // User cancelled - stop the loop
+        // User cancelled or timeout - stop the loop
         if (err instanceof Error && err.name === 'AbortError') {
           break
         }
@@ -331,7 +356,8 @@ export default function VideoProcessor({
         await new Promise(resolve => setTimeout(resolve, 500))
       }
       try {
-        const response = await fetch(video.downloadUrl!)
+        // 5 minute timeout for each video download
+        const response = await fetchWithTimeout(video.downloadUrl!, {}, 300000)
         if (!response.ok) {
           console.error('Download failed:', response.status, response.statusText)
           continue

@@ -3,6 +3,9 @@ import { auth } from '@clerk/nextjs/server';
 import { getOrCreateUser } from '@/lib/user';
 import { uploadToDrive, isGoogleDriveConnected } from '@/lib/google-drive';
 
+// Allow up to 5 minutes for video fetch + Google Drive upload
+export const maxDuration = 300;
+
 /**
  * Validate that a URL is safe to fetch (prevents SSRF attacks)
  * Only allows HTTPS URLs to trusted domains

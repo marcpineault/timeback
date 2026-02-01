@@ -27,6 +27,7 @@ export default function VideoTrimmer({
   const [endTime, setEndTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isTrimming, setIsTrimming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState<'start' | 'end' | 'playhead' | null>(null);
 
   useEffect(() => {
@@ -165,8 +166,13 @@ export default function VideoTrimmer({
     }
 
     setIsTrimming(true);
+    setError(null);
 
     try {
+      // 2 minute timeout for trim operation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
       const response = await fetch('/api/trim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -175,7 +181,10 @@ export default function VideoTrimmer({
           startTime,
           endTime,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const data = await response.json();
@@ -184,9 +193,12 @@ export default function VideoTrimmer({
 
       const data = await response.json();
       onTrimComplete(data.filename);
-    } catch (error) {
-      console.error('Trim error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to trim video');
+    } catch (err) {
+      console.error('Trim error:', err);
+      const message = err instanceof Error
+        ? (err.name === 'AbortError' ? 'Trim timed out. Please try again.' : err.message)
+        : 'Failed to trim video';
+      setError(message);
     } finally {
       setIsTrimming(false);
     }
@@ -358,6 +370,9 @@ export default function VideoTrimmer({
               >
                 Cancel
               </button>
+              {error && (
+                <p className="text-red-400 text-sm mr-4">{error}</p>
+              )}
               <button
                 onClick={handleApplyTrim}
                 disabled={isTrimming}

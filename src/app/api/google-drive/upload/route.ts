@@ -8,6 +8,9 @@ import {
   BulkUploadFile,
 } from '@/lib/googleDrive';
 
+// Allow up to 10 minutes for bulk Google Drive uploads
+export const maxDuration = 600;
+
 interface UploadRequest {
   files: BulkUploadFile[];
   createFolder?: boolean;
