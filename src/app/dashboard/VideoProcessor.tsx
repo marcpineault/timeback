@@ -39,7 +39,12 @@ export default function VideoProcessor({
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [platform, setPlatform] = useState<'ios' | 'android' | 'desktop'>('desktop')
   const [isSavingAll, setIsSavingAll] = useState(false)
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false)
+  const [saveProgress, setSaveProgress] = useState<{
+    current: number
+    total: number
+    savedIds: Set<string>
+    failedIds: Set<string>
+  } | null>(null)
 
   useEffect(() => {
     const ua = navigator.userAgent
@@ -292,72 +297,64 @@ export default function VideoProcessor({
     setVideosRemaining(prev => Math.max(0, prev - pendingVideos.length))
   }
 
-  // Download as ZIP file
-  const handleDownloadZip = async () => {
-    const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
-    setIsDownloadingZip(true)
-
-    try {
-      // Extract filenames from download URLs
-      const filenames = completedVideos
-        .map(v => v.downloadUrl?.split('/').pop())
-        .filter((f): f is string => !!f)
-
-      const response = await fetch('/api/download/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filenames }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create ZIP')
-      }
-
-      const blob = await response.blob()
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const zipFilename = `timeback-videos-${timestamp}.zip`
-
-      // On mobile, use Web Share API to share the ZIP file
-      if ((platform === 'ios' || platform === 'android') && navigator.share && navigator.canShare) {
-        const file = new File([blob], zipFilename, { type: 'application/zip' })
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: 'Download Videos',
-          })
-        }
-      } else {
-        // Desktop: trigger download via anchor
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = zipFilename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        console.error('ZIP download failed:', err)
-      }
-    }
-
-    setIsDownloadingZip(false)
-  }
-
   // Save videos to camera roll one by one (mobile only)
   const handleSaveAll = async () => {
     const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
     setIsSavingAll(true)
 
-    for (const video of completedVideos) {
+    const savedIds = new Set<string>()
+    const failedIds = new Set<string>()
+
+    setSaveProgress({
+      current: 0,
+      total: completedVideos.length,
+      savedIds,
+      failedIds,
+    })
+
+    for (let i = 0; i < completedVideos.length; i++) {
+      const video = completedVideos[i]
+
+      setSaveProgress({
+        current: i + 1,
+        total: completedVideos.length,
+        savedIds: new Set(savedIds),
+        failedIds: new Set(failedIds),
+      })
+
       try {
-        const response = await fetch(video.downloadUrl!)
-        if (!response.ok) {
-          console.error('Save failed:', response.status, response.statusText)
+        // Add cache-busting and retry logic
+        const url = video.downloadUrl!.includes('?')
+          ? `${video.downloadUrl}&_t=${Date.now()}`
+          : `${video.downloadUrl}?_t=${Date.now()}`
+
+        let response: Response | null = null
+        let lastError: Error | null = null
+
+        // Retry up to 3 times with exponential backoff
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            response = await fetch(url)
+            if (response.ok) break
+
+            if (response.status >= 400 && response.status < 500) {
+              // Client error - don't retry
+              break
+            }
+            // Server error - retry
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+          } catch (err) {
+            lastError = err instanceof Error ? err : new Error('Network error')
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+          }
+        }
+
+        if (!response?.ok) {
+          console.error('Save failed:', response?.status || lastError?.message)
+          failedIds.add(video.file.fileId)
           continue
         }
+
         const blob = await response.blob()
         const file = new File([blob], video.outputFilename || 'video.mp4', { type: 'video/mp4' })
 
@@ -366,13 +363,39 @@ export default function VideoProcessor({
             files: [file],
             title: 'Save Video',
           })
+          savedIds.add(video.file.fileId)
+        } else {
+          // Fallback: try standard download on mobile
+          const blobUrl = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = blobUrl
+          link.download = video.outputFilename || 'video.mp4'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(blobUrl)
+          savedIds.add(video.file.fileId)
         }
       } catch (err) {
-        // User cancelled - stop the loop
+        // User cancelled - stop the loop but keep progress
         if (err instanceof Error && err.name === 'AbortError') {
           break
         }
+        failedIds.add(video.file.fileId)
       }
+    }
+
+    // Keep progress visible for a moment to show final state
+    setSaveProgress({
+      current: completedVideos.length,
+      total: completedVideos.length,
+      savedIds: new Set(savedIds),
+      failedIds: new Set(failedIds),
+    })
+
+    // Clear progress after a delay if all succeeded
+    if (failedIds.size === 0) {
+      setTimeout(() => setSaveProgress(null), 2000)
     }
 
     setIsSavingAll(false)
@@ -498,10 +521,10 @@ export default function VideoProcessor({
                 </div>
               </div>
               {(platform === 'ios' || platform === 'android') ? (
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col gap-2">
                   <button
                     onClick={handleSaveAll}
-                    disabled={isSavingAll || isDownloadingZip}
+                    disabled={isSavingAll}
                     className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     {isSavingAll ? (
@@ -510,7 +533,9 @@ export default function VideoProcessor({
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Saving...
+                        {saveProgress
+                          ? `Saving ${saveProgress.current}/${saveProgress.total}...`
+                          : 'Preparing...'}
                       </>
                     ) : (
                       <>
@@ -521,28 +546,34 @@ export default function VideoProcessor({
                       </>
                     )}
                   </button>
-                  <button
-                    onClick={handleDownloadZip}
-                    disabled={isSavingAll || isDownloadingZip}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-600/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                  >
-                    {isDownloadingZip ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Creating ZIP...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download ZIP
-                      </>
-                    )}
-                  </button>
+                  {/* Progress and status display */}
+                  {saveProgress && (
+                    <div className="text-xs text-gray-400 text-center">
+                      {isSavingAll ? (
+                        <p>Tap &quot;Save Video&quot; in each share menu</p>
+                      ) : saveProgress.failedIds.size > 0 ? (
+                        <p className="text-amber-400">
+                          {saveProgress.savedIds.size} saved, {saveProgress.failedIds.size} failed
+                        </p>
+                      ) : (
+                        <p className="text-green-400">
+                          All {saveProgress.savedIds.size} videos saved!
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {/* Retry failed button */}
+                  {saveProgress && saveProgress.failedIds.size > 0 && !isSavingAll && (
+                    <button
+                      onClick={handleSaveAll}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Retry Failed ({saveProgress.failedIds.size})
+                    </button>
+                  )}
                 </div>
               ) : (
                 <button
@@ -569,21 +600,29 @@ export default function VideoProcessor({
                 </button>
               )}
             </div>
-            {/* Review tip */}
+            {/* Review tip - platform specific */}
             <div className="flex items-start gap-2 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
               <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-sm text-gray-300">
-                <span className="font-medium">Tip:</span> Use the{' '}
-                <span className="inline-flex items-center gap-1 text-indigo-400">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                  edit
-                </span>{' '}
-                button to cut out any unwanted sections from your video.
-              </p>
+              <div className="text-sm text-gray-300 space-y-2">
+                {(platform === 'ios' || platform === 'android') && (
+                  <p>
+                    <span className="font-medium">How to save:</span> Tap &quot;Save to Camera Roll&quot; above.
+                    For each video, tap <span className="text-blue-400">&quot;Save Video&quot;</span> in the share menu that appears.
+                  </p>
+                )}
+                <p>
+                  <span className="font-medium">Tip:</span> Use the{' '}
+                  <span className="inline-flex items-center gap-1 text-indigo-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    edit
+                  </span>{' '}
+                  button to cut out any unwanted sections from your video.
+                </p>
+              </div>
             </div>
           </div>
 
