@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface EnabledFeatures {
   speechCorrection: boolean;
@@ -127,6 +127,39 @@ const ASPECT_RATIO_OPTIONS: { value: AspectRatioPreset; label: string; platforms
   { value: '4:5', label: '4:5 Portrait', platforms: 'Instagram, Facebook' },
 ];
 
+// localStorage key for persisting processing config
+const STORAGE_KEY = 'timeback_processing_config';
+
+// Default config - used for initial state and merging with saved config
+const DEFAULT_CONFIG: ProcessingConfig = {
+  generateCaptions: true,
+  headline: '',
+  headlinePosition: 'top',
+  headlineStyle: 'speech-bubble',
+  captionStyle: 'instagram',
+  silenceThreshold: -25,
+  silenceDuration: 0.5,
+  useHookAsHeadline: false,
+  generateAIHeadline: false,
+  generateBRoll: false,
+  bRollConfig: {
+    style: 'dynamic',
+    intensity: 'medium',
+    maxMoments: 3,
+  },
+  normalizeAudio: true,
+  aspectRatio: 'original',
+  speechCorrection: false,
+  speechCorrectionConfig: {
+    removeFillerWords: true,
+    removeRepeatedWords: true,
+    removeRepeatedPhrases: true,
+    removeFalseStarts: true,
+    removeSelfCorrections: true,
+    aggressiveness: 'moderate',
+  },
+};
+
 export default function ProcessingOptions({
   onProcess,
   isProcessing,
@@ -134,35 +167,52 @@ export default function ProcessingOptions({
   videoCount = 1,
   enabledFeatures = { speechCorrection: false },
 }: ProcessingOptionsProps) {
-  const [config, setConfig] = useState<ProcessingConfig>({
-    generateCaptions: true,
-    headline: '',
-    headlinePosition: 'top',
-    headlineStyle: 'speech-bubble',
-    captionStyle: 'instagram',
-    silenceThreshold: -25,
-    silenceDuration: 0.5,
-    useHookAsHeadline: false,
-    generateAIHeadline: false,
-    generateBRoll: false,
-    bRollConfig: {
-      style: 'dynamic',
-      intensity: 'medium',
-      maxMoments: 3,
-    },
-    normalizeAudio: true,
-    aspectRatio: 'original',
-    speechCorrection: false,
-    speechCorrectionConfig: {
-      removeFillerWords: true,
-      removeRepeatedWords: true,
-      removeRepeatedPhrases: true,
-      removeFalseStarts: true,
-      removeSelfCorrections: true,
-      aggressiveness: 'moderate',
-    },
-  });
+  const [config, setConfig] = useState<ProcessingConfig>(DEFAULT_CONFIG);
   const [activePreset, setActivePreset] = useState<PresetKey>('custom');
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+
+  // Load saved config from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Merge with defaults to handle new fields added in updates
+        setConfig(prev => ({
+          ...prev,
+          ...parsed,
+          // Always reset headline to empty (session-specific)
+          headline: '',
+          // Deep merge speechCorrectionConfig
+          speechCorrectionConfig: {
+            ...prev.speechCorrectionConfig,
+            ...(parsed.speechCorrectionConfig || {}),
+          },
+          // Deep merge bRollConfig
+          bRollConfig: {
+            ...prev.bRollConfig,
+            ...(parsed.bRollConfig || {}),
+          },
+        }));
+      }
+    } catch {
+      // localStorage not available or invalid JSON - use defaults
+    }
+    setIsConfigLoaded(true);
+  }, []);
+
+  // Save config to localStorage when it changes (after initial load)
+  useEffect(() => {
+    if (!isConfigLoaded) return;
+
+    try {
+      // Don't persist custom headline text (session-specific)
+      const toSave = { ...config, headline: '' };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    } catch {
+      // localStorage not available - silently ignore
+    }
+  }, [config, isConfigLoaded]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
