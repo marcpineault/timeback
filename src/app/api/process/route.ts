@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       speechCorrection,
       speechCorrectionConfig,
       userId: bodyUserId,
+      videoId: existingVideoId,  // Optional: for reprocessing existing videos
     } = body;
 
     if (!fileId || !filename) {
@@ -67,13 +68,21 @@ export async function POST(request: NextRequest) {
 
       if (user) {
         dbUserId = user.id;
-        const canProcess = await canProcessVideo(user.id);
 
-        if (!canProcess.allowed) {
-          return NextResponse.json(
-            { error: canProcess.reason },
-            { status: 403 }
-          );
+        // Allow reprocessing even if at limit (check existingVideoId ownership)
+        const isReprocessAttempt = existingVideoId && await prisma.video.findFirst({
+          where: { id: existingVideoId, userId: user.id },
+        });
+
+        if (!isReprocessAttempt) {
+          const canProcess = await canProcessVideo(user.id);
+
+          if (!canProcess.allowed) {
+            return NextResponse.json(
+              { error: canProcess.reason },
+              { status: 403 }
+            );
+          }
         }
       }
     }
@@ -89,18 +98,43 @@ export async function POST(request: NextRequest) {
     let inputPath = path.join(uploadsDir, filename);
     let downloadedFromS3 = false;
 
-    // Create video record with PENDING status immediately
+    // Create or reuse video record
     let videoRecordId: string | null = null;
+    let isReprocess = false;  // Track if this is a reprocess (don't count against limit)
+
     if (dbUserId) {
-      const record = await prisma.video.create({
-        data: {
-          userId: dbUserId,
-          originalName: filename,
-          status: 'PENDING',
-        },
-      });
-      videoRecordId = record.id;
-      logger.info('Video record created', { videoId: videoRecordId, status: 'PENDING' });
+      if (existingVideoId) {
+        // Reprocessing an existing video - verify ownership and reuse record
+        const existingVideo = await prisma.video.findFirst({
+          where: { id: existingVideoId, userId: dbUserId },
+        });
+
+        if (existingVideo) {
+          videoRecordId = existingVideo.id;
+          isReprocess = true;
+          // Reset status to PENDING for reprocessing
+          await prisma.video.update({
+            where: { id: existingVideoId },
+            data: { status: 'PENDING', errorMessage: null, processedUrl: null },
+          });
+          logger.info('Reprocessing existing video', { videoId: videoRecordId });
+        } else {
+          logger.warn('Video not found or not owned by user', { videoId: existingVideoId });
+        }
+      }
+
+      // Create new record if not reprocessing
+      if (!videoRecordId) {
+        const record = await prisma.video.create({
+          data: {
+            userId: dbUserId,
+            originalName: filename,
+            status: 'PENDING',
+          },
+        });
+        videoRecordId = record.id;
+        logger.info('Video record created', { videoId: videoRecordId, status: 'PENDING' });
+      }
     }
 
     // Helper to update video status
@@ -157,7 +191,7 @@ export async function POST(request: NextRequest) {
     let stepOutput: string;
 
     const options: ProcessingOptions = {
-      silenceThreshold: silenceThreshold ?? -30,
+      silenceThreshold: silenceThreshold ?? -25,
       silenceDuration: silenceDuration ?? 0.4,
       headline: headline || undefined,
       headlinePosition: headlinePosition || 'top',
@@ -449,7 +483,13 @@ export async function POST(request: NextRequest) {
 
     // Track usage and update video record if user is authenticated
     if (dbUserId) {
-      await incrementVideoCount(dbUserId);
+      // Only increment video count for new videos, not reprocesses
+      if (!isReprocess) {
+        await incrementVideoCount(dbUserId);
+        logger.info('Video count incremented for new video');
+      } else {
+        logger.info('Skipped video count increment (reprocess)');
+      }
 
       // Update video record to COMPLETED with the processed URL (S3 key or local path)
       await updateVideoStatus('COMPLETED', { processedUrl });
@@ -475,12 +515,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    logger.info('Processing complete', { outputFilename, processedUrl });
+    logger.info('Processing complete', { outputFilename, processedUrl, videoId: videoRecordId });
     return NextResponse.json({
       success: true,
       outputFilename,
       downloadUrl: `/api/download/${outputFilename}`,
       processedUrl, // Include S3 key or local path for client
+      videoId: videoRecordId, // Include videoId for reprocessing
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
