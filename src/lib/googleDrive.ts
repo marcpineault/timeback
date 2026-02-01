@@ -1,4 +1,5 @@
 import { google, drive_v3 } from 'googleapis';
+import { Readable } from 'stream';
 
 /**
  * Create a new OAuth2 client instance
@@ -105,9 +106,12 @@ export async function uploadFileToDrive(
     ...(options.folderId && { parents: [options.folderId] }),
   };
 
+  // Convert Buffer to readable stream - Google Drive API requires a stream
+  const stream = Readable.from(options.data);
+
   const media = {
     mimeType: options.mimeType,
-    body: options.data,
+    body: stream,
   };
 
   try {
