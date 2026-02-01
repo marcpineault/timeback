@@ -4,7 +4,7 @@ import fs from 'fs';
 import { createReadStream } from 'fs';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
-import { isS3Configured, getProcessedVideoUrl } from '@/lib/s3';
+import { isS3Configured, getProcessedVideoUrl, findS3ObjectByFilename, getS3ObjectStream } from '@/lib/s3';
 
 // Allow up to 5 minutes for large video downloads on slow mobile connections
 export const maxDuration = 300;
@@ -106,21 +106,55 @@ export async function GET(
     }
 
     // Check if the processedUrl is an S3 key (starts with "processed/")
-    const isS3Key = video.processedUrl.startsWith('processed/');
+    let processedUrl = video.processedUrl;
+    let isS3Key = processedUrl.startsWith('processed/');
+
+    // Fallback: Check local filesystem first for non-S3 URLs
+    const processedDir = process.env.PROCESSED_DIR || path.join(process.cwd(), 'processed');
+    const filepath = path.join(processedDir, sanitizedFilename);
+
+    // If not an S3 key, check if local file exists
+    if (!isS3Key) {
+      if (!fs.existsSync(filepath)) {
+        // Local file not found - try to find on S3 as fallback
+        if (isS3Configured()) {
+          console.log(`[Download] Local file not found, searching S3: ${sanitizedFilename}`);
+          const s3Key = await findS3ObjectByFilename(sanitizedFilename);
+          if (s3Key) {
+            console.log(`[Download] Found file on S3: ${s3Key}`);
+            // Update the database record with the correct S3 key for future downloads
+            await prisma.video.update({
+              where: { id: video.id },
+              data: { processedUrl: s3Key },
+            });
+            processedUrl = s3Key;
+            isS3Key = true;
+          } else {
+            console.warn(`[Download] File not found locally or on S3: ${sanitizedFilename}`);
+            return NextResponse.json(
+              { error: 'File not found' },
+              { status: 404 }
+            );
+          }
+        } else {
+          return NextResponse.json(
+            { error: 'File not found' },
+            { status: 404 }
+          );
+        }
+      }
+    }
 
     if (isS3Key && isS3Configured()) {
       // Serve from R2 via presigned URL redirect
-      console.log(`[Download] Serving from R2: ${video.processedUrl}`);
-      const presignedUrl = await getProcessedVideoUrl(video.processedUrl);
+      console.log(`[Download] Serving from R2: ${processedUrl}`);
+      const presignedUrl = await getProcessedVideoUrl(processedUrl);
 
       // Redirect to the presigned URL for fast CDN download
       return NextResponse.redirect(presignedUrl);
     }
 
-    // Fallback: Serve from local filesystem
-    const processedDir = process.env.PROCESSED_DIR || path.join(process.cwd(), 'processed');
-    const filepath = path.join(processedDir, sanitizedFilename);
-
+    // Serve from local filesystem
     if (!fs.existsSync(filepath)) {
       return NextResponse.json(
         { error: 'File not found' },
