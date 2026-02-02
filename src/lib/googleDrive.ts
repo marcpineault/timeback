@@ -34,18 +34,34 @@ export function isGoogleDriveConfigured(): boolean {
 
 /**
  * Generate OAuth2 authorization URL for Google Drive access
+ * @param state - Optional state parameter for CSRF protection
+ * @param includePickerScope - If true, include drive.readonly scope for Google Picker
  */
-export function getAuthUrl(state?: string): string {
+export function getAuthUrl(state?: string, includePickerScope: boolean = false): string {
   const client = getOAuth2Client();
+
+  const scopes = [
+    'https://www.googleapis.com/auth/drive.file', // Access files created by this app
+  ];
+
+  // Add readonly scope for Google Picker (allows browsing user's Drive)
+  if (includePickerScope) {
+    scopes.push('https://www.googleapis.com/auth/drive.readonly');
+  }
 
   return client.generateAuthUrl({
     access_type: 'offline',
-    scope: [
-      'https://www.googleapis.com/auth/drive.file', // Only access files created by this app
-    ],
+    scope: scopes,
     state,
     prompt: 'consent', // Always show consent screen to get refresh token
   });
+}
+
+/**
+ * Get the Google Client ID for use with Google Picker API
+ */
+export function getGoogleClientId(): string | undefined {
+  return process.env.GOOGLE_CLIENT_ID;
 }
 
 /**
@@ -427,4 +443,82 @@ export async function listAllDriveFolders(
   } while (pageToken);
 
   return allFolders;
+}
+
+export interface DriveFileMetadata {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}
+
+/**
+ * Get file metadata from Google Drive
+ */
+export async function getFileMetadata(
+  accessToken: string,
+  fileId: string
+): Promise<DriveFileMetadata> {
+  const drive = getDriveClient(accessToken);
+
+  const response = await drive.files.get({
+    fileId,
+    fields: 'id, name, mimeType, size',
+  });
+
+  return {
+    id: response.data.id!,
+    name: response.data.name!,
+    mimeType: response.data.mimeType!,
+    size: parseInt(response.data.size || '0', 10),
+  };
+}
+
+/**
+ * Download a file from Google Drive
+ * Returns a readable stream of the file content
+ */
+export async function downloadFileFromDrive(
+  accessToken: string,
+  fileId: string
+): Promise<{ stream: NodeJS.ReadableStream; metadata: DriveFileMetadata }> {
+  const drive = getDriveClient(accessToken);
+
+  // Get file metadata first
+  const metadata = await getFileMetadata(accessToken, fileId);
+
+  // Download the file
+  const response = await drive.files.get(
+    {
+      fileId,
+      alt: 'media',
+    },
+    {
+      responseType: 'stream',
+    }
+  );
+
+  return {
+    stream: response.data as NodeJS.ReadableStream,
+    metadata,
+  };
+}
+
+/**
+ * Download a file from Google Drive as a Buffer
+ */
+export async function downloadFileAsBuffer(
+  accessToken: string,
+  fileId: string
+): Promise<{ buffer: Buffer; metadata: DriveFileMetadata }> {
+  const { stream, metadata } = await downloadFileFromDrive(accessToken, fileId);
+
+  // Convert stream to buffer
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+
+  return { buffer, metadata };
 }
