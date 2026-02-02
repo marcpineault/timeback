@@ -5,6 +5,7 @@ import { getOrCreateUser } from '@/lib/user'
 import { PLANS, PlanType } from '@/lib/plans'
 import { stripe } from '@/lib/stripe'
 import SubscriptionActions from './SubscriptionActions'
+import type Stripe from 'stripe'
 
 async function getSubscriptionDetails(stripeSubscriptionId: string | null) {
   if (!stripeSubscriptionId || !stripe) {
@@ -12,7 +13,7 @@ async function getSubscriptionDetails(stripeSubscriptionId: string | null) {
   }
 
   try {
-    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId) as Stripe.Subscription
     return {
       status: subscription.status,
       currentPeriodEnd: new Date(subscription.current_period_end * 1000),
