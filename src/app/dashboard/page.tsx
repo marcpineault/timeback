@@ -78,10 +78,10 @@ export default async function DashboardPage() {
               Tutorials
             </a>
             <Link
-              href="/pricing"
+              href="/account/subscription"
               className="text-gray-400 hover:text-white transition-colors text-sm"
             >
-              Upgrade
+              Subscription
             </Link>
             <UserButton afterSignOutUrl="/" />
           </div>
@@ -102,12 +102,19 @@ export default async function DashboardPage() {
                   : `${usage.videosUsed} videos used this month (unlimited)`}
               </p>
             </div>
-            {usage.plan === 'FREE' && (
+            {usage.plan === 'FREE' ? (
               <Link
                 href="/pricing"
                 className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg text-sm font-medium transition-colors text-center"
               >
                 Upgrade to Pro
+              </Link>
+            ) : (
+              <Link
+                href="/account/subscription"
+                className="px-4 py-2 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-white rounded-lg text-sm font-medium transition-colors text-center"
+              >
+                Manage Plan
               </Link>
             )}
           </div>
