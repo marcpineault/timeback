@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import NewsletterSignup from '@/components/NewsletterSignup'
 
 export default async function LandingPage() {
   const { userId } = await auth()
@@ -348,6 +349,9 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Newsletter Signup */}
+      <NewsletterSignup />
 
       {/* Final CTA */}
       <section className="py-16 sm:py-24 px-4">
