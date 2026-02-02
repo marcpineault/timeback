@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { logger } from './logger';
+import { isFileLocked } from './fileLock';
 
 const MAX_FILE_AGE_HOURS = 1; // Delete files older than 1 hour
 const CONCURRENCY_LIMIT = 5; // Process 5 files at a time
@@ -28,11 +29,22 @@ export async function cleanupOldFiles(): Promise<void> {
 
           const filepath = path.join(dir, file);
 
+          // Skip files that are currently being processed
+          if (isFileLocked(filepath)) {
+            logger.debug('Skipping locked file during cleanup', { filepath });
+            return;
+          }
+
           try {
             const stat = await fs.stat(filepath);
             const fileAge = now - stat.mtimeMs;
 
             if (fileAge > maxAge) {
+              // Double-check lock before deleting (in case it was acquired during stat)
+              if (isFileLocked(filepath)) {
+                logger.debug('Skipping newly locked file during cleanup', { filepath });
+                return;
+              }
               await fs.unlink(filepath);
               logger.debug('Deleted old file', { filepath });
             }
