@@ -51,7 +51,66 @@ export async function POST(req: Request) {
     const planDetails = PLANS[plan]
     const planDescription = planDetails.features.join(' • ')
 
-    // Create checkout session
+    // Check if user already has an active subscription - upgrade with proration
+    if (user.stripeSubscriptionId) {
+      try {
+        // Retrieve the existing subscription
+        const existingSubscription = await stripe.subscriptions.retrieve(
+          user.stripeSubscriptionId
+        )
+
+        // Only upgrade if subscription is active and not canceled
+        if (
+          existingSubscription.status === 'active' &&
+          !existingSubscription.cancel_at_period_end
+        ) {
+          const subscriptionItemId = existingSubscription.items.data[0]?.id
+
+          if (subscriptionItemId) {
+            // Update the subscription with proration
+            // This gives credit for unused time on current plan
+            await stripe.subscriptions.update(user.stripeSubscriptionId, {
+              items: [
+                {
+                  id: subscriptionItemId,
+                  price: STRIPE_PRICES[plan],
+                },
+              ],
+              proration_behavior: 'create_prorations',
+              metadata: {
+                plan,
+                videosPerMonth: planDetails.videosPerMonth.toString(),
+                maxDuration: planDetails.maxDuration.toString(),
+                maxResolution: planDetails.maxResolution.toString(),
+              },
+            })
+
+            // Update user's plan in database immediately
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { plan },
+            })
+
+            // Redirect to success page - upgrade is complete with proration
+            return NextResponse.redirect(
+              new URL(
+                `/dashboard?success=true&upgraded=true`,
+                process.env.NEXT_PUBLIC_APP_URL
+              ),
+              { status: 303 }
+            )
+          }
+        }
+      } catch (subscriptionError) {
+        // If subscription retrieval fails, fall through to create new checkout
+        console.error(
+          'Failed to upgrade existing subscription:',
+          subscriptionError
+        )
+      }
+    }
+
+    // Create new checkout session for users without active subscription
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
