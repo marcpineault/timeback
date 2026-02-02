@@ -3,6 +3,7 @@ import path from 'path';
 import fs, { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { logger } from './logger';
+import { runFFmpegCommand, runFFmpegWithRetry, runFFmpegSpawn, FFmpegProcessError, FFmpegProcessConfig, getMemoryEfficientOptions } from './ffmpegProcess';
 
 /**
  * Custom error class for file not found errors during video processing
@@ -266,33 +267,50 @@ export async function removeSilence(
 
   logger.debug(`[Silence Removal] Processing ${segments.length} segments...`);
 
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .complexFilter(filterComplex)
-      .outputOptions([
-        '-map', '[outv]',
-        '-map', '[outa]',
-        // Memory-efficient settings for constrained server environments
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '0',
-        '-max_muxing_queue_size', '512',  // Limit muxing buffer
-        '-bufsize', '1M',  // Limit rate control buffer
-        '-c:a', 'aac',
-        '-b:a', '128k',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        logger.debug(`[Silence Removal] Complete!`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        logger.error(`[Silence Removal] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  // Use retry wrapper for resilience against SIGKILL/memory issues
+  const processConfig: FFmpegProcessConfig = {
+    timeout: 5 * 60 * 1000, // 5 minutes timeout
+    maxRetries: 1, // Retry once on transient failures
+    context: 'Silence Removal',
+  };
+
+  try {
+    await runFFmpegWithRetry(() => {
+      return ffmpeg(inputPath)
+        .complexFilter(filterComplex)
+        .outputOptions([
+          '-map', '[outv]',
+          '-map', '[outa]',
+          // Memory-efficient settings for constrained server environments
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '2',  // Limit threads to reduce memory pressure
+          '-max_muxing_queue_size', '512',  // Limit muxing buffer
+          '-bufsize', '1M',  // Limit rate control buffer
+          '-c:a', 'aac',
+          '-b:a', '128k',
+        ])
+        .output(outputPath);
+    }, processConfig);
+
+    logger.debug(`[Silence Removal] Complete!`);
+    return outputPath;
+  } catch (err) {
+    // Provide more helpful error messages for common failures
+    if (err instanceof FFmpegProcessError) {
+      if (err.isMemoryKill) {
+        logger.error(`[Silence Removal] Process killed due to memory constraints. Video may be too long or complex.`);
+        throw new Error('Video processing failed due to memory constraints. Try a shorter video or disable some processing options.');
+      }
+      if (err.isTimeout) {
+        logger.error(`[Silence Removal] Process timed out`);
+        throw new Error('Video processing timed out. The video may be too long or the server is under heavy load.');
+      }
+    }
+    logger.error(`[Silence Removal] Error:`, err instanceof Error ? err : new Error(String(err)));
+    throw err;
+  }
 }
 
 /**
@@ -346,38 +364,41 @@ export async function burnCaptions(
   }
   logger.debug(`[Captions] Filter: ${filterString}`);
 
-  return new Promise((resolve, reject) => {
-    const cmd = ffmpeg(inputPath)
-      .videoFilters(filterString)
-      .outputOptions([
-        // Memory-efficient encoding for constrained server environments
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '0',
-        '-max_muxing_queue_size', '512',
-        '-bufsize', '1M',
-        '-c:a', 'copy',
-      ])
-      .output(outputPath)
-      .on('stderr', (line: string) => {
-        if (line.includes('subtitle') || line.includes('Error') || line.includes('error')) {
-          logger.debug(`[Captions FFmpeg] ${line}`);
-        }
-      })
-      .on('end', () => {
-        logger.debug(`[Captions] Complete!`);
-        try { fs.unlinkSync(tempSubPath); } catch {}
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        logger.error(`[Captions] Error:`, err);
-        try { fs.unlinkSync(tempSubPath); } catch {}
-        reject(err);
-      });
+  const processConfig: FFmpegProcessConfig = {
+    timeout: 5 * 60 * 1000,
+    maxRetries: 1,
+    context: 'Captions',
+  };
 
-    cmd.run();
-  });
+  try {
+    await runFFmpegWithRetry(() => {
+      return ffmpeg(inputPath)
+        .videoFilters(filterString)
+        .outputOptions([
+          // Memory-efficient encoding for constrained server environments
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '2',
+          '-max_muxing_queue_size', '512',
+          '-bufsize', '1M',
+          '-c:a', 'copy',
+        ])
+        .output(outputPath);
+    }, processConfig);
+
+    logger.debug(`[Captions] Complete!`);
+    try { fs.unlinkSync(tempSubPath); } catch {}
+    return outputPath;
+  } catch (err) {
+    try { fs.unlinkSync(tempSubPath); } catch {}
+
+    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
+      throw new Error('Caption burning failed due to memory constraints. Try a shorter video.');
+    }
+    logger.error(`[Captions] Error:`, err instanceof Error ? err : new Error(String(err)));
+    throw err;
+  }
 }
 
 /**
@@ -530,41 +551,37 @@ export async function addHeadline(
 
   logger.debug(`[Headline] Adding 2-line headline: "${line1}" / "${line2}" at ${position} (${headlineStyle})`);
 
-  return new Promise((resolve, reject) => {
-    let stderrOutput = '';
+  const processConfig: FFmpegProcessConfig = {
+    timeout: 3 * 60 * 1000, // 3 minutes should be enough for headline
+    maxRetries: 1,
+    context: 'Headline',
+  };
 
-    ffmpeg(inputPath)
-      .videoFilters(filterString)
-      .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '0',
-        '-max_muxing_queue_size', '512',
-        '-bufsize', '1M',
-        '-c:a', 'copy',
-      ])
-      .output(outputPath)
-      .on('stderr', (line: string) => {
-        stderrOutput += line + '\n';
-        // Log FFmpeg progress/errors in real-time for debugging
-        if (line.includes('Error') || line.includes('error') || line.includes('Invalid')) {
-          logger.debug(`[Headline FFmpeg] ${line}`);
-        }
-      })
-      .on('end', () => {
-        logger.debug(`[Headline] Complete!`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        // Include stderr output in error for better diagnostics
-        const errorDetails = stderrOutput.slice(-1000); // Last 1000 chars of stderr
-        logger.error(`[Headline] Error:`, err);
-        logger.error(`[Headline] FFmpeg stderr: ${errorDetails}`);
-        reject(new Error(`${err.message}\nFFmpeg details: ${errorDetails}`));
-      })
-      .run();
-  });
+  try {
+    await runFFmpegWithRetry(() => {
+      return ffmpeg(inputPath)
+        .videoFilters(filterString)
+        .outputOptions([
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '2',
+          '-max_muxing_queue_size', '512',
+          '-bufsize', '1M',
+          '-c:a', 'copy',
+        ])
+        .output(outputPath);
+    }, processConfig);
+
+    logger.debug(`[Headline] Complete!`);
+    return outputPath;
+  } catch (err) {
+    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
+      throw new Error('Headline rendering failed due to memory constraints.');
+    }
+    logger.error(`[Headline] Error:`, err instanceof Error ? err : new Error(String(err)));
+    throw err;
+  }
 }
 
 export interface BRollCutaway {
@@ -746,50 +763,52 @@ async function overlayAnimationOnVideo(
   startTime: number,
   duration: number
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // Use filter_complex to overlay animation with fade in/out
-    const fadeIn = 0.3;
-    const fadeOut = 0.3;
-    const endTime = startTime + duration;
+  // Use filter_complex to overlay animation with fade in/out
+  const fadeIn = 0.3;
+  const fadeOut = 0.3;
+  const endTime = startTime + duration;
 
-    // Filter: overlay animation on main video with time-based enable and fade
-    const filterComplex = [
-      // Scale animation if needed and add fade
-      `[1:v]fade=t=in:st=0:d=${fadeIn},fade=t=out:st=${duration - fadeOut}:d=${fadeOut}[anim]`,
-      // Overlay at position with time enable
-      `[0:v][anim]overlay=x=${x}:y=${y}:enable='between(t,${startTime},${endTime})'[out]`
-    ].join(';');
+  // Filter: overlay animation on main video with time-based enable and fade
+  const filterComplex = [
+    // Scale animation if needed and add fade
+    `[1:v]fade=t=in:st=0:d=${fadeIn},fade=t=out:st=${duration - fadeOut}:d=${fadeOut}[anim]`,
+    // Overlay at position with time enable
+    `[0:v][anim]overlay=x=${x}:y=${y}:enable='between(t,${startTime},${endTime})'[out]`
+  ].join(';');
 
-    const args = [
-      '-y',
-      '-i', mainVideo,
-      '-i', animationVideo,
-      '-filter_complex', filterComplex,
-      '-map', '[out]',
-      '-map', '0:a?',
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '28',
-      '-c:a', 'copy',
-      '-shortest',
-      outputPath
-    ];
+  const args = [
+    '-y',
+    '-i', mainVideo,
+    '-i', animationVideo,
+    '-filter_complex', filterComplex,
+    '-map', '[out]',
+    '-map', '0:a?',
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-crf', '28',
+    '-threads', '2',
+    '-c:a', 'copy',
+    '-shortest',
+    outputPath
+  ];
 
-    logger.debug(`[B-Roll] Overlaying animation at (${x},${y}) from ${startTime}s to ${endTime}s`);
+  logger.debug(`[B-Roll] Overlaying animation at (${x},${y}) from ${startTime}s to ${endTime}s`);
 
-    const proc = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] });
-    let stderr = '';
-    proc.stderr?.on('data', (data) => { stderr += data.toString(); });
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        logger.error(`[B-Roll] FFmpeg overlay error: ${stderr.slice(-500)}`);
-        reject(new Error(`FFmpeg overlay failed with code ${code}`));
-      }
+  try {
+    await runFFmpegSpawn(args, {
+      timeout: 3 * 60 * 1000, // 3 minute timeout
+      maxRetries: 1,
+      context: 'B-Roll Overlay',
     });
-    proc.on('error', reject);
-  });
+  } catch (err) {
+    if (err instanceof FFmpegProcessError) {
+      logger.error(`[B-Roll] FFmpeg overlay error: ${err.message}`);
+      if (err.isMemoryKill) {
+        throw new Error('B-Roll overlay failed due to memory constraints.');
+      }
+    }
+    throw err;
+  }
 }
 
 /**
@@ -802,25 +821,33 @@ export async function normalizeAudio(
 ): Promise<string> {
   logger.debug(`[Audio] Normalizing audio levels...`);
 
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .audioFilters('loudnorm=I=-14:TP=-1:LRA=11')
-      .outputOptions([
-        '-c:v', 'copy',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        logger.debug(`[Audio] Normalization complete!`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        logger.error(`[Audio] Normalization error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const processConfig: FFmpegProcessConfig = {
+    timeout: 3 * 60 * 1000,
+    maxRetries: 1,
+    context: 'Audio Normalization',
+  };
+
+  try {
+    await runFFmpegWithRetry(() => {
+      return ffmpeg(inputPath)
+        .audioFilters('loudnorm=I=-14:TP=-1:LRA=11')
+        .outputOptions([
+          '-c:v', 'copy',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+        ])
+        .output(outputPath);
+    }, processConfig);
+
+    logger.debug(`[Audio] Normalization complete!`);
+    return outputPath;
+  } catch (err) {
+    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
+      throw new Error('Audio normalization failed due to memory constraints.');
+    }
+    logger.error(`[Audio] Normalization error:`, err instanceof Error ? err : new Error(String(err)));
+    throw err;
+  }
 }
 
 /**
@@ -902,28 +929,36 @@ export async function convertAspectRatio(
     `[bg][fg]overlay=(W-w)/2:(H-h)/2[out]`
   ].join(';');
 
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .complexFilter(filterComplex, 'out')
-      .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '0',
-        '-max_muxing_queue_size', '512',
-        '-c:a', 'copy',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        logger.debug(`[Aspect] Conversion complete!`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        logger.error(`[Aspect] Conversion error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const processConfig: FFmpegProcessConfig = {
+    timeout: 5 * 60 * 1000,
+    maxRetries: 1,
+    context: 'Aspect Ratio',
+  };
+
+  try {
+    await runFFmpegWithRetry(() => {
+      return ffmpeg(inputPath)
+        .complexFilter(filterComplex, 'out')
+        .outputOptions([
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '2',
+          '-max_muxing_queue_size', '512',
+          '-c:a', 'copy',
+        ])
+        .output(outputPath);
+    }, processConfig);
+
+    logger.debug(`[Aspect] Conversion complete!`);
+    return outputPath;
+  } catch (err) {
+    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
+      throw new Error('Aspect ratio conversion failed due to memory constraints.');
+    }
+    logger.error(`[Aspect] Conversion error:`, err instanceof Error ? err : new Error(String(err)));
+    throw err;
+  }
 }
 
 /**
@@ -1048,39 +1083,37 @@ export async function applyCombinedFilters(
   const filterString = filters.join(',');
   logger.debug(`[Combined] Applying ${filters.length} filters in single pass`);
 
-  return new Promise((resolve, reject) => {
-    let stderrOutput = '';
+  const processConfig: FFmpegProcessConfig = {
+    timeout: 5 * 60 * 1000,
+    maxRetries: 1,
+    context: 'Combined Filters',
+  };
 
-    ffmpeg(inputPath)
-      .videoFilters(filterString)
-      .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '0',
-        '-max_muxing_queue_size', '512',
-        '-bufsize', '1M',
-        '-c:a', 'copy',
-      ])
-      .output(outputPath)
-      .on('stderr', (line: string) => {
-        stderrOutput += line + '\n';
-        if (line.includes('Error') || line.includes('error') || line.includes('Invalid')) {
-          logger.debug(`[Combined FFmpeg] ${line}`);
-        }
-      })
-      .on('end', () => {
-        logger.debug(`[Combined] Processing complete!`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        const errorDetails = stderrOutput.slice(-1000);
-        logger.error(`[Combined] Error:`, err);
-        logger.error(`[Combined] FFmpeg stderr: ${errorDetails}`);
-        reject(new Error(`${err.message}\nFFmpeg details: ${errorDetails}`));
-      })
-      .run();
-  });
+  try {
+    await runFFmpegWithRetry(() => {
+      return ffmpeg(inputPath)
+        .videoFilters(filterString)
+        .outputOptions([
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '2',
+          '-max_muxing_queue_size', '512',
+          '-bufsize', '1M',
+          '-c:a', 'copy',
+        ])
+        .output(outputPath);
+    }, processConfig);
+
+    logger.debug(`[Combined] Processing complete!`);
+    return outputPath;
+  } catch (err) {
+    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
+      throw new Error('Combined filter processing failed due to memory constraints.');
+    }
+    logger.error(`[Combined] Error:`, err instanceof Error ? err : new Error(String(err)));
+    throw err;
+  }
 }
 
 /**

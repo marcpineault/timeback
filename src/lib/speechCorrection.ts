@@ -5,6 +5,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { TranscriptionWord } from './whisper';
 import { safeFFprobe } from './ffmpeg';
+import { runFFmpegWithRetry, FFmpegProcessError, FFmpegProcessConfig } from './ffmpegProcess';
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -944,38 +945,53 @@ export async function applySpeechCorrections(
 
   console.log(`[Speech Correction] Processing ${segments.length} segments...`);
 
-  return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .complexFilter(filterComplex)
-      .outputOptions([
-        '-map', '[outv]',
-        '-map', '[outa]',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-threads', '2',
-        '-max_muxing_queue_size', '512',
-        '-bufsize', '1M',
-        '-c:a', 'aac',
-        '-b:a', '96k',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        const totalKept = segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
-        const timeRemoved = duration - totalKept;
-        console.log(`[Speech Correction] Complete! Removed ${timeRemoved.toFixed(2)}s of mistakes`);
-        resolve({
-          outputPath,
-          segmentsRemoved: mistakes.length,
-          timeRemoved
-        });
-      })
-      .on('error', (err) => {
-        console.error(`[Speech Correction] Error:`, err);
-        reject(err);
-      })
-      .run();
-  });
+  const processConfig: FFmpegProcessConfig = {
+    timeout: 5 * 60 * 1000, // 5 minutes
+    maxRetries: 1,
+    context: 'Speech Correction',
+  };
+
+  try {
+    await runFFmpegWithRetry(() => {
+      return ffmpeg(inputPath)
+        .complexFilter(filterComplex)
+        .outputOptions([
+          '-map', '[outv]',
+          '-map', '[outa]',
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '28',
+          '-threads', '2',
+          '-max_muxing_queue_size', '512',
+          '-bufsize', '1M',
+          '-c:a', 'aac',
+          '-b:a', '96k',
+        ])
+        .output(outputPath);
+    }, processConfig);
+
+    const totalKept = segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+    const timeRemoved = duration - totalKept;
+    console.log(`[Speech Correction] Complete! Removed ${timeRemoved.toFixed(2)}s of mistakes`);
+    return {
+      outputPath,
+      segmentsRemoved: mistakes.length,
+      timeRemoved
+    };
+  } catch (err) {
+    if (err instanceof FFmpegProcessError) {
+      if (err.isMemoryKill) {
+        console.error(`[Speech Correction] Process killed due to memory constraints`);
+        throw new Error('Speech correction failed due to memory constraints. Try a shorter video or disable some options.');
+      }
+      if (err.isTimeout) {
+        console.error(`[Speech Correction] Process timed out`);
+        throw new Error('Speech correction timed out. The video may be too long.');
+      }
+    }
+    console.error(`[Speech Correction] Error:`, err);
+    throw err;
+  }
 }
 
 /**
