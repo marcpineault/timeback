@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
             headers: {
               'Content-Type': file.mimeType,
             },
-            body: buffer,
+            body: new Uint8Array(buffer),
           });
 
           if (!uploadResponse.ok) {
