@@ -5,7 +5,6 @@ import { getOrCreateUser } from '@/lib/user'
 import { PLANS, PlanType } from '@/lib/plans'
 import { stripe } from '@/lib/stripe'
 import SubscriptionActions from './SubscriptionActions'
-import type Stripe from 'stripe'
 
 async function getSubscriptionDetails(stripeSubscriptionId: string | null) {
   if (!stripeSubscriptionId || !stripe) {
@@ -13,11 +12,19 @@ async function getSubscriptionDetails(stripeSubscriptionId: string | null) {
   }
 
   try {
-    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId) as Stripe.Subscription
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+      expand: ['items.data'],
+    })
+
+    // In Stripe API 2025-03-31+, billing periods are now at subscription item level
+    const firstItem = subscription.items.data[0]
+    const currentPeriodEnd = firstItem?.current_period_end
+    const currentPeriodStart = firstItem?.current_period_start
+
     return {
       status: subscription.status,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : new Date(),
+      currentPeriodStart: currentPeriodStart ? new Date(currentPeriodStart * 1000) : new Date(),
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       cancelAt: subscription.cancel_at ? new Date(subscription.cancel_at * 1000) : null,
     }
