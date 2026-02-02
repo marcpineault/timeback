@@ -27,6 +27,11 @@ interface ImportResult {
   error?: string;
 }
 
+interface TokenState {
+  accessToken: string;
+  tokenExpiry: Date | null;
+}
+
 export async function POST(request: NextRequest) {
   const { userId: clerkId } = await auth();
 
@@ -82,33 +87,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Refresh token if expired
-    let accessToken = user.googleDriveAccessToken;
-    const tokenExpiry = user.googleDriveTokenExpiry;
-    const isExpired = tokenExpiry && tokenExpiry < new Date(Date.now() + 5 * 60 * 1000);
+    // Token state that can be refreshed during the download loop
+    let tokenState: TokenState = {
+      accessToken: user.googleDriveAccessToken,
+      tokenExpiry: user.googleDriveTokenExpiry,
+    };
+    const refreshToken = user.googleDriveRefreshToken;
 
-    if (isExpired && user.googleDriveRefreshToken) {
-      try {
-        const newCredentials = await refreshAccessToken(user.googleDriveRefreshToken);
-        if (newCredentials.access_token) {
-          accessToken = newCredentials.access_token;
-          await prisma.user.update({
-            where: { clerkId },
-            data: {
-              googleDriveAccessToken: newCredentials.access_token,
-              googleDriveTokenExpiry: newCredentials.expiry_date
+    // Helper to check and refresh token if needed (called before each file download)
+    const ensureValidToken = async (): Promise<string> => {
+      const isExpiringSoon = tokenState.tokenExpiry &&
+        tokenState.tokenExpiry < new Date(Date.now() + 5 * 60 * 1000);
+
+      if (isExpiringSoon && refreshToken) {
+        console.log('[Google Drive Import] Token expiring soon, refreshing...');
+        try {
+          const newCredentials = await refreshAccessToken(refreshToken);
+          if (newCredentials.access_token) {
+            tokenState = {
+              accessToken: newCredentials.access_token,
+              tokenExpiry: newCredentials.expiry_date
                 ? new Date(newCredentials.expiry_date)
                 : null,
-            },
-          });
+            };
+            // Update token in database
+            await prisma.user.update({
+              where: { clerkId },
+              data: {
+                googleDriveAccessToken: newCredentials.access_token,
+                googleDriveTokenExpiry: tokenState.tokenExpiry,
+              },
+            });
+            console.log('[Google Drive Import] Token refreshed successfully');
+          }
+        } catch (refreshError) {
+          console.error('[Google Drive Import] Token refresh failed:', refreshError);
+          throw new Error('Google Drive session expired. Please reconnect.');
         }
-      } catch (refreshError) {
-        console.error('[Google Drive Import] Token refresh failed:', refreshError);
-        return NextResponse.json(
-          { error: 'Google Drive session expired. Please reconnect.' },
-          { status: 401 }
-        );
       }
+
+      return tokenState.accessToken;
+    };
+
+    // Initial token refresh check
+    try {
+      await ensureValidToken();
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Token refresh failed' },
+        { status: 401 }
+      );
     }
 
     // Process files
@@ -116,6 +144,18 @@ export async function POST(request: NextRequest) {
     const useS3 = isS3Configured();
 
     for (const file of body.files) {
+      // Ensure token is valid before each download (important for multi-file imports)
+      let accessToken: string;
+      try {
+        accessToken = await ensureValidToken();
+      } catch (error) {
+        results.push({
+          success: false,
+          originalName: file.name,
+          error: error instanceof Error ? error.message : 'Token refresh failed',
+        });
+        continue;
+      }
       try {
         console.log(`[Google Drive Import] Downloading: ${file.name} (${file.fileId})`);
 
