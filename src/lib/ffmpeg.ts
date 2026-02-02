@@ -65,9 +65,12 @@ export interface ProcessingOptions {
 }
 
 /**
- * Detect the noise floor of a video's audio track
- * This analyzes a sample of the audio to determine the background noise level
- * Returns the noise floor in dB (typically between -60 and -20 dB)
+ * Detect the optimal silence threshold for a video's audio track
+ * Uses volumedetect to find the mean volume level, which is a good baseline for silence threshold
+ *
+ * The logic: mean_volume represents average loudness including speech and pauses.
+ * Anything significantly below the mean is likely silence/pauses.
+ * We set threshold slightly below mean to catch pauses without cutting quiet speech.
  *
  * Performance: Only samples first 30 seconds for fast analysis during bulk processing
  */
@@ -75,79 +78,77 @@ export async function detectNoiseFloor(
   inputPath: string,
   sampleDuration: number = 30 // Only analyze first N seconds for performance
 ): Promise<{ noiseFloor: number; recommendedThreshold: number }> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     let statsOutput = '';
 
-    logger.debug(`[Noise Floor] Analyzing audio noise floor (sampling ${sampleDuration}s)`);
+    logger.debug(`[Audio Analysis] Analyzing audio levels (sampling ${sampleDuration}s)`);
 
-    // Use astats filter to get audio statistics
-    // We analyze RMS (Root Mean Square) levels which represent average loudness
+    // Use volumedetect filter to get mean and max volume
+    // This is more reliable than astats for determining silence threshold
     const command = ffmpeg(inputPath)
       .inputOptions(['-t', String(sampleDuration)]) // Only sample first N seconds
-      .audioFilters('astats=metadata=1:reset=1')
+      .audioFilters('volumedetect')
       .format('null')
       .output('/dev/null');
 
     command
       .on('stderr', (line: string) => {
         statsOutput += line + '\n';
-
-        // Look for RMS level in the output
-        // Format: [Parsed_astats_0 @ ...] RMS level dB: -XX.XX
-        // or: lavfi.astats.Overall.RMS_level=-XX.XX
       })
       .on('end', () => {
-        // Parse the astats output to find RMS levels
-        // We look for the minimum RMS level which represents the quietest parts (noise floor)
-        const rmsMatches = statsOutput.match(/RMS level dB:\s*(-?[\d.]+)/gi) ||
-                          statsOutput.match(/RMS_level=(-?[\d.]+)/gi);
+        // Parse volumedetect output for mean_volume and max_volume
+        // Format: [Parsed_volumedetect_0 @ ...] mean_volume: -XX.X dB
+        // Format: [Parsed_volumedetect_0 @ ...] max_volume: -XX.X dB
+        const meanMatch = statsOutput.match(/mean_volume:\s*(-?[\d.]+)\s*dB/i);
+        const maxMatch = statsOutput.match(/max_volume:\s*(-?[\d.]+)\s*dB/i);
 
-        if (!rmsMatches || rmsMatches.length === 0) {
-          // Fallback: try to find any dB level measurements
-          const dbMatches = statsOutput.match(/-[\d.]+\s*dB/gi);
-          if (dbMatches && dbMatches.length > 0) {
-            const levels = dbMatches.map(m => parseFloat(m.replace('dB', '').trim()));
-            const minLevel = Math.min(...levels.filter(l => l > -100 && l < 0));
-            const noiseFloor = minLevel || -50;
-            // Recommended threshold is 3-6 dB above noise floor
-            const recommendedThreshold = Math.min(-15, Math.max(-50, noiseFloor + 5));
-            logger.debug(`[Noise Floor] Detected (fallback): ${noiseFloor.toFixed(1)} dB, recommended threshold: ${recommendedThreshold.toFixed(1)} dB`);
-            resolve({ noiseFloor, recommendedThreshold });
-            return;
-          }
-
-          // If no audio stats found, return conservative defaults
-          logger.debug(`[Noise Floor] Could not detect noise floor, using defaults`);
+        if (!meanMatch) {
+          logger.debug(`[Audio Analysis] Could not detect mean volume, using defaults`);
           resolve({ noiseFloor: -40, recommendedThreshold: -25 });
           return;
         }
 
-        // Extract numeric values from matches
-        const levels = rmsMatches.map(m => {
-          const match = m.match(/-?[\d.]+/);
-          return match ? parseFloat(match[0]) : null;
-        }).filter((l): l is number => l !== null && l > -100 && l < 0);
+        const meanVolume = parseFloat(meanMatch[1]);
+        const maxVolume = maxMatch ? parseFloat(maxMatch[1]) : meanVolume + 10;
 
-        if (levels.length === 0) {
-          logger.debug(`[Noise Floor] No valid RMS levels found, using defaults`);
-          resolve({ noiseFloor: -40, recommendedThreshold: -25 });
-          return;
+        // Calculate dynamic range (difference between peak and mean)
+        const dynamicRange = maxVolume - meanVolume;
+
+        // The recommended threshold should be:
+        // - Close to or slightly below the mean volume for typical speech content
+        // - Adjusted based on dynamic range (more range = more room to be aggressive)
+        //
+        // For speech videos:
+        // - Mean is usually -20 to -30 dB
+        // - Pauses are typically 10-20 dB below mean
+        // - We want threshold at or just below mean to catch pauses
+        //
+        // Threshold = mean_volume + small_offset
+        // Small offset: 0 to +3 dB (slightly above mean catches more pauses)
+        let recommendedThreshold: number;
+
+        if (dynamicRange > 15) {
+          // High dynamic range (lots of variation) - can be more aggressive
+          // Set threshold at mean level
+          recommendedThreshold = meanVolume;
+        } else if (dynamicRange > 8) {
+          // Medium dynamic range - set threshold slightly below mean
+          recommendedThreshold = meanVolume - 3;
+        } else {
+          // Low dynamic range (consistent volume) - be less aggressive
+          recommendedThreshold = meanVolume - 5;
         }
 
-        // The noise floor is typically the quietest sustained level
-        // We use the minimum RMS level as an approximation
-        const noiseFloor = Math.min(...levels);
-
-        // Recommended threshold is 3-6 dB above noise floor
-        // This ensures we catch speech but not background noise
         // Clamp to reasonable bounds (-50 to -15 dB)
-        const recommendedThreshold = Math.min(-15, Math.max(-50, noiseFloor + 5));
+        recommendedThreshold = Math.min(-15, Math.max(-50, recommendedThreshold));
 
-        logger.debug(`[Noise Floor] Detected: ${noiseFloor.toFixed(1)} dB, recommended threshold: ${recommendedThreshold.toFixed(1)} dB`);
-        resolve({ noiseFloor, recommendedThreshold });
+        logger.debug(`[Audio Analysis] Mean volume: ${meanVolume.toFixed(1)} dB, Max volume: ${maxVolume.toFixed(1)} dB, Dynamic range: ${dynamicRange.toFixed(1)} dB`);
+        logger.debug(`[Audio Analysis] Recommended threshold: ${recommendedThreshold.toFixed(1)} dB`);
+
+        resolve({ noiseFloor: meanVolume, recommendedThreshold });
       })
       .on('error', (err: Error) => {
-        logger.error(`[Noise Floor] Error analyzing audio:`, err);
+        logger.error(`[Audio Analysis] Error analyzing audio:`, err);
         // Return defaults on error rather than failing
         resolve({ noiseFloor: -40, recommendedThreshold: -25 });
       })
@@ -318,9 +319,9 @@ export async function removeSilence(
   // Auto-detect optimal silence threshold if enabled
   if (options.autoSilenceThreshold) {
     logger.info(`[Silence Removal] Auto-detecting optimal silence threshold...`);
-    const { recommendedThreshold, noiseFloor } = await detectNoiseFloor(inputPath);
+    const { recommendedThreshold, noiseFloor: meanVolume } = await detectNoiseFloor(inputPath);
     threshold = recommendedThreshold;
-    logger.info(`[Silence Removal] Auto-detected noise floor: ${noiseFloor.toFixed(1)} dB, using threshold: ${threshold.toFixed(1)} dB`);
+    logger.info(`[Silence Removal] Mean volume: ${meanVolume.toFixed(1)} dB, using threshold: ${threshold.toFixed(1)} dB`);
   }
 
   // Detect silences
