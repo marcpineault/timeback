@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       captionStyle,
       silenceThreshold,
       silenceDuration,
+      autoSilenceThreshold,
       generateCaptions,
       useHookAsHeadline,
       generateAIHeadline: shouldGenerateAIHeadline,
@@ -206,6 +207,7 @@ export async function POST(request: NextRequest) {
     const options: ProcessingOptions = {
       silenceThreshold: silenceThreshold ?? -25,
       silenceDuration: silenceDuration ?? 0.4,
+      autoSilenceThreshold: autoSilenceThreshold ?? false,
       headline: headline || undefined,
       headlinePosition: headlinePosition || 'top',
       headlineStyle: headlineStyle || 'speech-bubble',

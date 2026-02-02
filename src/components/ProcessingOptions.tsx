@@ -38,6 +38,7 @@ export interface ProcessingConfig {
   captionStyle: 'instagram';
   silenceThreshold: number;
   silenceDuration: number;
+  autoSilenceThreshold: boolean;
   useHookAsHeadline: boolean;
   generateAIHeadline: boolean;  // Use AI to generate engaging headline
   generateBRoll: boolean;
@@ -79,7 +80,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       generateCaptions: true,
       captionStyle: 'instagram',
       normalizeAudio: true,
-      silenceThreshold: -25,
+      autoSilenceThreshold: true,
       silenceDuration: 0.4,
     },
   },
@@ -91,7 +92,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       generateCaptions: true,
       captionStyle: 'instagram',
       normalizeAudio: true,
-      silenceThreshold: -25,
+      autoSilenceThreshold: true,
       silenceDuration: 0.3,
     },
   },
@@ -103,7 +104,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       generateCaptions: true,
       captionStyle: 'instagram',
       normalizeAudio: true,
-      silenceThreshold: -30,
+      autoSilenceThreshold: true,
       silenceDuration: 0.5,
     },
   },
@@ -115,6 +116,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       generateCaptions: true,
       captionStyle: 'instagram',
       normalizeAudio: true,
+      autoSilenceThreshold: true,
     },
   },
 };
@@ -139,6 +141,7 @@ const DEFAULT_CONFIG: ProcessingConfig = {
   captionStyle: 'instagram',
   silenceThreshold: -25,
   silenceDuration: 0.5,
+  autoSilenceThreshold: true, // Default to auto for better out-of-box experience
   useHookAsHeadline: false,
   generateAIHeadline: false,
   generateBRoll: false,
@@ -249,30 +252,77 @@ export default function ProcessingOptions({
       <div className="space-y-3 sm:space-y-4">
         <h3 className="text-base sm:text-lg font-medium text-white">Silence Removal</h3>
 
-        <div className="space-y-3 sm:space-y-4">
+        {/* Auto-detect toggle */}
+        <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs sm:text-sm text-gray-400">
-                Silence Threshold
-              </label>
-              <span className="text-xs sm:text-sm text-white font-medium">{config.silenceThreshold} dB</span>
-            </div>
+            <span className="text-sm text-gray-300">Auto-detect threshold</span>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Analyzes audio to find optimal settings for each video
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
             <input
-              type="range"
-              value={config.silenceThreshold}
-              onChange={(e) => setConfig({ ...config, silenceThreshold: Number(e.target.value) })}
-              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              min="-50"
-              max="-15"
-              step="1"
+              type="checkbox"
+              checked={config.autoSilenceThreshold}
+              onChange={(e) => setConfig({ ...config, autoSilenceThreshold: e.target.checked })}
+              className="sr-only peer"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Less aggressive</span>
-              <span>More aggressive</span>
+            <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-violet-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-indigo-500 peer-checked:to-violet-500"></div>
+          </label>
+        </div>
+
+        {/* Manual threshold controls - only show when auto is disabled */}
+        {!config.autoSilenceThreshold && (
+          <div className="space-y-3 sm:space-y-4 p-3 border border-gray-700 rounded-lg">
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs sm:text-sm text-gray-400">
+                  Silence Threshold
+                </label>
+                <span className="text-xs sm:text-sm text-white font-medium">{config.silenceThreshold} dB</span>
+              </div>
+              <input
+                type="range"
+                value={config.silenceThreshold}
+                onChange={(e) => setConfig({ ...config, silenceThreshold: Number(e.target.value) })}
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                min="-50"
+                max="-15"
+                step="1"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Less aggressive</span>
+                <span>More aggressive</span>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs sm:text-sm text-gray-400">
+                  Min Silence Duration
+                </label>
+                <span className="text-xs sm:text-sm text-white font-medium">{config.silenceDuration}s</span>
+              </div>
+              <input
+                type="range"
+                value={config.silenceDuration}
+                onChange={(e) => setConfig({ ...config, silenceDuration: Number(e.target.value) })}
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                min="0.2"
+                max="2"
+                step="0.1"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Short pauses</span>
+                <span>Long pauses</span>
+              </div>
             </div>
           </div>
+        )}
 
-          <div>
+        {/* Show min silence duration even when auto is enabled */}
+        {config.autoSilenceThreshold && (
+          <div className="p-3 border border-gray-700 rounded-lg">
             <div className="flex justify-between items-center mb-2">
               <label className="text-xs sm:text-sm text-gray-400">
                 Min Silence Duration
@@ -293,7 +343,7 @@ export default function ProcessingOptions({
               <span>Long pauses</span>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Audio Enhancement Settings */}
