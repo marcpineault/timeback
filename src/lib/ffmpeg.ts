@@ -115,28 +115,27 @@ export async function detectNoiseFloor(
         const dynamicRange = maxVolume - meanVolume;
 
         // The recommended threshold should be:
-        // - Close to or slightly below the mean volume for typical speech content
+        // - Below the mean volume for typical speech content
         // - Adjusted based on dynamic range (more range = more room to be aggressive)
         //
         // For speech videos:
         // - Mean is usually -20 to -30 dB
         // - Pauses are typically 10-20 dB below mean
-        // - We want threshold at or just below mean to catch pauses
+        // - We want threshold below mean to catch pauses without cutting quiet speech
         //
-        // Threshold = mean_volume + small_offset
-        // Small offset: 0 to +3 dB (slightly above mean catches more pauses)
+        // Threshold = mean_volume - offset
+        // Offset adjusted based on dynamic range
         let recommendedThreshold: number;
 
         if (dynamicRange > 15) {
-          // High dynamic range (lots of variation) - can be more aggressive
-          // Set threshold at mean level
-          recommendedThreshold = meanVolume;
-        } else if (dynamicRange > 8) {
-          // Medium dynamic range - set threshold slightly below mean
+          // High dynamic range (lots of variation) - can be slightly more aggressive
           recommendedThreshold = meanVolume - 3;
+        } else if (dynamicRange > 8) {
+          // Medium dynamic range - moderate offset
+          recommendedThreshold = meanVolume - 5;
         } else {
           // Low dynamic range (consistent volume) - be less aggressive
-          recommendedThreshold = meanVolume - 5;
+          recommendedThreshold = meanVolume - 8;
         }
 
         // Clamp to reasonable bounds (-50 to -15 dB)
