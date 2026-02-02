@@ -7,6 +7,7 @@ import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
 import VideoPreview from '@/components/VideoPreview'
 import MediaEditor from '@/components/MediaEditor'
 import GoogleDriveUpload from '@/components/GoogleDriveUpload'
+import GoogleDriveImport from '@/components/GoogleDriveImport'
 
 interface EnabledFeatures {
   speechCorrection: boolean
@@ -118,6 +119,21 @@ export default function VideoProcessor({
     const maxFiles = Math.min(files.length, videosRemaining)
     const newVideos: QueuedVideo[] = files.slice(0, maxFiles).map(file => ({
       file,
+      status: 'pending',
+    }))
+    setVideoQueue(prev => [...prev, ...newVideos])
+  }
+
+  const handleGoogleDriveImportComplete = (files: { fileId: string; filename: string; originalName: string; size: number; s3Key?: string }[]) => {
+    const maxFiles = Math.min(files.length, videosRemaining)
+    const newVideos: QueuedVideo[] = files.slice(0, maxFiles).map(file => ({
+      file: {
+        fileId: file.fileId,
+        filename: file.filename,
+        originalName: file.originalName,
+        size: file.size,
+        s3Key: file.s3Key,
+      },
       status: 'pending',
     }))
     setVideoQueue(prev => [...prev, ...newVideos])
@@ -487,10 +503,24 @@ export default function VideoProcessor({
   return (
     <div className="space-y-6">
       {!isProcessing && canUploadMore && (
-        <VideoUploader
-          onUploadComplete={handleUploadComplete}
-          disabled={isProcessing}
-        />
+        <div className="space-y-4">
+          <VideoUploader
+            onUploadComplete={handleUploadComplete}
+            disabled={isProcessing}
+          />
+
+          {/* Google Drive Import Option */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 h-px bg-gray-700" />
+            <span className="text-gray-500 text-sm">or</span>
+            <div className="flex-1 h-px bg-gray-700" />
+          </div>
+
+          <GoogleDriveImport
+            onImportComplete={handleGoogleDriveImportComplete}
+            disabled={isProcessing}
+          />
+        </div>
       )}
 
       <VideoQueue

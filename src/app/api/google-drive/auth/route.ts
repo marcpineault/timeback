@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAuthUrl, isGoogleDriveConfigured } from '@/lib/googleDrive';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { userId } = await auth();
 
   if (!userId) {
@@ -17,9 +17,13 @@ export async function GET() {
   }
 
   try {
+    // Check if picker scope is requested (for importing from Google Drive)
+    const searchParams = request.nextUrl.searchParams;
+    const includePickerScope = searchParams.get('scope') === 'picker';
+
     // Include userId in state for callback verification
     const state = Buffer.from(JSON.stringify({ userId })).toString('base64');
-    const authUrl = getAuthUrl(state);
+    const authUrl = getAuthUrl(state, includePickerScope);
 
     return NextResponse.json({ authUrl });
   } catch (error) {
