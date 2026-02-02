@@ -5,6 +5,7 @@ import { existsSync, lstatSync } from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
+import { safeFFprobe } from '@/lib/ffmpeg';
 
 // Allow up to 3 minutes for removing sections from videos
 export const maxDuration = 180;
@@ -142,12 +143,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get video duration
-    const duration = await new Promise<number>((resolve, reject) => {
-      ffmpeg.ffprobe(inputPath, (err, metadata) => {
-        if (err) return reject(err);
-        resolve(metadata.format.duration || 0);
-      });
-    });
+    const durationMetadata = await safeFFprobe(inputPath);
+    const duration = durationMetadata.format.duration || 0;
 
     // Sort sections by start time and merge overlapping
     const sortedSections = [...sectionsToRemove].sort((a, b) => a.start - b.start);

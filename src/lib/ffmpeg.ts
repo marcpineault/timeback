@@ -1,8 +1,49 @@
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
-import fs from 'fs';
+import fs, { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { logger } from './logger';
+
+/**
+ * Custom error class for file not found errors during video processing
+ */
+export class VideoFileNotFoundError extends Error {
+  constructor(filePath: string) {
+    super(`Video file not found: ${filePath}. The file may have been deleted or moved during processing.`);
+    this.name = 'VideoFileNotFoundError';
+  }
+}
+
+/**
+ * Validates that a file exists before processing
+ * @throws VideoFileNotFoundError if file doesn't exist
+ */
+export function validateFileExists(filePath: string, context?: string): void {
+  if (!existsSync(filePath)) {
+    const contextInfo = context ? ` (during ${context})` : '';
+    logger.error(`File not found${contextInfo}`, { filePath });
+    throw new VideoFileNotFoundError(filePath);
+  }
+}
+
+/**
+ * Safe ffprobe wrapper that validates file existence before calling ffprobe
+ */
+export function safeFFprobe(inputPath: string): Promise<ffmpeg.FfprobeData> {
+  return new Promise((resolve, reject) => {
+    validateFileExists(inputPath, 'ffprobe');
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) {
+        // Check if it's a file not found error from ffprobe
+        if (err.message?.includes('No such file or directory')) {
+          return reject(new VideoFileNotFoundError(inputPath));
+        }
+        return reject(err);
+      }
+      resolve(metadata);
+    });
+  });
+}
 import { generateContextualAnimation, selectAnimationFromContext, generateAnimation } from './sharp-animations';
 
 export interface SilenceInterval {
@@ -75,12 +116,8 @@ export async function detectSilence(
  * Get video duration
  */
 export async function getVideoDuration(inputPath: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(inputPath, (err, metadata) => {
-      if (err) return reject(err);
-      resolve(metadata.format.duration || 0);
-    });
-  });
+  const metadata = await safeFFprobe(inputPath);
+  return metadata.format.duration || 0;
 }
 
 /**
@@ -601,17 +638,13 @@ export async function insertBRollCutaways(
   logger.debug(`[B-Roll] Adding ${cutaways.length} animation overlays (style: ${style})`);
 
   // Get video dimensions
-  const videoInfo = await new Promise<{ width: number; height: number; duration: number }>((resolve, reject) => {
-    ffmpeg.ffprobe(inputPath, (err, metadata) => {
-      if (err) return reject(err);
-      const video = metadata.streams.find(s => s.codec_type === 'video');
-      resolve({
-        width: video?.width || 1080,
-        height: video?.height || 1920,
-        duration: metadata.format.duration || 60,
-      });
-    });
-  });
+  const metadata = await safeFFprobe(inputPath);
+  const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+  const videoInfo = {
+    width: videoStream?.width || 1080,
+    height: videoStream?.height || 1920,
+    duration: metadata.format.duration || 60,
+  };
 
   // Animation box dimensions (centered, 70% width, 35% height)
   const animWidth = Math.floor(videoInfo.width * 0.7);
@@ -825,16 +858,12 @@ export async function convertAspectRatio(
   }
 
   // Get video dimensions
-  const videoInfo = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-    ffmpeg.ffprobe(inputPath, (err, metadata) => {
-      if (err) return reject(err);
-      const video = metadata.streams.find(s => s.codec_type === 'video');
-      resolve({
-        width: video?.width || 1920,
-        height: video?.height || 1080,
-      });
-    });
-  });
+  const aspectMetadata = await safeFFprobe(inputPath);
+  const aspectVideoStream = aspectMetadata.streams.find(s => s.codec_type === 'video');
+  const videoInfo = {
+    width: aspectVideoStream?.width || 1920,
+    height: aspectVideoStream?.height || 1080,
+  };
 
   const currentRatio = videoInfo.width / videoInfo.height;
   const targetRatioValue = ASPECT_RATIOS[targetRatio].ratio;

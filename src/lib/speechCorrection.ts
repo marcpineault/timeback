@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import { TranscriptionWord } from './whisper';
+import { safeFFprobe } from './ffmpeg';
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -900,12 +901,11 @@ export async function applySpeechCorrections(
   totalDuration?: number
 ): Promise<{ outputPath: string; segmentsRemoved: number; timeRemoved: number }> {
   // Get video duration if not provided
-  const duration = totalDuration || await new Promise<number>((resolve, reject) => {
-    ffmpeg.ffprobe(inputPath, (err, metadata) => {
-      if (err) return reject(err);
-      resolve(metadata.format.duration || 0);
-    });
-  });
+  let duration = totalDuration;
+  if (!duration) {
+    const metadata = await safeFFprobe(inputPath);
+    duration = metadata.format.duration || 0;
+  }
 
   console.log(`[Speech Correction] Applying corrections to video (duration: ${duration.toFixed(2)}s)`);
 
