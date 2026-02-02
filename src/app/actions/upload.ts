@@ -134,11 +134,11 @@ export async function getS3UploadUrl(
       };
     }
 
-    const maxSize = 500 * 1024 * 1024;
+    const maxSize = 1024 * 1024 * 1024;
     if (fileSize > maxSize) {
       return {
         success: false,
-        error: 'File too large. Maximum size is 500MB.'
+        error: 'File too large. Maximum size is 1GB.'
       };
     }
 
@@ -202,7 +202,7 @@ export async function getBatchS3UploadUrls(
       return { success: false, error: 'S3 is not configured' };
     }
 
-    const maxSize = 500 * 1024 * 1024;
+    const maxSize = 1024 * 1024 * 1024;
 
     const urls: Array<{ url: string; key: string; index: number }> = [];
 
@@ -212,7 +212,7 @@ export async function getBatchS3UploadUrls(
         throw new Error(`Invalid file type for ${file.filename}`);
       }
       if (file.fileSize > maxSize) {
-        throw new Error(`File ${file.filename} too large. Maximum size is 500MB.`);
+        throw new Error(`File ${file.filename} too large. Maximum size is 1GB.`);
       }
 
       const { url, key } = await createUploadUrl(file.filename, file.contentType);

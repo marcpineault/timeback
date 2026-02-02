@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (max 500MB to match Next.js body limit)
-    const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB in bytes
+    // Validate file size (max 1GB)
+    const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB in bytes
     if (file.size > MAX_FILE_SIZE) {
       logger.warn('File size exceeds limit', { size: file.size, maxSize: MAX_FILE_SIZE });
       return NextResponse.json(
-        { error: 'File size exceeds 500MB limit. Please upload a smaller video.' },
+        { error: 'File size exceeds 1GB limit. Please upload a smaller video.' },
         { status: 400 }
       );
     }
