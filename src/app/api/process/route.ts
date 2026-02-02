@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     const {
       fileId,
       filename,
+      originalName,  // Original filename for display in dashboard
       s3Key,  // S3 key if file was uploaded to S3
       headline,
       headlinePosition,
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
         const record = await prisma.video.create({
           data: {
             userId: dbUserId,
-            originalName: filename,
+            originalName: originalName || filename, // Use original name if available, fallback to UUID filename
             status: 'PENDING',
           },
         });
