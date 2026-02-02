@@ -94,6 +94,7 @@ export async function getUserUsage(userId: string) {
     where: { id: userId },
     include: {
       videos: {
+        where: { status: 'COMPLETED' }, // Only show successfully processed videos
         orderBy: { createdAt: 'desc' },
         take: 10,
       },

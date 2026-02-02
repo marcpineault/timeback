@@ -196,13 +196,14 @@ export async function removeSilence(
 
   logger.debug(`[Silence Removal] Non-silent segments to keep: ${segments.length}`);
 
-  if (segments.length === 0) {
-    throw new Error('No non-silent segments found in video');
-  }
-
-  // If no silences found, just copy the file
-  if (silences.length === 0) {
-    logger.debug(`[Silence Removal] No silences found, copying original file`);
+  // If no silences found or no non-silent segments detected, copy the original file
+  // This handles cases where the audio is too quiet or the threshold is too aggressive
+  if (silences.length === 0 || segments.length === 0) {
+    if (segments.length === 0) {
+      logger.debug(`[Silence Removal] No non-silent segments found (audio may be too quiet for threshold ${threshold}dB), copying original file`);
+    } else {
+      logger.debug(`[Silence Removal] No silences found, copying original file`);
+    }
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
