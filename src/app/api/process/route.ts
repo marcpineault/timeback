@@ -13,6 +13,7 @@ import { cleanupOldFiles } from '@/lib/cleanup';
 import { isS3Configured, getS3ObjectStream, deleteS3Object, uploadProcessedVideo } from '@/lib/s3';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
+import { acquireFileLock, releaseFileLock } from '@/lib/fileLock';
 
 // Allow up to 10 minutes for video processing (transcription, silence removal, etc.)
 export const maxDuration = 600;
@@ -20,6 +21,9 @@ export const maxDuration = 600;
 export async function POST(request: NextRequest) {
   // Run cleanup of old files in background (non-blocking)
   setImmediate(() => cleanupOldFiles());
+
+  // Track locked file path for cleanup in error handler
+  let lockedFilePath: string | null = null;
 
   try {
     const body = await request.json();
@@ -186,6 +190,11 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Acquire file lock to prevent cleanup during processing
+    acquireFileLock(inputPath);
+    lockedFilePath = inputPath;
+    logger.debug('Acquired file lock for processing', { inputPath });
 
     // Update status to PROCESSING
     await updateVideoStatus('PROCESSING');
@@ -519,6 +528,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Release file lock now that processing is complete
+    releaseFileLock(inputPath);
+    logger.debug('Released file lock after successful processing', { inputPath });
+
     logger.info('Processing complete', { outputFilename, processedUrl, videoId: videoRecordId });
     return NextResponse.json({
       success: true,
@@ -530,6 +543,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Processing error', { error: errorMessage });
+
+    // Release file lock if one was acquired
+    if (lockedFilePath) {
+      releaseFileLock(lockedFilePath);
+      logger.debug('Released file lock after error', { lockedFilePath });
+    }
 
     // Update video status to FAILED if we have a video record
     // Need to access the videoRecord from the outer scope - it won't exist if error occurred before creation
