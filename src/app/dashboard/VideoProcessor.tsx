@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
@@ -15,6 +15,10 @@ interface EnabledFeatures {
 
 // localStorage key for persisting video queue
 const QUEUE_STORAGE_KEY = 'timeback_video_queue';
+const QUEUE_VERSION_KEY = 'timeback_video_queue_version';
+
+// Generate a unique session ID to detect cross-tab conflicts
+const SESSION_ID = typeof window !== 'undefined' ? `${Date.now()}_${Math.random().toString(36).slice(2)}` : '';
 
 interface VideoProcessorProps {
   userId: string
@@ -60,18 +64,61 @@ export default function VideoProcessor({
   const [videosRemaining, setVideosRemaining] = useState(initialVideosRemaining)
   const [isQueueLoaded, setIsQueueLoaded] = useState(false)
 
+  // Track processing counts with refs to avoid stale closure issues
+  const processingStateRef = useRef({
+    activeCount: 0,
+    completedCount: 0,
+    successCount: 0, // Track successful completions for quota update
+    totalCount: 0,
+    isCancelled: false,
+  })
+
+  // Version counter for localStorage sync
+  const queueVersionRef = useRef(0)
+
   // Restore video queue from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(QUEUE_STORAGE_KEY);
+      const savedVersion = localStorage.getItem(QUEUE_VERSION_KEY);
+
+      // Initialize version from storage
+      if (savedVersion) {
+        const version = parseInt(savedVersion, 10);
+        if (!isNaN(version)) {
+          queueVersionRef.current = version;
+        }
+      }
+
       if (saved) {
-        const parsed = JSON.parse(saved) as QueuedVideo[];
-        // Only restore videos that can actually be used:
-        // - Completed videos (have downloadUrl)
-        // - Videos with s3Key (can be re-processed)
-        const restorable = parsed.filter(v => {
-          // Completed videos are fully restorable
-          if (v.status === 'complete' && v.downloadUrl) return true;
+        // Validate JSON structure before parsing
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) {
+          console.warn('[VideoProcessor] Invalid queue data in localStorage, clearing');
+          localStorage.removeItem(QUEUE_STORAGE_KEY);
+          setIsQueueLoaded(true);
+          return;
+        }
+
+        const typedParsed = parsed as QueuedVideo[];
+        const now = Date.now();
+        // Videos older than 4 hours might have stale download URLs (server cleanup)
+        const STALE_THRESHOLD_MS = 4 * 60 * 60 * 1000;
+
+        // Filter and validate each video object
+        const restorable = typedParsed.filter(v => {
+          // Validate required structure
+          if (!v || typeof v !== 'object' || !v.file || !v.file.fileId) {
+            return false;
+          }
+          // Completed videos are restorable (but check for staleness)
+          if (v.status === 'complete' && v.downloadUrl) {
+            // Warn about very old videos but still allow restore
+            if (v.completedAt && (now - v.completedAt) > STALE_THRESHOLD_MS) {
+              console.warn('[VideoProcessor] Restoring old completed video, download may fail:', v.file.fileId);
+            }
+            return true;
+          }
           // Videos with s3Key can be re-processed (mark as pending)
           if (v.file.s3Key) return true;
           // Videos without s3Key and not complete cannot be restored
@@ -93,27 +140,80 @@ export default function VideoProcessor({
           setVideoQueue(restorable);
         }
       }
-    } catch {
+    } catch (err) {
       // localStorage not available or invalid JSON
+      console.warn('[VideoProcessor] Failed to restore queue from localStorage:', err);
+      // Clear corrupted data
+      try {
+        localStorage.removeItem(QUEUE_STORAGE_KEY);
+      } catch {
+        // Ignore cleanup errors
+      }
     }
     setIsQueueLoaded(true);
   }, []);
 
-  // Save video queue to localStorage when it changes
+  // Save video queue to localStorage when it changes (with version for cross-tab sync)
   useEffect(() => {
     if (!isQueueLoaded) return;
 
     try {
+      // Increment version for this save
+      queueVersionRef.current += 1;
+
       if (videoQueue.length === 0) {
         localStorage.removeItem(QUEUE_STORAGE_KEY);
+        localStorage.removeItem(QUEUE_VERSION_KEY);
       } else {
         // Save queue (blob URLs won't persist but that's fine)
         localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(videoQueue));
+        localStorage.setItem(QUEUE_VERSION_KEY, String(queueVersionRef.current));
       }
-    } catch {
-      // localStorage not available
+    } catch (err) {
+      // localStorage not available or quota exceeded
+      console.warn('[VideoProcessor] Failed to save queue to localStorage:', err);
     }
   }, [videoQueue, isQueueLoaded]);
+
+  // Listen for cross-tab storage changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === QUEUE_STORAGE_KEY && e.newValue !== null) {
+        try {
+          const newVersion = localStorage.getItem(QUEUE_VERSION_KEY);
+          const parsedVersion = newVersion ? parseInt(newVersion, 10) : 0;
+
+          // Only apply if the external version is newer
+          if (parsedVersion > queueVersionRef.current) {
+            const parsed = JSON.parse(e.newValue);
+            if (Array.isArray(parsed)) {
+              queueVersionRef.current = parsedVersion;
+              // Merge: keep local processing videos, update others
+              setVideoQueue(prev => {
+                const processingIds = new Set(
+                  prev.filter(v => v.status === 'processing').map(v => v.file.fileId)
+                );
+                const external = parsed as QueuedVideo[];
+                // Keep our processing videos, take external for everything else
+                const merged = external.map(ext => {
+                  if (processingIds.has(ext.file.fileId)) {
+                    return prev.find(p => p.file.fileId === ext.file.fileId) || ext;
+                  }
+                  return ext;
+                });
+                return merged;
+              });
+            }
+          }
+        } catch {
+          // Ignore parse errors from other tabs
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const handleUploadComplete = (files: UploadedFile[]) => {
     const maxFiles = Math.min(files.length, videosRemaining)
@@ -237,6 +337,7 @@ export default function VideoProcessor({
         error: undefined, // Clear any previous error on success
         downloadUrl: data.downloadUrl,
         outputFilename: data.outputFilename,
+        completedAt: Date.now(), // Track completion time for stale detection
       }
     } catch (err) {
       return {
@@ -255,9 +356,17 @@ export default function VideoProcessor({
     setLastConfig(config)
 
     const pendingVideos = videoQueue.filter(v => v.status === 'pending')
-    let completedCount = 0
 
-    // Mark all pending videos as processing
+    // Reset processing state ref for this batch
+    processingStateRef.current = {
+      activeCount: 0,
+      completedCount: 0,
+      successCount: 0,
+      totalCount: pendingVideos.length,
+      isCancelled: false,
+    }
+
+    // Mark all pending videos as processing in a single atomic update
     setVideoQueue(prev =>
       prev.map(v => pendingVideos.some(p => p.file.fileId === v.file.fileId)
         ? { ...v, status: 'processing' }
@@ -268,35 +377,60 @@ export default function VideoProcessor({
     // Process videos in parallel with concurrency limit
     const processWithConcurrency = async () => {
       const queue = [...pendingVideos]
-      let activeCount = 0
 
       const updateStatus = () => {
-        const remaining = pendingVideos.length - completedCount
-        if (activeCount > 1) {
-          setProcessingStatus(`Processing ${activeCount} videos concurrently (${completedCount}/${pendingVideos.length} complete)`)
+        const state = processingStateRef.current
+        if (state.isCancelled) return
+
+        const remaining = state.totalCount - state.completedCount
+        if (state.activeCount > 1) {
+          setProcessingStatus(`Processing ${state.activeCount} videos concurrently (${state.completedCount}/${state.totalCount} complete)`)
         } else if (remaining > 0) {
-          setProcessingStatus(`Processing ${completedCount + 1}/${pendingVideos.length}`)
+          setProcessingStatus(`Processing ${state.completedCount + 1}/${state.totalCount}`)
         }
       }
 
       const processNext = async (): Promise<void> => {
-        if (queue.length === 0) return
+        // Check for cancellation
+        if (processingStateRef.current.isCancelled || queue.length === 0) return
 
         const video = queue.shift()!
-        activeCount++
+        processingStateRef.current.activeCount++
         updateStatus()
 
         try {
           const result = await processVideo(video, config)
-          setVideoQueue(prev =>
-            prev.map(v => v.file.fileId === video.file.fileId ? result : v)
-          )
+
+          // Check for cancellation before updating state
+          if (!processingStateRef.current.isCancelled) {
+            // Track successful completions
+            if (result.status === 'complete') {
+              processingStateRef.current.successCount++
+            }
+            // Atomic update for this specific video
+            setVideoQueue(prev =>
+              prev.map(v => v.file.fileId === video.file.fileId ? result : v)
+            )
+          }
+        } catch (err) {
+          // Handle unexpected errors gracefully
+          if (!processingStateRef.current.isCancelled) {
+            setVideoQueue(prev =>
+              prev.map(v => v.file.fileId === video.file.fileId
+                ? { ...v, status: 'error', error: err instanceof Error ? err.message : 'Processing failed' }
+                : v
+              )
+            )
+          }
         } finally {
-          activeCount--
-          completedCount++
+          processingStateRef.current.activeCount--
+          processingStateRef.current.completedCount++
           updateStatus()
-          // Process next video when this one finishes
-          await processNext()
+
+          // Process next video when this one finishes (if not cancelled)
+          if (!processingStateRef.current.isCancelled) {
+            await processNext()
+          }
         }
       }
 
@@ -310,10 +444,14 @@ export default function VideoProcessor({
 
     await processWithConcurrency()
 
-    setIsProcessing(false)
-    setProcessingStatus('')
-    // Update videos remaining count locally (no page reload to preserve queue)
-    setVideosRemaining(prev => Math.max(0, prev - pendingVideos.length))
+    // Only update state if not cancelled
+    if (!processingStateRef.current.isCancelled) {
+      setIsProcessing(false)
+      setProcessingStatus('')
+      // Update videos remaining count locally (no page reload to preserve queue)
+      // Use the tracked successCount from the ref to avoid stale state
+      setVideosRemaining(prev => Math.max(0, prev - processingStateRef.current.successCount))
+    }
   }
 
   // Save videos to camera roll one by one (mobile only)

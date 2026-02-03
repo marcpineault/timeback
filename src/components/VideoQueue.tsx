@@ -10,6 +10,8 @@ export interface QueuedVideo {
   error?: string;
   downloadUrl?: string;
   outputFilename?: string;
+  /** Timestamp when video was completed (for detecting stale entries) */
+  completedAt?: number;
 }
 
 interface VideoQueueProps {

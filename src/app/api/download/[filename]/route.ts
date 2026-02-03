@@ -87,18 +87,46 @@ export async function GET(
     });
 
     // If not found, try finding by S3 key that ends with the filename
+    // Use stricter matching: the filename must be preceded by "/" or "-" to prevent partial matches
     if (!video) {
+      // First try with "/" prefix (standard S3 path)
       video = await prisma.video.findFirst({
         where: {
           userId: user.id,
           processedUrl: {
-            endsWith: sanitizedFilename,
+            endsWith: `/${sanitizedFilename}`,
           },
         },
       });
     }
 
+    // Also try with "-" prefix (for timestamp-prefixed filenames)
+    if (!video) {
+      video = await prisma.video.findFirst({
+        where: {
+          userId: user.id,
+          processedUrl: {
+            endsWith: `-${sanitizedFilename}`,
+          },
+        },
+      });
+    }
+
+    // Final fallback: exact S3 key match (for processed/{filename} format)
+    if (!video) {
+      video = await prisma.video.findFirst({
+        where: {
+          userId: user.id,
+          processedUrl: `processed/${sanitizedFilename}`,
+        },
+      });
+    }
+
     if (!video || !video.processedUrl) {
+      console.warn(`[Download] Access denied: video not found for user`, {
+        userId: user.id,
+        filename: sanitizedFilename,
+      });
       return NextResponse.json(
         { error: 'Video not found or access denied' },
         { status: 403 }
@@ -177,10 +205,14 @@ export async function GET(
 
     // Stream the file instead of loading entirely into memory (better for large videos)
     const stream = createReadStream(filepath);
+    let bytesRead = 0;
+    let streamError: Error | null = null;
+
     const webStream = new ReadableStream({
       start(controller) {
         stream.on('data', (chunk) => {
           try {
+            bytesRead += chunk.length;
             controller.enqueue(chunk);
           } catch {
             // Controller closed (client disconnected), clean up the file stream
@@ -189,13 +221,22 @@ export async function GET(
         });
         stream.on('end', () => {
           try {
+            // Verify we read the expected amount
+            if (bytesRead !== stat.size) {
+              console.warn(`[Download] Incomplete read: ${bytesRead}/${stat.size} bytes for ${sanitizedFilename}`);
+            }
             controller.close();
           } catch {
             // Controller already closed
           }
         });
         stream.on('error', (err) => {
-          console.error('[Download] Stream error:', err.message);
+          streamError = err;
+          console.error('[Download] Stream error:', err.message, {
+            filename: sanitizedFilename,
+            bytesRead,
+            expectedSize: stat.size,
+          });
           try {
             controller.error(err);
           } catch {
@@ -205,15 +246,21 @@ export async function GET(
       },
       cancel() {
         // Client disconnected, clean up the file stream
+        console.log(`[Download] Client disconnected after ${bytesRead}/${stat.size} bytes for ${sanitizedFilename}`);
         stream.destroy();
       },
     });
 
+    // Add headers that help clients detect incomplete downloads
     return new NextResponse(webStream, {
       headers: {
         'Content-Type': 'video/mp4',
         'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
         'Content-Length': stat.size.toString(),
+        // Enable range requests for better resumability
+        'Accept-Ranges': 'bytes',
+        // Cache control for consistent behavior
+        'Cache-Control': 'private, no-cache',
       },
     });
   } catch (error) {
