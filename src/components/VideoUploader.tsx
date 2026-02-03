@@ -278,6 +278,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           reject(new Error('Upload timed out. Please check your connection and try again.'));
         });
 
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was aborted'));
+        });
+
         xhr.open('PUT', urlResult.url!);
         xhr.setRequestHeader('Content-Type', contentType);
         xhr.send(file);
@@ -393,6 +397,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
           xhr.onerror = () => reject(new Error('Network error'));
           xhr.ontimeout = () => reject(new Error('Upload timed out'));
+          xhr.onabort = () => reject(new Error('Upload was aborted'));
 
           xhr.open('PUT', urlInfo.url);
           xhr.setRequestHeader('Content-Type', contentType);
@@ -478,7 +483,11 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     const uploadPromises = files.map(async (file, index) => {
       const urlInfo = batchUrlResult.urls!.find(u => u.index === index);
       if (!urlInfo) {
+        // Mark file as failed - no presigned URL was generated for it
         console.error(`[Upload] No URL info for file ${file.name} at index ${index}`);
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'error' as const, error: 'Failed to get upload URL' } : f
+        ));
         return null;
       }
 
