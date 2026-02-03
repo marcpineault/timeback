@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   uploadVideo,
   initChunkedUpload,
@@ -59,6 +59,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   const [s3Available, setS3Available] = useState<boolean | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Ref to track upload status - avoids stale closure issues with useCallback
+  // This ensures the guard check always sees current status, not stale state from old closures
+  const isUploadingRef = useRef(false);
 
   const isUploading = uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending');
 
@@ -565,11 +569,15 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
   const uploadFiles = async (files: File[]) => {
     // Prevent starting a new upload batch while one is in progress
-    // This guards against race conditions with async state updates
-    if (uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending')) {
+    // Use ref instead of state to avoid stale closure issues with useCallback
+    // State check would see old values due to handleFileSelect/handleDrop closures
+    if (isUploadingRef.current) {
       console.warn('[Upload] Upload already in progress, ignoring new upload request');
       return;
     }
+
+    // Mark uploads as in progress immediately using ref
+    isUploadingRef.current = true;
 
     setError(null);
     setIsPreparing(true);
@@ -585,6 +593,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
     if (validFiles.length === 0) {
       setError('No valid video files selected. Please upload MP4, MOV, WebM, or AVI files.');
+      isUploadingRef.current = false;
       return;
     }
 
@@ -677,6 +686,9 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     // This prevents stale state issues where subsequent batches would update
     // the wrong files due to React's async state updates
     setUploadingFiles([]);
+
+    // Mark uploads as complete - must use ref to avoid stale closure issues
+    isUploadingRef.current = false;
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
