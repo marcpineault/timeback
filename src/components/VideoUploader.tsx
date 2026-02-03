@@ -88,6 +88,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   // This ensures the guard check always sees current status, not stale state from old closures
   const isUploadingRef = useRef(false);
 
+  // Ref to hold the latest uploadFiles function - solves stale closure issue
+  // Callbacks can use this ref to always call the current version of uploadFiles
+  const uploadFilesRef = useRef<(files: File[]) => Promise<void>>(null!);
+
   const isUploading = uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending');
 
   // Get max concurrent uploads based on device type
@@ -740,6 +744,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
   };
 
+  // Always keep the ref updated with the latest uploadFiles function
+  // This ensures callbacks always call the current version, avoiding stale closures
+  uploadFilesRef.current = uploadFiles;
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -748,20 +756,20 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      uploadFiles(files);
+      // Use ref to always call the latest uploadFiles function
+      uploadFilesRef.current(files);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, s3Available, isMobile]);
+  }, [disabled]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      uploadFiles(Array.from(files));
+      // Use ref to always call the latest uploadFiles function
+      uploadFilesRef.current(Array.from(files));
     }
     // Reset input so same file can be selected again if needed
     e.target.value = '';
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s3Available, isMobile]);
+  }, []);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
