@@ -2,28 +2,45 @@ import { logger } from './logger';
 
 /**
  * In-memory file lock manager to prevent cleanup of files being processed.
- * Uses a Set to track locked file paths with automatic expiration.
+ * Uses a Map to track locked file paths with automatic expiration.
+ *
+ * Lock duration is set to exceed the maximum processing time (maxDuration = 600s = 10 min)
+ * plus a safety margin for cleanup and upload operations.
  */
 
 interface LockInfo {
   lockedAt: number;
   expiresAt: number;
+  /** Optional video ID for debugging */
+  videoId?: string;
 }
 
 // In-memory store of locked files with their expiration times
 const lockedFiles = new Map<string, LockInfo>();
 
-// Default lock duration: 30 minutes (should be longer than max processing time)
-const DEFAULT_LOCK_DURATION_MS = 30 * 60 * 1000;
+// Default lock duration: 15 minutes (exceeds 10-minute processing timeout + buffer for cleanup)
+// This ensures locks don't expire during normal processing
+const DEFAULT_LOCK_DURATION_MS = 15 * 60 * 1000;
+
+// Maximum lock duration to prevent runaway locks
+const MAX_LOCK_DURATION_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * Acquire a lock on a file to prevent it from being cleaned up during processing.
  * @param filePath - The absolute path to the file to lock
- * @param durationMs - How long to hold the lock (default: 30 minutes)
+ * @param durationMs - How long to hold the lock (default: 15 minutes)
+ * @param videoId - Optional video ID for debugging
  * @returns true if lock was acquired
  */
-export function acquireFileLock(filePath: string, durationMs: number = DEFAULT_LOCK_DURATION_MS): boolean {
+export function acquireFileLock(
+  filePath: string,
+  durationMs: number = DEFAULT_LOCK_DURATION_MS,
+  videoId?: string
+): boolean {
   const now = Date.now();
+
+  // Enforce maximum lock duration to prevent runaway locks
+  const effectiveDuration = Math.min(durationMs, MAX_LOCK_DURATION_MS);
 
   // Clean up any expired locks first
   cleanupExpiredLocks();
@@ -32,18 +49,24 @@ export function acquireFileLock(filePath: string, durationMs: number = DEFAULT_L
   const existing = lockedFiles.get(filePath);
   if (existing && existing.expiresAt > now) {
     // Already locked and not expired - extend the lock
-    existing.expiresAt = now + durationMs;
-    logger.debug('Extended file lock', { filePath, expiresAt: new Date(existing.expiresAt).toISOString() });
+    existing.expiresAt = now + effectiveDuration;
+    if (videoId) existing.videoId = videoId;
+    logger.debug('Extended file lock', {
+      filePath,
+      expiresAt: new Date(existing.expiresAt).toISOString(),
+      videoId: existing.videoId,
+    });
     return true;
   }
 
   // Acquire new lock
   lockedFiles.set(filePath, {
     lockedAt: now,
-    expiresAt: now + durationMs,
+    expiresAt: now + effectiveDuration,
+    videoId,
   });
 
-  logger.debug('Acquired file lock', { filePath, durationMs });
+  logger.debug('Acquired file lock', { filePath, durationMs: effectiveDuration, videoId });
   return true;
 }
 

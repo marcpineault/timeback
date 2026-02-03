@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
 
   // Track locked file path for cleanup in error handler
   let lockedFilePath: string | null = null;
+  // Track video record ID for per-video error handling
+  let videoRecordId: string | null = null;
+  // Track intermediate files for cleanup on error
+  const intermediateFiles: string[] = [];
+  // Track input file path for cleanup
+  let inputFilePath: string | null = null;
 
   try {
     const body = await request.json();
@@ -108,7 +114,6 @@ export async function POST(request: NextRequest) {
     let downloadedFromS3 = false;
 
     // Create or reuse video record
-    let videoRecordId: string | null = null;
     let isReprocess = false;  // Track if this is a reprocess (don't count against limit)
 
     if (dbUserId) {
@@ -193,8 +198,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Acquire file lock to prevent cleanup during processing
-    acquireFileLock(inputPath);
+    acquireFileLock(inputPath, undefined, videoRecordId || undefined);
     lockedFilePath = inputPath;
+    inputFilePath = inputPath; // Track for cleanup on error
     logger.debug('Acquired file lock for processing', { inputPath });
 
     // Update status to PROCESSING
@@ -234,10 +240,13 @@ export async function POST(request: NextRequest) {
     // Step 1: Remove silence (runs in parallel with early transcription if applicable)
     logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
+    intermediateFiles.push(stepOutput); // Track for cleanup on error
     await removeSilence(currentInput, stepOutput, options);
-    // Clean up intermediate file
+    // Clean up intermediate file (and remove from tracking since it's deleted)
     if (currentInput !== inputPath) {
-      await fs.unlink(currentInput).catch(() => {})
+      await fs.unlink(currentInput).catch(() => {});
+      const idx = intermediateFiles.indexOf(currentInput);
+      if (idx > -1) intermediateFiles.splice(idx, 1);
     }
     currentInput = stepOutput;
 
@@ -245,10 +254,13 @@ export async function POST(request: NextRequest) {
     if (shouldNormalizeAudio) {
       logger.info('Step 1.5: Normalizing audio levels');
       stepOutput = path.join(processedDir, `${baseName}_normalized.mp4`);
+      intermediateFiles.push(stepOutput); // Track for cleanup on error
       await normalizeAudio(currentInput, stepOutput);
-      // Clean up intermediate file
+      // Clean up intermediate file (and remove from tracking)
       if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
+        await fs.unlink(currentInput).catch(() => {});
+        const idx = intermediateFiles.indexOf(currentInput);
+        if (idx > -1) intermediateFiles.splice(idx, 1);
       }
       currentInput = stepOutput;
     }
@@ -349,27 +361,48 @@ export async function POST(request: NextRequest) {
         } : DEFAULT_SPEECH_CORRECTION_CONFIG;
 
         stepOutput = path.join(processedDir, `${baseName}_corrected.mp4`);
-        const correctionResult = await correctSpeechMistakes(
-          currentInput,
-          stepOutput,
-          transcriptionWords,
-          correctionConfig
-        );
+        intermediateFiles.push(stepOutput); // Track for cleanup on error
 
-        logger.info('Speech correction complete', { segmentsRemoved: correctionResult.segmentsRemoved, timeRemoved: correctionResult.timeRemoved.toFixed(2) });
+        try {
+          const correctionResult = await correctSpeechMistakes(
+            currentInput,
+            stepOutput,
+            transcriptionWords,
+            correctionConfig
+          );
 
-        // Clean up intermediate file
-        if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
-        }
-        currentInput = stepOutput;
+          logger.info('Speech correction complete', { segmentsRemoved: correctionResult.segmentsRemoved, timeRemoved: correctionResult.timeRemoved.toFixed(2) });
 
-        // Re-transcribe the corrected video if we need captions (since timestamps changed)
-        if (generateCaptions && correctionResult.segmentsRemoved > 0) {
-          logger.info('Re-transcribing after speech correction for accurate captions');
-          const newTranscription = await transcribeVideo(currentInput, processedDir, { animated: captionStyle === 'animated' });
-          srtPath = newTranscription.srtPath;
-          transcriptionSegments = newTranscription.segments;
+          // Clean up intermediate file (and remove from tracking)
+          if (currentInput !== inputPath) {
+            await fs.unlink(currentInput).catch(() => {});
+            const idx = intermediateFiles.indexOf(currentInput);
+            if (idx > -1) intermediateFiles.splice(idx, 1);
+          }
+          currentInput = stepOutput;
+
+          // Re-transcribe the corrected video if we need captions (since timestamps changed)
+          if (generateCaptions && correctionResult.segmentsRemoved > 0) {
+            logger.info('Re-transcribing after speech correction for accurate captions');
+            try {
+              const newTranscription = await transcribeVideo(currentInput, processedDir, { animated: captionStyle === 'animated' });
+              srtPath = newTranscription.srtPath;
+              transcriptionSegments = newTranscription.segments;
+            } catch (reTranscribeError) {
+              // Re-transcription failed - disable captions to avoid misaligned timestamps
+              logger.error('Re-transcription after speech correction failed, disabling captions', {
+                error: String(reTranscribeError),
+              });
+              srtPath = undefined; // Clear the old SRT path to prevent misaligned captions
+              // Continue processing without captions rather than failing entirely
+            }
+          }
+        } catch (speechCorrectionError) {
+          // Speech correction failed - log and continue without it
+          logger.error('Speech correction failed, continuing without', {
+            error: String(speechCorrectionError),
+          });
+          // Don't update currentInput - keep using the previous step's output
         }
       }
 
@@ -377,10 +410,13 @@ export async function POST(request: NextRequest) {
       if (generateCaptions && srtPath) {
         logger.info('Step 3: Burning captions');
         stepOutput = path.join(processedDir, `${baseName}_captioned.mp4`);
+        intermediateFiles.push(stepOutput); // Track for cleanup on error
         await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
-        // Clean up intermediate file
+        // Clean up intermediate file (and remove from tracking)
         if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
+          await fs.unlink(currentInput).catch(() => {});
+          const idx = intermediateFiles.indexOf(currentInput);
+          if (idx > -1) intermediateFiles.splice(idx, 1);
         }
         currentInput = stepOutput;
       }
@@ -435,15 +471,21 @@ export async function POST(request: NextRequest) {
     if (finalHeadline) {
       logger.info('Step 4: Adding headline', { headline: finalHeadline });
       stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
+      intermediateFiles.push(stepOutput); // Track for cleanup on error
       try {
         await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle, options.headlineStyle);
-        // Clean up intermediate file
+        // Clean up intermediate file (and remove from tracking)
         if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
+          await fs.unlink(currentInput).catch(() => {});
+          const idx = intermediateFiles.indexOf(currentInput);
+          if (idx > -1) intermediateFiles.splice(idx, 1);
         }
         currentInput = stepOutput;
       } catch (headlineErr) {
         logger.error('Step 4: Headline failed, continuing without headline', { error: String(headlineErr) });
+        // Remove the failed output from tracking since it wasn't created
+        const idx = intermediateFiles.indexOf(stepOutput);
+        if (idx > -1) intermediateFiles.splice(idx, 1);
       }
     }
 
@@ -451,10 +493,13 @@ export async function POST(request: NextRequest) {
     if (aspectRatio && aspectRatio !== 'original') {
       logger.info('Step 5: Converting aspect ratio', { aspectRatio });
       stepOutput = path.join(processedDir, `${baseName}_aspect.mp4`);
+      intermediateFiles.push(stepOutput); // Track for cleanup on error
       await convertAspectRatio(currentInput, stepOutput, aspectRatio as AspectRatioPreset);
-      // Clean up intermediate file
+      // Clean up intermediate file (and remove from tracking)
       if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {})
+        await fs.unlink(currentInput).catch(() => {});
+        const idx = intermediateFiles.indexOf(currentInput);
+        if (idx > -1) intermediateFiles.splice(idx, 1);
       }
       currentInput = stepOutput;
     }
@@ -544,7 +589,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Processing error', { error: errorMessage });
+    logger.error('Processing error', { error: errorMessage, videoId: videoRecordId });
 
     // Release file lock if one was acquired
     if (lockedFilePath) {
@@ -552,31 +597,46 @@ export async function POST(request: NextRequest) {
       logger.debug('Released file lock after error', { lockedFilePath });
     }
 
-    // Update video status to FAILED if we have a video record
-    // Need to access the videoRecord from the outer scope - it won't exist if error occurred before creation
-    // So we use a different approach - check if there's a pending video for this user
-    try {
-      const { userId: clerkUserId } = await auth();
-      if (clerkUserId) {
-        const user = await prisma.user.findUnique({
-          where: { clerkId: clerkUserId },
-        });
-        if (user) {
-          // Find and update any PROCESSING videos for this user to FAILED
-          await prisma.video.updateMany({
-            where: {
-              userId: user.id,
-              status: { in: ['PENDING', 'PROCESSING'] },
-            },
-            data: {
-              status: 'FAILED',
-              errorMessage: errorMessage,
-            },
-          });
+    // Clean up intermediate files created during processing
+    if (intermediateFiles.length > 0) {
+      logger.info('Cleaning up intermediate files after error', { count: intermediateFiles.length });
+      for (const file of intermediateFiles) {
+        try {
+          if (existsSync(file)) {
+            await fs.unlink(file);
+            logger.debug('Cleaned up intermediate file', { file });
+          }
+        } catch (cleanupErr) {
+          logger.warn('Failed to clean up intermediate file', { file, error: String(cleanupErr) });
         }
       }
-    } catch (dbError) {
-      logger.error('Failed to update video status on error', { error: String(dbError) });
+    }
+
+    // Clean up input file if it was downloaded from S3
+    if (inputFilePath && existsSync(inputFilePath)) {
+      try {
+        await fs.unlink(inputFilePath);
+        logger.debug('Cleaned up input file after error', { inputFilePath });
+      } catch (cleanupErr) {
+        logger.warn('Failed to clean up input file', { inputFilePath, error: String(cleanupErr) });
+      }
+    }
+
+    // Update ONLY this specific video to FAILED (not all user videos)
+    // The videoRecordId is captured in the outer scope when the record is created
+    if (videoRecordId) {
+      try {
+        await prisma.video.update({
+          where: { id: videoRecordId },
+          data: {
+            status: 'FAILED',
+            errorMessage: errorMessage,
+          },
+        });
+        logger.info('Video status updated to FAILED', { videoId: videoRecordId });
+      } catch (dbError) {
+        logger.error('Failed to update video status on error', { videoId: videoRecordId, error: String(dbError) });
+      }
     }
 
     return NextResponse.json(
