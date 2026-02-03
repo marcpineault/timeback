@@ -35,8 +35,9 @@ interface UploadingFile {
 }
 
 interface VideoUploaderProps {
-  onUploadComplete: (files: UploadedFile[]) => void;
+  onUploadComplete: (files: UploadedFile[], autoProcess?: boolean) => void;
   disabled?: boolean;
+  showAutoProcessOption?: boolean;
 }
 
 // 5MB chunks to stay well under Railway's 10MB limit
@@ -78,13 +79,15 @@ const getContentType = (file: File): string => {
   return mimeTypes[ext || ''] || 'video/mp4';
 };
 
-export default function VideoUploader({ onUploadComplete, disabled }: VideoUploaderProps) {
+export default function VideoUploader({ onUploadComplete, disabled, showAutoProcessOption = false }: VideoUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [s3Available, setS3Available] = useState<boolean | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [autoProcessEnabled, setAutoProcessEnabled] = useState(false);
+  const [autoProcessLoading, setAutoProcessLoading] = useState(true);
 
   // Ref to track upload status - avoids stale closure issues with useCallback
   // This ensures the guard check always sees current status, not stale state from old closures
@@ -129,6 +132,37 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     setIsMobile(mobile);
   }, []);
+
+  // Load auto-process preference if option is shown
+  useEffect(() => {
+    if (!showAutoProcessOption) {
+      setAutoProcessLoading(false);
+      return;
+    }
+
+    // Load from localStorage first for instant display
+    try {
+      const saved = localStorage.getItem('timeback_auto_process');
+      if (saved) {
+        setAutoProcessEnabled(JSON.parse(saved));
+      }
+    } catch {
+      // localStorage not available
+    }
+
+    // Then load from server
+    fetch('/api/user/preferences')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.preferences) {
+          setAutoProcessEnabled(data.preferences.autoProcessOnUpload);
+        }
+      })
+      .catch(() => {
+        // Use localStorage value
+      })
+      .finally(() => setAutoProcessLoading(false));
+  }, [showAutoProcessOption]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -762,9 +796,9 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       }
 
       // Notify parent of completed uploads
-      console.log(`[Upload] Batch finished with ${results.length} successful uploads`);
+      console.log(`[Upload] Batch finished with ${results.length} successful uploads, autoProcess=${autoProcessEnabled}`);
       if (results.length > 0) {
-        onUploadComplete(results);
+        onUploadComplete(results, showAutoProcessOption ? autoProcessEnabled : undefined);
       }
     } finally {
       // Always reset state - even if an error occurred
@@ -871,6 +905,48 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           </div>
         </label>
       </div>
+
+      {/* Auto-Process Toggle - Optional */}
+      {showAutoProcessOption && !isUploading && !autoProcessLoading && (
+        <div className="bg-[#1A1A24] rounded-xl p-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <div className="relative flex items-center pt-0.5">
+              <input
+                type="checkbox"
+                checked={autoProcessEnabled}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  setAutoProcessEnabled(enabled);
+                  // Save to localStorage immediately
+                  try {
+                    localStorage.setItem('timeback_auto_process', JSON.stringify(enabled));
+                  } catch {
+                    // localStorage not available
+                  }
+                  // Save to server in background
+                  fetch('/api/user/preferences', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ autoProcessOnUpload: enabled }),
+                  }).catch(() => {
+                    // Silently fail
+                  });
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-violet-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-indigo-500 peer-checked:to-violet-500"></div>
+            </div>
+            <div className="flex-1">
+              <span className="text-sm font-medium text-white">Auto-process after upload</span>
+              <p className="text-xs text-gray-400 mt-1">
+                {autoProcessEnabled
+                  ? 'Videos will be processed automatically using your saved settings. You can close this page after uploading.'
+                  : 'Enable to automatically process videos with your saved settings.'}
+              </p>
+            </div>
+          </label>
+        </div>
+      )}
 
       {/* Upload Progress List */}
       {uploadingFiles.length > 0 && (
