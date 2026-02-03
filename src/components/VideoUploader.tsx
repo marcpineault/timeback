@@ -278,6 +278,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           reject(new Error('Upload timed out. Please check your connection and try again.'));
         });
 
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was aborted'));
+        });
+
         xhr.open('PUT', urlResult.url!);
         xhr.setRequestHeader('Content-Type', contentType);
         xhr.send(file);
@@ -367,13 +371,34 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       try {
         // Timeout: 30 seconds per MB, minimum 2 minutes
         const timeoutMs = Math.max(120000, Math.ceil(file.size / (1024 * 1024)) * 30000);
+        // Stall detection: abort if no progress for 60 seconds
+        const STALL_TIMEOUT_MS = 60000;
 
         const uploadResult = await new Promise<boolean>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
+          let lastProgressTime = Date.now();
+          let stallCheckInterval: ReturnType<typeof setInterval> | null = null;
+          let isSettled = false;
+
+          const cleanup = () => {
+            if (stallCheckInterval) {
+              clearInterval(stallCheckInterval);
+              stallCheckInterval = null;
+            }
+          };
+
+          const settle = (fn: () => void) => {
+            if (!isSettled) {
+              isSettled = true;
+              cleanup();
+              fn();
+            }
+          };
 
           xhr.timeout = timeoutMs;
 
           xhr.upload.onprogress = (event) => {
+            lastProgressTime = Date.now(); // Reset stall timer on progress
             if (event.lengthComputable) {
               const progress = Math.round((event.loaded / event.total) * 100);
               setUploadingFiles(prev => prev.map((f, i) =>
@@ -385,14 +410,24 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           xhr.onload = () => {
             console.log(`[Upload] S3 responded for ${file.name}: status=${xhr.status}`);
             if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(true);
+              settle(() => resolve(true));
             } else {
-              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+              settle(() => reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`)));
             }
           };
 
-          xhr.onerror = () => reject(new Error('Network error'));
-          xhr.ontimeout = () => reject(new Error('Upload timed out'));
+          xhr.onerror = () => settle(() => reject(new Error('Network error')));
+          xhr.ontimeout = () => settle(() => reject(new Error('Upload timed out')));
+          xhr.onabort = () => settle(() => reject(new Error('Upload was aborted')));
+
+          // Stall detection: check every 10 seconds if progress has stalled
+          stallCheckInterval = setInterval(() => {
+            const timeSinceProgress = Date.now() - lastProgressTime;
+            if (timeSinceProgress > STALL_TIMEOUT_MS) {
+              console.warn(`[Upload] Stall detected for ${file.name}: no progress for ${Math.round(timeSinceProgress / 1000)}s, aborting`);
+              xhr.abort();
+            }
+          }, 10000);
 
           xhr.open('PUT', urlInfo.url);
           xhr.setRequestHeader('Content-Type', contentType);
@@ -478,7 +513,11 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     const uploadPromises = files.map(async (file, index) => {
       const urlInfo = batchUrlResult.urls!.find(u => u.index === index);
       if (!urlInfo) {
+        // Mark file as failed - no presigned URL was generated for it
         console.error(`[Upload] No URL info for file ${file.name} at index ${index}`);
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'error' as const, error: 'Failed to get upload URL' } : f
+        ));
         return null;
       }
 
