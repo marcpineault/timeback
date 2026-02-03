@@ -732,7 +732,8 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     if (files.length > 0) {
       uploadFiles(files);
     }
-  }, [disabled]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, s3Available, isMobile]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -741,7 +742,8 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
     // Reset input so same file can be selected again if needed
     e.target.value = '';
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s3Available, isMobile]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
