@@ -52,8 +52,7 @@ const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000; // 1 second, doubles each retry
 
-// Stall detection - abort if no progress for this long
-const STALL_TIMEOUT_MS = 30000; // 30 seconds
+// Simple upload timeout per file (based on size, calculated per-file)
 
 // Get content type from file, with fallback based on extension
 const getContentType = (file: File): string => {
@@ -339,162 +338,120 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     }
   };
 
-  // Upload a single file to S3 using presigned URL with retry logic (returns promise for concurrency control)
+  // Simple upload using XHR with progress tracking - no complex stall detection
   const uploadSingleFileToS3 = async (
     file: File,
     index: number,
     urlInfo: { url: string; key: string }
   ): Promise<{ index: number; s3Key: string } | null> => {
-    let lastError = '';
     const contentType = getContentType(file);
     const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
     console.log(`[Upload] Starting upload for ${file.name} (${fileSizeMB}MB, type: ${contentType})`);
 
+    // Set status to uploading
+    setUploadingFiles(prev => prev.map((f, i) =>
+      i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
+    ));
+
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      // If this is a retry, log and wait with exponential backoff
       if (attempt > 0) {
         const retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
         console.log(`[Upload] Retry ${attempt}/${MAX_RETRIES} for ${file.name} after ${retryDelay}ms`);
         await delay(retryDelay);
-
-        // Update status to show we're retrying
         setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'uploading' as const, progress: 0, error: undefined } : f
-        ));
-      } else {
-        setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
+          i === index ? { ...f, progress: 0, error: undefined } : f
         ));
       }
 
-      const result = await new Promise<{ success: true; s3Key: string } | { success: false; error: string; shouldRetry: boolean }>((resolve) => {
-        const xhr = new XMLHttpRequest();
-        let resolved = false;
-        let lastProgressTime = Date.now();
-        let lastProgressValue = 0;
-        let stallCheckInterval: ReturnType<typeof setInterval> | null = null;
-        let finalizingWatchdog: ReturnType<typeof setTimeout> | null = null;
-
-        const safeResolve = (value: { success: true; s3Key: string } | { success: false; error: string; shouldRetry: boolean }) => {
-          if (resolved) return;
-          resolved = true;
-
-          // Clean up timers
-          if (stallCheckInterval) clearInterval(stallCheckInterval);
-          if (finalizingWatchdog) clearTimeout(finalizingWatchdog);
-
-          resolve(value);
-        };
-
-        // Set timeout based on file size - allow 30 seconds per MB, minimum 2 minutes
-        // This accounts for slow mobile connections
+      try {
+        // Timeout: 30 seconds per MB, minimum 2 minutes
         const timeoutMs = Math.max(120000, Math.ceil(file.size / (1024 * 1024)) * 30000);
-        xhr.timeout = timeoutMs;
 
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            lastProgressTime = Date.now();
-            lastProgressValue = progress;
+        const uploadResult = await new Promise<boolean>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
 
-            setUploadingFiles(prev => prev.map((f, i) =>
-              i === index ? { ...f, progress } : f
-            ));
-          }
-        });
+          xhr.timeout = timeoutMs;
 
-        xhr.addEventListener('load', () => {
-          console.log(`[Upload] S3 responded for ${file.name}: status=${xhr.status}`);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            safeResolve({ success: true, s3Key: urlInfo.key });
-          } else {
-            // Don't retry 4xx errors (client errors like invalid URL)
-            const shouldRetry = xhr.status >= 500 || xhr.status === 0;
-            const errorMsg = `Upload failed: ${xhr.status} ${xhr.statusText}`;
-            console.error(`[Upload] ${errorMsg} for ${file.name}`);
-            safeResolve({ success: false, error: errorMsg, shouldRetry });
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          console.error(`[Upload] Network error for ${file.name}`);
-          safeResolve({ success: false, error: 'Network error', shouldRetry: true });
-        });
-
-        xhr.addEventListener('timeout', () => {
-          console.error(`[Upload] Timeout for ${file.name} after ${timeoutMs}ms`);
-          safeResolve({ success: false, error: 'Upload timed out', shouldRetry: true });
-        });
-
-        xhr.addEventListener('abort', () => {
-          console.warn(`[Upload] Upload aborted for ${file.name}`);
-          safeResolve({ success: false, error: 'Upload was cancelled', shouldRetry: false });
-        });
-
-        // Stall detection - abort if no progress for STALL_TIMEOUT_MS
-        // This catches hung uploads mid-transfer
-        stallCheckInterval = setInterval(() => {
-          if (resolved) return;
-
-          const timeSinceProgress = Date.now() - lastProgressTime;
-          // Only check for stalls during upload (progress < 100)
-          if (lastProgressValue < 100 && timeSinceProgress > STALL_TIMEOUT_MS) {
-            console.warn(`[Upload] Upload stalled for ${file.name} at ${lastProgressValue}% (no progress for ${Math.round(timeSinceProgress / 1000)}s)`);
-            xhr.abort();
-            safeResolve({ success: false, error: `Upload stalled at ${lastProgressValue}%`, shouldRetry: true });
-          }
-        }, 5000); // Check every 5 seconds
-
-        // Add a watchdog for when upload completes but S3 doesn't respond (Finalizing state)
-        // This catches edge cases where load/error/timeout events don't fire
-        xhr.upload.addEventListener('load', () => {
-          console.log(`[Upload] All bytes sent for ${file.name}, waiting for S3 response...`);
-
-          // Give S3 60 seconds to respond after upload completes
-          finalizingWatchdog = setTimeout(() => {
-            if (!resolved && xhr.readyState !== 4) {
-              console.warn(`[Upload] S3 not responding after 60s for ${file.name}, aborting`);
-              xhr.abort();
-              // Note: abort event handler will resolve the promise
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              setUploadingFiles(prev => prev.map((f, i) =>
+                i === index ? { ...f, progress } : f
+              ));
             }
-          }, 60000);
+          };
+
+          xhr.onload = () => {
+            console.log(`[Upload] S3 responded for ${file.name}: status=${xhr.status}`);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(true);
+            } else {
+              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Network error'));
+          xhr.ontimeout = () => reject(new Error('Upload timed out'));
+
+          xhr.open('PUT', urlInfo.url);
+          xhr.setRequestHeader('Content-Type', contentType);
+          xhr.send(file);
         });
 
-        xhr.open('PUT', urlInfo.url);
-        xhr.setRequestHeader('Content-Type', contentType);
-        console.log(`[Upload] XHR opened for ${file.name}, sending...`);
-        xhr.send(file);
-      });
+        if (uploadResult) {
+          console.log(`[Upload] Successfully uploaded ${file.name}`);
+          setUploadingFiles(prev => prev.map((f, i) =>
+            i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
+          ));
+          return { index, s3Key: urlInfo.key };
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+        console.warn(`[Upload] Attempt ${attempt + 1} failed for ${file.name}: ${errorMsg}`);
 
-      if (result.success) {
-        console.log(`[Upload] Successfully uploaded ${file.name}`);
-        // Mark file as complete when S3 responds - batch confirm is nearly instant
-        // If batch confirm fails, error handling will mark files appropriately
-        setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
-        ));
-        return { index, s3Key: result.s3Key };
-      }
-
-      lastError = result.error;
-      console.warn(`[Upload] Attempt ${attempt + 1} failed for ${file.name}: ${lastError}`);
-
-      // Don't retry if we shouldn't
-      if (!result.shouldRetry) {
-        break;
+        // Don't retry 4xx errors
+        if (errorMsg.startsWith('HTTP 4')) {
+          console.error(`[Upload] Client error, not retrying: ${errorMsg}`);
+          break;
+        }
       }
     }
 
     // All retries exhausted
-    console.error(`[Upload] All retries exhausted for ${file.name}: ${lastError}`);
+    console.error(`[Upload] All retries exhausted for ${file.name}`);
     setUploadingFiles(prev => prev.map((f, i) =>
-      i === index ? { ...f, status: 'error' as const, error: lastError } : f
+      i === index ? { ...f, status: 'error' as const, error: 'Upload failed after retries' } : f
     ));
     return null;
   };
 
-  // Optimized batch S3 upload - gets all URLs upfront, uploads with true parallel queue, confirms all at once
+  // Simple semaphore for concurrency control
+  const createSemaphore = (limit: number) => {
+    let running = 0;
+    const queue: (() => void)[] = [];
+
+    return {
+      acquire: () => new Promise<void>((resolve) => {
+        if (running < limit) {
+          running++;
+          resolve();
+        } else {
+          queue.push(resolve);
+        }
+      }),
+      release: () => {
+        running--;
+        const next = queue.shift();
+        if (next) {
+          running++;
+          next();
+        }
+      }
+    };
+  };
+
+  // Simplified batch S3 upload - uses Promise.allSettled with semaphore for cleaner concurrency
   const uploadFilesToS3Batch = async (files: File[], initialState: UploadingFile[]): Promise<UploadedFile[]> => {
     console.log(`[Upload] Starting batch upload for ${files.length} files`);
 
@@ -512,70 +469,44 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       throw new Error(batchUrlResult.error || 'Failed to get upload URLs');
     }
 
-    console.log(`[Upload] Got ${batchUrlResult.urls.length} presigned URLs, starting parallel uploads...`);
+    console.log(`[Upload] Got ${batchUrlResult.urls.length} presigned URLs, starting uploads...`);
 
-    // Step 2: Upload files with true parallel queue (sliding window approach)
-    // As soon as one upload completes, the next one starts immediately
-    // Use lower concurrency on mobile to prevent overwhelming the connection
+    // Step 2: Upload files with semaphore-controlled concurrency
     const maxConcurrent = getMaxConcurrentUploads();
-    const allResults: ({ index: number; s3Key: string } | null)[] = new Array(files.length).fill(null);
-    let nextIndex = 0;
-    let activeCount = 0;
+    const semaphore = createSemaphore(maxConcurrent);
 
-    await new Promise<void>((resolve) => {
-      const startNextUpload = () => {
-        while (activeCount < maxConcurrent && nextIndex < files.length) {
-          const currentIndex = nextIndex;
-          nextIndex++;
-          activeCount++;
+    const uploadPromises = files.map(async (file, index) => {
+      const urlInfo = batchUrlResult.urls!.find(u => u.index === index);
+      if (!urlInfo) {
+        console.error(`[Upload] No URL info for file ${file.name} at index ${index}`);
+        return null;
+      }
 
-          const urlInfo = batchUrlResult.urls!.find(u => u.index === currentIndex);
-          if (!urlInfo) {
-            allResults[currentIndex] = null;
-            activeCount--;
-            continue;
-          }
-
-          uploadSingleFileToS3(files[currentIndex], currentIndex, urlInfo)
-            .then((result) => {
-              allResults[currentIndex] = result;
-            })
-            .catch((err) => {
-              console.error(`[Upload] Error uploading ${files[currentIndex].name}:`, err);
-              allResults[currentIndex] = null;
-            })
-            .finally(() => {
-              activeCount--;
-
-              // Immediately start next upload when a slot becomes available
-              if (nextIndex < files.length) {
-                startNextUpload();
-              } else if (activeCount === 0) {
-                resolve();
-              }
-            });
-        }
-
-        // If no uploads were started and none are active, we're done
-        if (activeCount === 0) {
-          resolve();
-        }
-      };
-
-      startNextUpload();
+      // Wait for a slot
+      await semaphore.acquire();
+      try {
+        return await uploadSingleFileToS3(file, index, urlInfo);
+      } finally {
+        semaphore.release();
+      }
     });
 
-    const successfulUploads = allResults.filter((r): r is { index: number; s3Key: string } => r !== null);
+    // Wait for all uploads to complete (success or failure)
+    const results = await Promise.allSettled(uploadPromises);
 
-    console.log(`[Upload] Parallel uploads complete: ${successfulUploads.length}/${files.length} successful`);
+    const successfulUploads = results
+      .map((r, i) => r.status === 'fulfilled' ? r.value : null)
+      .filter((r): r is { index: number; s3Key: string } => r !== null);
+
+    console.log(`[Upload] Uploads complete: ${successfulUploads.length}/${files.length} successful`);
 
     if (successfulUploads.length === 0) {
       console.warn('[Upload] No successful uploads to confirm');
       return [];
     }
 
-    console.log('[Upload] Confirming batch uploads with server...');
     // Step 3: Confirm all uploads in a single request
+    console.log('[Upload] Confirming batch uploads with server...');
     const confirmData = successfulUploads.map(u => ({
       s3Key: u.s3Key,
       originalName: files[u.index].name,
@@ -585,7 +516,6 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     const confirmResult = await confirmBatchS3Uploads(confirmData);
     if (!confirmResult.success || !confirmResult.files) {
       console.error('[Upload] Batch confirmation failed:', confirmResult.error);
-      // Mark all uploaded files as error since confirmation failed
       setUploadingFiles(prev => prev.map((f, i) => {
         const wasUploaded = successfulUploads.some(u => u.index === i);
         if (wasUploaded) {
@@ -596,10 +526,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       throw new Error('Failed to confirm uploads');
     }
 
-    console.log(`[Upload] Batch confirmation successful for ${confirmResult.files.length} files`);
+    console.log(`[Upload] Batch confirmed ${confirmResult.files.length} files`);
 
-    // Update state and return results
-    const results: UploadedFile[] = [];
+    // Build results
+    const uploadedFiles: UploadedFile[] = [];
     for (const confirmed of confirmResult.files) {
       const uploadInfo = successfulUploads.find(u => u.s3Key === confirmed.s3Key);
       if (uploadInfo && confirmed.success) {
@@ -611,15 +541,15 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           s3Key: confirmed.s3Key,
           previewUrl: initialState[uploadInfo.index].previewUrl,
         };
-        results.push(uploadedFile);
+        uploadedFiles.push(uploadedFile);
 
         setUploadingFiles(prev => prev.map((f, i) =>
-          i === uploadInfo.index ? { ...f, status: 'complete' as const, progress: 100, result: uploadedFile } : f
+          i === uploadInfo.index ? { ...f, result: uploadedFile } : f
         ));
       }
     }
 
-    return results;
+    return uploadedFiles;
   };
 
   // Check if a file is a valid video (handles iOS MIME type inconsistencies)
