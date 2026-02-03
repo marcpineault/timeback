@@ -43,9 +43,8 @@ interface VideoUploaderProps {
 // Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
-// Concurrent uploads - browsers limit ~6 connections per domain
-// Keep lower to avoid overwhelming connection pool and ensure responses come back
-const MAX_CONCURRENT_UPLOADS_DESKTOP = 3;
+// Concurrent uploads - allow many parallel uploads for faster batch processing
+const MAX_CONCURRENT_UPLOADS_DESKTOP = 50;
 const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
 
 // Retry configuration for failed uploads
