@@ -216,33 +216,84 @@ export default function VideoProcessor({
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const handleUploadComplete = (files: UploadedFile[]) => {
-    setVideoQueue(prev => {
-      // Get existing original names to detect duplicates
-      const existingNames = new Set(prev.map(v => v.file.originalName.toLowerCase()))
+  const handleUploadComplete = async (files: UploadedFile[], autoProcess?: boolean) => {
+    // Get existing original names to detect duplicates
+    const existingNames = new Set(videoQueue.map(v => v.file.originalName.toLowerCase()))
 
-      // Filter out duplicates
-      const uniqueFiles = files.filter(file => {
-        const isDuplicate = existingNames.has(file.originalName.toLowerCase())
-        if (isDuplicate) {
-          console.log(`[VideoProcessor] Skipping duplicate video: ${file.originalName}`)
-        }
-        return !isDuplicate
-      })
-
-      if (uniqueFiles.length < files.length) {
-        const skippedCount = files.length - uniqueFiles.length
-        setUploadError(`${skippedCount} video(s) skipped - already in queue`)
+    // Filter out duplicates
+    const uniqueFiles = files.filter(file => {
+      const isDuplicate = existingNames.has(file.originalName.toLowerCase())
+      if (isDuplicate) {
+        console.log(`[VideoProcessor] Skipping duplicate video: ${file.originalName}`)
       }
-
-      const maxFiles = Math.min(uniqueFiles.length, videosRemaining)
-      const newVideos: QueuedVideo[] = uniqueFiles.slice(0, maxFiles).map(file => ({
-        file,
-        status: 'pending',
-      }))
-
-      return [...prev, ...newVideos]
+      return !isDuplicate
     })
+
+    if (uniqueFiles.length < files.length) {
+      const skippedCount = files.length - uniqueFiles.length
+      setUploadError(`${skippedCount} video(s) skipped - already in queue`)
+    }
+
+    const maxFiles = Math.min(uniqueFiles.length, videosRemaining)
+    const newVideos: QueuedVideo[] = uniqueFiles.slice(0, maxFiles).map(file => ({
+      file,
+      status: 'pending',
+    }))
+
+    // Update queue with new videos
+    setVideoQueue(prev => [...prev, ...newVideos])
+
+    // If auto-process is enabled, fetch saved preferences and start processing
+    if (autoProcess && newVideos.length > 0) {
+      console.log('[VideoProcessor] Auto-process enabled, fetching saved preferences...')
+      try {
+        const response = await fetch('/api/user/preferences')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.preferences) {
+            // Build ProcessingConfig from saved preferences
+            const savedConfig: ProcessingConfig = {
+              generateCaptions: data.preferences.generateCaptions ?? true,
+              headline: '', // Always empty for auto-process
+              headlinePosition: data.preferences.headlinePosition ?? 'top',
+              headlineStyle: data.preferences.headlineStyle ?? 'speech-bubble',
+              captionStyle: data.preferences.captionStyle ?? 'instagram',
+              silenceThreshold: data.preferences.silenceThreshold ?? -25,
+              silenceDuration: data.preferences.silenceDuration ?? 0.5,
+              autoSilenceThreshold: data.preferences.autoSilenceThreshold ?? true,
+              useHookAsHeadline: data.preferences.useHookAsHeadline ?? false,
+              generateAIHeadline: data.preferences.generateAIHeadline ?? false,
+              generateBRoll: data.preferences.generateBRoll ?? false,
+              bRollConfig: {
+                style: 'dynamic',
+                intensity: 'medium',
+                maxMoments: 3,
+              },
+              normalizeAudio: data.preferences.normalizeAudio ?? true,
+              aspectRatio: data.preferences.aspectRatio ?? 'original',
+              speechCorrection: data.preferences.speechCorrection ?? false,
+              speechCorrectionConfig: data.preferences.speechCorrectionConfig ?? {
+                removeFillerWords: true,
+                removeRepeatedWords: true,
+                removeRepeatedPhrases: true,
+                removeFalseStarts: true,
+                removeSelfCorrections: true,
+                aggressiveness: 'moderate',
+              },
+            }
+            console.log('[VideoProcessor] Starting auto-processing with saved preferences')
+            // Trigger processing with a small delay to ensure state is updated
+            setTimeout(() => {
+              handleProcess(savedConfig)
+            }, 100)
+          } else {
+            console.log('[VideoProcessor] No saved preferences found, skipping auto-process')
+          }
+        }
+      } catch (err) {
+        console.error('[VideoProcessor] Failed to fetch preferences for auto-process:', err)
+      }
+    }
   }
 
   const handleGoogleDriveImportComplete = (files: { fileId: string; filename: string; originalName: string; size: number; s3Key?: string }[]) => {
@@ -686,6 +737,7 @@ export default function VideoProcessor({
           <VideoUploader
             onUploadComplete={handleUploadComplete}
             disabled={isProcessing}
+            showAutoProcessOption={true}
           />
 
           {/* Duplicate upload warning */}

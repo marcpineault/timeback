@@ -20,12 +20,60 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   videos          Video[]
+  processingPreferences UserProcessingPreferences?
 
   // Google Drive integration
   googleDriveAccessToken  String?
   googleDriveRefreshToken String?
   googleDriveTokenExpiry  DateTime?
   googleDriveConnected Boolean @default(false)
+}
+
+model UserProcessingPreferences {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Auto-processing toggle (opt-in, defaults to OFF)
+  autoProcessOnUpload  Boolean @default(false)
+
+  // Selected preset (null = custom settings)
+  activePreset         String?  // 'youtube-shorts' | 'instagram-reels' | 'youtube' | 'instagram-feed' | null
+
+  // Caption Settings
+  generateCaptions     Boolean @default(true)
+  captionStyle         String  @default("instagram")
+
+  // Headline Settings
+  headline             String  @default("")
+  headlinePosition     String  @default("top")
+  headlineStyle        String  @default("speech-bubble")
+  useHookAsHeadline    Boolean @default(false)
+  generateAIHeadline   Boolean @default(false)
+
+  // Audio Settings
+  silenceThreshold     Float   @default(-25)
+  silenceDuration      Float   @default(0.5)
+  autoSilenceThreshold Boolean @default(true)
+  normalizeAudio       Boolean @default(true)
+
+  // Video Settings
+  aspectRatio          String  @default("original")
+
+  // Speech Correction (Beta)
+  speechCorrection           Boolean @default(false)
+  removeFillerWords          Boolean @default(true)
+  removeRepeatedWords        Boolean @default(true)
+  removeRepeatedPhrases      Boolean @default(true)
+  removeFalseStarts          Boolean @default(true)
+  removeSelfCorrections      Boolean @default(true)
+  speechAggressiveness       String  @default("moderate")
+
+  // B-Roll (future)
+  generateBRoll        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Video {
