@@ -564,6 +564,13 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   };
 
   const uploadFiles = async (files: File[]) => {
+    // Prevent starting a new upload batch while one is in progress
+    // This guards against race conditions with async state updates
+    if (uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending')) {
+      console.warn('[Upload] Upload already in progress, ignoring new upload request');
+      return;
+    }
+
     setError(null);
     setIsPreparing(true);
 
@@ -665,6 +672,11 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     if (results.length > 0) {
       onUploadComplete(results);
     }
+
+    // Clear upload state after batch completes so next batch starts fresh
+    // This prevents stale state issues where subsequent batches would update
+    // the wrong files due to React's async state updates
+    setUploadingFiles([]);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
