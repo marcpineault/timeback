@@ -599,116 +599,88 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     // Mark uploads as in progress immediately using ref
     isUploadingRef.current = true;
 
-    setError(null);
-    setIsPreparing(true);
+    try {
+      setError(null);
+      setIsPreparing(true);
 
-    // Small delay on mobile to show preparing state (iOS may have already processed, but gives visual feedback)
-    if (isMobile) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    // Validate file types (with iOS-friendly fallback to extension check)
-    const validFiles = files.filter(f => isValidVideoFile(f));
-    setIsPreparing(false);
-
-    if (validFiles.length === 0) {
-      setError('No valid video files selected. Please upload MP4, MOV, WebM, or AVI files.');
-      isUploadingRef.current = false;
-      return;
-    }
-
-    if (validFiles.length < files.length) {
-      setError(`${files.length - validFiles.length} file(s) skipped - invalid format.`);
-    }
-
-    // Initialize upload state with preview URLs
-    const initialState: UploadingFile[] = validFiles.map(file => ({
-      file,
-      progress: 0,
-      status: 'pending',
-      previewUrl: URL.createObjectURL(file),
-    }));
-    setUploadingFiles(initialState);
-
-    // Check S3 availability
-    let useS3 = s3Available;
-    if (useS3 === null) {
-      useS3 = await checkS3Available();
-      setS3Available(useS3);
-    }
-
-    let results: UploadedFile[] = [];
-
-    // Use optimized batch upload for S3
-    if (useS3) {
-      console.log('[Upload] Using optimized batch S3 upload');
-      try {
-        results = await uploadFilesToS3Batch(validFiles, initialState);
-      } catch (err) {
-        console.error('[Upload] Batch upload failed:', err);
-        setError(err instanceof Error ? err.message : 'Upload failed');
+      // Small delay on mobile to show preparing state (iOS may have already processed, but gives visual feedback)
+      if (isMobile) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    } else {
-      // Fallback: Upload files with true parallel queue (sliding window approach)
-      // Use lower concurrency on mobile to prevent overwhelming the connection
-      console.log('[Upload] Using fallback upload with parallel queue');
-      const maxConcurrent = getMaxConcurrentUploads();
-      const allResults: (UploadedFile | null)[] = new Array(validFiles.length).fill(null);
 
-      await new Promise<void>((resolve) => {
-        let nextIndex = 0;
-        let activeCount = 0;
+      // Validate file types (with iOS-friendly fallback to extension check)
+      const validFiles = files.filter(f => isValidVideoFile(f));
+      setIsPreparing(false);
 
-        const startNextUpload = () => {
-          while (activeCount < maxConcurrent && nextIndex < validFiles.length) {
-            const currentIndex = nextIndex;
-            nextIndex++;
-            activeCount++;
+      if (validFiles.length === 0) {
+        setError('No valid video files selected. Please upload MP4, MOV, WebM, or AVI files.');
+        return;
+      }
 
-            uploadSingleFile(validFiles[currentIndex], currentIndex, initialState[currentIndex].previewUrl)
-              .then((result) => {
-                allResults[currentIndex] = result;
-              })
-              .catch((err) => {
-                console.error(`[Upload] Error uploading ${validFiles[currentIndex].name}:`, err);
-                allResults[currentIndex] = null;
-              })
-              .finally(() => {
-                activeCount--;
+      if (validFiles.length < files.length) {
+        setError(`${files.length - validFiles.length} file(s) skipped - invalid format.`);
+      }
 
-                // Immediately start next upload when a slot becomes available
-                if (nextIndex < validFiles.length) {
-                  startNextUpload();
-                } else if (activeCount === 0) {
-                  resolve();
-                }
-              });
+      // Initialize upload state with preview URLs
+      const initialState: UploadingFile[] = validFiles.map(file => ({
+        file,
+        progress: 0,
+        status: 'pending',
+        previewUrl: URL.createObjectURL(file),
+      }));
+      setUploadingFiles(initialState);
+
+      // Check S3 availability
+      let useS3 = s3Available;
+      if (useS3 === null) {
+        useS3 = await checkS3Available();
+        setS3Available(useS3);
+      }
+
+      let results: UploadedFile[] = [];
+
+      // Use optimized batch upload for S3
+      if (useS3) {
+        console.log('[Upload] Using optimized batch S3 upload');
+        try {
+          results = await uploadFilesToS3Batch(validFiles, initialState);
+        } catch (err) {
+          console.error('[Upload] Batch upload failed:', err);
+          setError(err instanceof Error ? err.message : 'Upload failed');
+        }
+      } else {
+        // Fallback: Upload files using semaphore (same pattern as S3 batch)
+        console.log('[Upload] Using fallback upload with semaphore');
+        const maxConcurrent = getMaxConcurrentUploads();
+        const semaphore = createSemaphore(maxConcurrent);
+
+        const uploadPromises = validFiles.map(async (file, index) => {
+          await semaphore.acquire();
+          try {
+            return await uploadSingleFile(file, index, initialState[index].previewUrl);
+          } finally {
+            semaphore.release();
           }
+        });
 
-          // If no uploads were started and none are active, we're done
-          if (activeCount === 0) {
-            resolve();
-          }
-        };
+        const allResults = await Promise.allSettled(uploadPromises);
+        results = allResults
+          .map(r => r.status === 'fulfilled' ? r.value : null)
+          .filter((r): r is UploadedFile => r !== null);
+      }
 
-        startNextUpload();
-      });
-
-      results = allResults.filter((r): r is UploadedFile => r !== null);
+      // Notify parent of completed uploads
+      if (results.length > 0) {
+        onUploadComplete(results);
+      }
+    } finally {
+      // Always reset state - even if an error occurred
+      // This prevents uploads from getting permanently stuck
+      setUploadingFiles([]);
+      setIsPreparing(false);
+      isUploadingRef.current = false;
+      console.log('[Upload] Upload batch complete, state reset');
     }
-
-    // Notify parent of completed uploads
-    if (results.length > 0) {
-      onUploadComplete(results);
-    }
-
-    // Clear upload state after batch completes so next batch starts fresh
-    // This prevents stale state issues where subsequent batches would update
-    // the wrong files due to React's async state updates
-    setUploadingFiles([]);
-
-    // Mark uploads as complete - must use ref to avoid stale closure issues
-    isUploadingRef.current = false;
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
