@@ -42,6 +42,7 @@ export default function VideoProcessor({
   const [lastConfig, setLastConfig] = useState<ProcessingConfig | null>(null)
   const [processingStatus, setProcessingStatus] = useState<string>('')
   const [platform, setPlatform] = useState<'ios' | 'android' | 'desktop'>('desktop')
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [isSavingAll, setIsSavingAll] = useState(false)
   const [saveProgress, setSaveProgress] = useState<{
     current: number
@@ -216,27 +217,67 @@ export default function VideoProcessor({
   }, []);
 
   const handleUploadComplete = (files: UploadedFile[]) => {
-    const maxFiles = Math.min(files.length, videosRemaining)
-    const newVideos: QueuedVideo[] = files.slice(0, maxFiles).map(file => ({
-      file,
-      status: 'pending',
-    }))
-    setVideoQueue(prev => [...prev, ...newVideos])
+    setVideoQueue(prev => {
+      // Get existing original names to detect duplicates
+      const existingNames = new Set(prev.map(v => v.file.originalName.toLowerCase()))
+
+      // Filter out duplicates
+      const uniqueFiles = files.filter(file => {
+        const isDuplicate = existingNames.has(file.originalName.toLowerCase())
+        if (isDuplicate) {
+          console.log(`[VideoProcessor] Skipping duplicate video: ${file.originalName}`)
+        }
+        return !isDuplicate
+      })
+
+      if (uniqueFiles.length < files.length) {
+        const skippedCount = files.length - uniqueFiles.length
+        setUploadError(`${skippedCount} video(s) skipped - already in queue`)
+      }
+
+      const maxFiles = Math.min(uniqueFiles.length, videosRemaining)
+      const newVideos: QueuedVideo[] = uniqueFiles.slice(0, maxFiles).map(file => ({
+        file,
+        status: 'pending',
+      }))
+
+      return [...prev, ...newVideos]
+    })
   }
 
   const handleGoogleDriveImportComplete = (files: { fileId: string; filename: string; originalName: string; size: number; s3Key?: string }[]) => {
-    const maxFiles = Math.min(files.length, videosRemaining)
-    const newVideos: QueuedVideo[] = files.slice(0, maxFiles).map(file => ({
-      file: {
-        fileId: file.fileId,
-        filename: file.filename,
-        originalName: file.originalName,
-        size: file.size,
-        s3Key: file.s3Key,
-      },
-      status: 'pending',
-    }))
-    setVideoQueue(prev => [...prev, ...newVideos])
+    setVideoQueue(prev => {
+      // Get existing original names to detect duplicates
+      const existingNames = new Set(prev.map(v => v.file.originalName.toLowerCase()))
+
+      // Filter out duplicates
+      const uniqueFiles = files.filter(file => {
+        const isDuplicate = existingNames.has(file.originalName.toLowerCase())
+        if (isDuplicate) {
+          console.log(`[VideoProcessor] Skipping duplicate video from Google Drive: ${file.originalName}`)
+        }
+        return !isDuplicate
+      })
+
+      if (uniqueFiles.length < files.length) {
+        const skippedCount = files.length - uniqueFiles.length
+        setUploadError(`${skippedCount} video(s) skipped - already in queue`)
+      }
+
+      const maxFiles = Math.min(uniqueFiles.length, videosRemaining)
+      const newVideos: QueuedVideo[] = uniqueFiles.slice(0, maxFiles).map(file => ({
+        file: {
+          fileId: file.fileId,
+          filename: file.filename,
+          originalName: file.originalName,
+          size: file.size,
+          s3Key: file.s3Key,
+        },
+        status: 'pending',
+      }))
+
+      return [...prev, ...newVideos]
+    })
   }
 
   const handleRemoveVideo = (fileId: string) => {
@@ -646,6 +687,21 @@ export default function VideoProcessor({
             onUploadComplete={handleUploadComplete}
             disabled={isProcessing}
           />
+
+          {/* Duplicate upload warning */}
+          {uploadError && (
+            <div className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-400 text-sm flex items-center justify-between">
+              <span>{uploadError}</span>
+              <button
+                onClick={() => setUploadError(null)}
+                className="text-amber-400 hover:text-amber-300 ml-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
 
           {/* Google Drive Import Option */}
           <div className="flex items-center gap-4">

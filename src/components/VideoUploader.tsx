@@ -708,7 +708,7 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     if (files && files.length > 0) {
       uploadFiles(Array.from(files));
     }
-    // Reset input so same files can be selected again
+    // Reset input so same file can be selected again if needed
     e.target.value = '';
   }, []);
 
