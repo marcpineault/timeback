@@ -374,10 +374,8 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       });
 
       if (result.success) {
-        // Mark as complete immediately when upload finishes (before batch confirm)
-        setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
-        ));
+        // Keep status as 'uploading' with 100% progress until batch confirmation succeeds
+        // This shows "Finalizing..." in the UI while we wait for confirmation
         return { index, s3Key: result.s3Key };
       }
 
@@ -470,6 +468,14 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
     const confirmResult = await confirmBatchS3Uploads(confirmData);
     if (!confirmResult.success || !confirmResult.files) {
+      // Mark all uploaded files as error since confirmation failed
+      setUploadingFiles(prev => prev.map((f, i) => {
+        const wasUploaded = successfulUploads.some(u => u.index === i);
+        if (wasUploaded) {
+          return { ...f, status: 'error' as const, error: 'Failed to confirm upload' };
+        }
+        return f;
+      }));
       throw new Error('Failed to confirm uploads');
     }
 
@@ -755,16 +761,22 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
                   </p>
                 </div>
 
-                {/* Progress Bar */}
+                {/* Progress Bar or Finalizing State */}
                 {item.status === 'uploading' && (
                   <div className="flex items-center gap-2">
-                    <div className="w-20 bg-gray-600 rounded-full h-1.5">
-                      <div
-                        className="bg-violet-500 h-1.5 rounded-full transition-all"
-                        style={{ width: `${item.progress}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-400 w-8">{item.progress}%</span>
+                    {item.progress === 100 ? (
+                      <span className="text-xs text-violet-400 animate-pulse">Finalizing...</span>
+                    ) : (
+                      <>
+                        <div className="w-20 bg-gray-600 rounded-full h-1.5">
+                          <div
+                            className="bg-violet-500 h-1.5 rounded-full transition-all"
+                            style={{ width: `${item.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-400 w-8">{item.progress}%</span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
