@@ -1,5 +1,6 @@
 import { google, drive_v3 } from 'googleapis';
 import { Readable } from 'stream';
+import { getProcessedVideoUrl, isS3Configured } from './s3';
 
 /**
  * Create a new OAuth2 client instance
@@ -171,6 +172,7 @@ export interface BulkUploadFile {
   name: string;
   mimeType: string;
   url: string; // URL to fetch the file from
+  s3Key?: string; // Optional S3 key for just-in-time presigned URL generation
 }
 
 export interface BulkUploadResult {
@@ -298,18 +300,32 @@ export async function bulkUploadToDrive(
       batch.map(async (file) => {
         console.log(`[Google Drive] Processing file: ${file.name}`);
 
+        // Generate presigned URL just-in-time if s3Key is provided
+        // This prevents URL expiration issues when processing large batches
+        let fetchUrl = file.url;
+        if (file.s3Key && isS3Configured()) {
+          try {
+            console.log(`[Google Drive] Generating fresh presigned URL for ${file.name}`);
+            fetchUrl = await getProcessedVideoUrl(file.s3Key);
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            console.error(`[Google Drive] Failed to generate presigned URL for ${file.name}: ${errorMsg}`);
+            throw new Error(`Failed to generate S3 URL: ${errorMsg}`);
+          }
+        }
+
         // SSRF protection: validate URL before fetching
-        const urlCheck = isUrlSafeForFetch(file.url, trustedOrigin);
+        const urlCheck = isUrlSafeForFetch(fetchUrl, trustedOrigin);
         if (!urlCheck.safe) {
           console.error(`[Google Drive] URL validation failed for ${file.name}: ${urlCheck.reason}`);
           throw new Error(`URL validation failed: ${urlCheck.reason}`);
         }
 
         // Fetch the file from the URL
-        console.log(`[Google Drive] Fetching file from URL: ${file.url.substring(0, 100)}...`);
+        console.log(`[Google Drive] Fetching file from URL: ${fetchUrl.substring(0, 100)}...`);
         let response: Response;
         try {
-          response = await fetch(file.url, {
+          response = await fetch(fetchUrl, {
             // Longer timeout for large videos
             signal: AbortSignal.timeout(5 * 60 * 1000), // 5 minute timeout
           });

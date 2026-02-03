@@ -7,7 +7,7 @@ import {
   refreshAccessToken,
   BulkUploadFile,
 } from '@/lib/googleDrive';
-import { isS3Configured, getProcessedVideoUrl } from '@/lib/s3';
+import { isS3Configured } from '@/lib/s3';
 
 interface UploadRequest {
   files: BulkUploadFile[];
@@ -70,21 +70,16 @@ async function resolveVideoUrls(
       console.log(`[Google Drive] processedUrl: ${video.processedUrl}, isS3Key: ${isS3Key}`);
 
       if (isS3Key && isS3Configured()) {
-        try {
-          // Get presigned URL directly from S3
-          const presignedUrl = await getProcessedVideoUrl(video.processedUrl);
-          console.log(`[Google Drive] Successfully resolved ${filename} to S3 presigned URL`);
-          resolved.push({
-            ...file,
-            url: presignedUrl,
-          });
-          continue;
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`[Google Drive] Failed to get presigned URL for ${filename}:`, errorMsg);
-          errors.push({ name: file.name, error: `Failed to get S3 URL: ${errorMsg}` });
-          continue;
-        }
+        // Pass the S3 key instead of pre-generating a presigned URL
+        // The presigned URL will be generated just-in-time in bulkUploadToDrive
+        // This prevents URL expiration issues when processing large batches
+        console.log(`[Google Drive] Passing S3 key for ${filename} (URL will be generated just-in-time)`);
+        resolved.push({
+          ...file,
+          url: file.url, // Keep original URL as fallback
+          s3Key: video.processedUrl, // Pass S3 key for just-in-time URL generation
+        });
+        continue;
       } else if (!isS3Key) {
         // File is stored locally, not in S3 - this won't work for server-side fetch
         console.error(`[Google Drive] File ${filename} is stored locally, not in S3 - cannot fetch server-side`);
