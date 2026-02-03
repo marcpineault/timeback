@@ -65,6 +65,332 @@ export interface ProcessingOptions {
 }
 
 /**
+ * Analyze a single chunk of audio and return volume statistics
+ */
+async function analyzeAudioChunk(
+  inputPath: string,
+  startTime: number,
+  duration: number
+): Promise<{ maxVolume: number; meanVolume: number } | null> {
+  return new Promise((resolve) => {
+    let statsOutput = '';
+
+    const command = ffmpeg(inputPath)
+      .inputOptions(['-ss', String(startTime), '-t', String(duration)])
+      .audioFilters('volumedetect')
+      .format('null')
+      .output('/dev/null');
+
+    command
+      .on('stderr', (line: string) => {
+        statsOutput += line + '\n';
+      })
+      .on('end', () => {
+        const meanMatch = statsOutput.match(/mean_volume:\s*(-?[\d.]+)\s*dB/i);
+        const maxMatch = statsOutput.match(/max_volume:\s*(-?[\d.]+)\s*dB/i);
+
+        if (!maxMatch) {
+          resolve(null);
+          return;
+        }
+
+        resolve({
+          maxVolume: parseFloat(maxMatch[1]),
+          meanVolume: meanMatch ? parseFloat(meanMatch[1]) : parseFloat(maxMatch[1]) - 15,
+        });
+      })
+      .on('error', () => {
+        resolve(null);
+      })
+      .run();
+  });
+}
+
+/**
+ * Phase 1: Full-video audio analysis in chunks
+ * Analyzes the entire video in chunks and uses the median of max volumes
+ * to be robust against outliers and varying audio levels throughout the video.
+ */
+async function analyzeFullVideoAudio(
+  inputPath: string,
+  videoDuration: number,
+  chunkDuration: number = 30
+): Promise<{ maxVolumes: number[]; meanVolumes: number[]; medianMax: number; medianMean: number }> {
+  const numChunks = Math.ceil(videoDuration / chunkDuration);
+  const maxVolumes: number[] = [];
+  const meanVolumes: number[] = [];
+
+  logger.debug(`[Audio Analysis] Analyzing full video in ${numChunks} chunks of ${chunkDuration}s each`);
+
+  // Analyze chunks in parallel (up to 3 at a time to avoid overwhelming the system)
+  const chunkPromises: Promise<void>[] = [];
+
+  for (let i = 0; i < numChunks; i++) {
+    const startTime = i * chunkDuration;
+    const actualDuration = Math.min(chunkDuration, videoDuration - startTime);
+
+    if (actualDuration < 1) continue; // Skip very short final chunks
+
+    chunkPromises.push(
+      analyzeAudioChunk(inputPath, startTime, actualDuration).then((result) => {
+        if (result) {
+          maxVolumes.push(result.maxVolume);
+          meanVolumes.push(result.meanVolume);
+        }
+      })
+    );
+
+    // Process in batches of 3 to limit concurrent FFmpeg processes
+    if (chunkPromises.length >= 3 || i === numChunks - 1) {
+      await Promise.all(chunkPromises);
+      chunkPromises.length = 0;
+    }
+  }
+
+  // Calculate medians (robust to outliers)
+  const sortedMax = [...maxVolumes].sort((a, b) => a - b);
+  const sortedMean = [...meanVolumes].sort((a, b) => a - b);
+
+  const medianMax = sortedMax.length > 0
+    ? sortedMax[Math.floor(sortedMax.length / 2)]
+    : -20;
+  const medianMean = sortedMean.length > 0
+    ? sortedMean[Math.floor(sortedMean.length / 2)]
+    : -35;
+
+  logger.debug(`[Audio Analysis] Chunk analysis complete: ${maxVolumes.length} chunks analyzed`);
+  logger.debug(`[Audio Analysis] Max volumes range: ${Math.min(...maxVolumes).toFixed(1)} to ${Math.max(...maxVolumes).toFixed(1)} dB`);
+  logger.debug(`[Audio Analysis] Median max: ${medianMax.toFixed(1)} dB, Median mean: ${medianMean.toFixed(1)} dB`);
+
+  return { maxVolumes, meanVolumes, medianMax, medianMean };
+}
+
+/**
+ * Phase 3: Percentile-based threshold calculation using astats
+ * Uses FFmpeg astats to get more detailed audio statistics including RMS levels
+ * This is more robust than simple max/mean as it considers the distribution of audio levels
+ */
+async function analyzeAudioPercentiles(
+  inputPath: string,
+  sampleDuration?: number
+): Promise<{ peakLevel: number; rmsLevel: number; dynamicRange: number } | null> {
+  return new Promise((resolve) => {
+    let statsOutput = '';
+
+    const inputOptions = sampleDuration ? ['-t', String(sampleDuration)] : [];
+
+    const command = ffmpeg(inputPath)
+      .inputOptions(inputOptions)
+      .audioFilters('astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level')
+      .format('null')
+      .output('/dev/null');
+
+    command
+      .on('stderr', (line: string) => {
+        statsOutput += line + '\n';
+      })
+      .on('end', () => {
+        // Parse astats output - look for Overall statistics
+        // Format: [Parsed_astats_0 @ ...] Overall
+        // Peak level dB: -X.XX
+        // RMS level dB: -X.XX
+        const peakMatch = statsOutput.match(/Peak level dB:\s*(-?[\d.]+)/i);
+        const rmsMatch = statsOutput.match(/RMS level dB:\s*(-?[\d.]+)/i);
+
+        if (!peakMatch || !rmsMatch) {
+          logger.debug(`[Audio Percentiles] Could not parse astats output`);
+          resolve(null);
+          return;
+        }
+
+        const peakLevel = parseFloat(peakMatch[1]);
+        const rmsLevel = parseFloat(rmsMatch[1]);
+        const dynamicRange = peakLevel - rmsLevel;
+
+        logger.debug(`[Audio Percentiles] Peak: ${peakLevel.toFixed(1)} dB, RMS: ${rmsLevel.toFixed(1)} dB, Dynamic range: ${dynamicRange.toFixed(1)} dB`);
+
+        resolve({ peakLevel, rmsLevel, dynamicRange });
+      })
+      .on('error', (err: Error) => {
+        logger.debug(`[Audio Percentiles] Error: ${err.message}`);
+        resolve(null);
+      })
+      .run();
+  });
+}
+
+/**
+ * Calculate optimal silence threshold using multiple methods and combine them
+ * This is the core of the adaptive threshold calculation
+ */
+function calculateAdaptiveThreshold(
+  medianMax: number,
+  medianMean: number,
+  peakLevel?: number,
+  rmsLevel?: number,
+  dynamicRange?: number
+): number {
+  const thresholds: number[] = [];
+  const weights: number[] = [];
+
+  // Method 1: Traditional max - offset (original approach, but using median)
+  const traditionalThreshold = medianMax - 22;
+  thresholds.push(traditionalThreshold);
+  weights.push(1.0);
+
+  // Method 2: Mean-based threshold (relative to average level)
+  const meanBasedThreshold = medianMean - 8;
+  thresholds.push(meanBasedThreshold);
+  weights.push(0.5);
+
+  // Method 3: If we have astats data, use RMS-based calculation
+  if (rmsLevel !== undefined && dynamicRange !== undefined) {
+    // RMS represents the "energy" of the audio, silence should be well below RMS
+    const rmsBasedThreshold = rmsLevel - 12;
+    thresholds.push(rmsBasedThreshold);
+    weights.push(0.8);
+
+    // If dynamic range is large, we can be more aggressive
+    if (dynamicRange > 20) {
+      // High dynamic range = clear distinction between speech and silence
+      const aggressiveThreshold = medianMax - 25;
+      thresholds.push(aggressiveThreshold);
+      weights.push(0.3);
+    }
+  }
+
+  // Calculate weighted average
+  let weightedSum = 0;
+  let totalWeight = 0;
+  for (let i = 0; i < thresholds.length; i++) {
+    weightedSum += thresholds[i] * weights[i];
+    totalWeight += weights[i];
+  }
+
+  let threshold = weightedSum / totalWeight;
+
+  // Clamp to reasonable bounds (-50 to -15 dB)
+  threshold = Math.min(-15, Math.max(-50, threshold));
+
+  logger.debug(`[Adaptive Threshold] Calculated threshold: ${threshold.toFixed(1)} dB`);
+  logger.debug(`[Adaptive Threshold] Component thresholds: ${thresholds.map(t => t.toFixed(1)).join(', ')} dB`);
+
+  return threshold;
+}
+
+/**
+ * Phase 2: Dual-pass detection with verification
+ * Runs silence detection twice with different thresholds and verifies results
+ * If the more sensitive pass finds significantly more silences, the threshold may be too conservative
+ */
+async function dualPassSilenceDetection(
+  inputPath: string,
+  primaryThreshold: number,
+  minDuration: number,
+  videoDuration: number
+): Promise<{ silences: SilenceInterval[]; threshold: number; wasAdjusted: boolean }> {
+  // First pass with primary threshold
+  logger.debug(`[Dual-Pass] First pass with threshold: ${primaryThreshold.toFixed(1)} dB`);
+  const primarySilences = await detectSilence(inputPath, primaryThreshold, minDuration);
+
+  const primaryTotalSilence = primarySilences.reduce((sum, s) => sum + (s.end - s.start), 0);
+  const primarySilencePercent = (primaryTotalSilence / videoDuration) * 100;
+
+  logger.debug(`[Dual-Pass] First pass: ${primarySilences.length} silences, ${primarySilencePercent.toFixed(1)}% of video`);
+
+  // Second pass with more sensitive threshold (-3 dB lower)
+  const sensitiveThreshold = primaryThreshold - 3;
+  logger.debug(`[Dual-Pass] Second pass with threshold: ${sensitiveThreshold.toFixed(1)} dB`);
+  const sensitiveSilences = await detectSilence(inputPath, sensitiveThreshold, minDuration);
+
+  const sensitiveTotalSilence = sensitiveSilences.reduce((sum, s) => sum + (s.end - s.start), 0);
+  const sensitiveSilencePercent = (sensitiveTotalSilence / videoDuration) * 100;
+
+  logger.debug(`[Dual-Pass] Second pass: ${sensitiveSilences.length} silences, ${sensitiveSilencePercent.toFixed(1)}% of video`);
+
+  // Decision logic
+  let finalSilences = primarySilences;
+  let finalThreshold = primaryThreshold;
+  let wasAdjusted = false;
+
+  // If primary pass found very little silence (<5%) and sensitive pass found significantly more
+  if (primarySilencePercent < 5 && sensitiveSilencePercent > primarySilencePercent * 1.5) {
+    logger.debug(`[Dual-Pass] Primary threshold too conservative, using sensitive results`);
+    finalSilences = sensitiveSilences;
+    finalThreshold = sensitiveThreshold;
+    wasAdjusted = true;
+  }
+
+  // If primary found too much silence (>80%), threshold might be too aggressive
+  // In this case, stick with primary but log a warning
+  if (primarySilencePercent > 80) {
+    logger.warn(`[Dual-Pass] Warning: Very high silence percentage (${primarySilencePercent.toFixed(1)}%), audio may be very quiet`);
+  }
+
+  // Sanity check: if still no silences found and sensitive pass found some, use those
+  if (finalSilences.length === 0 && sensitiveSilences.length > 0) {
+    logger.debug(`[Dual-Pass] No silences with primary, using sensitive results`);
+    finalSilences = sensitiveSilences;
+    finalThreshold = sensitiveThreshold;
+    wasAdjusted = true;
+  }
+
+  return { silences: finalSilences, threshold: finalThreshold, wasAdjusted };
+}
+
+/**
+ * Adaptive silence detection - combines all three phases for robust detection
+ * Phase 1: Full-video analysis in chunks
+ * Phase 2: Dual-pass detection with verification
+ * Phase 3: Percentile-based threshold calculation
+ */
+export async function detectSilenceAdaptive(
+  inputPath: string,
+  minDuration: number = 0.5
+): Promise<{ silences: SilenceInterval[]; threshold: number; analysisInfo: string }> {
+  // Get video duration first
+  const videoDuration = await getVideoDuration(inputPath);
+
+  logger.info(`[Adaptive Silence] Starting adaptive detection for ${videoDuration.toFixed(1)}s video`);
+
+  // Phase 1: Full-video analysis
+  const chunkDuration = Math.min(30, videoDuration); // Use smaller chunks for short videos
+  const { medianMax, medianMean } = await analyzeFullVideoAudio(inputPath, videoDuration, chunkDuration);
+
+  // Phase 3: Percentile-based analysis (sample first 60s or full video if shorter)
+  const sampleForPercentiles = Math.min(60, videoDuration);
+  const percentileData = await analyzeAudioPercentiles(inputPath, sampleForPercentiles);
+
+  // Calculate adaptive threshold
+  const adaptiveThreshold = calculateAdaptiveThreshold(
+    medianMax,
+    medianMean,
+    percentileData?.peakLevel,
+    percentileData?.rmsLevel,
+    percentileData?.dynamicRange
+  );
+
+  logger.info(`[Adaptive Silence] Calculated adaptive threshold: ${adaptiveThreshold.toFixed(1)} dB`);
+
+  // Phase 2: Dual-pass detection
+  const { silences, threshold, wasAdjusted } = await dualPassSilenceDetection(
+    inputPath,
+    adaptiveThreshold,
+    minDuration,
+    videoDuration
+  );
+
+  const totalSilence = silences.reduce((sum, s) => sum + (s.end - s.start), 0);
+  const silencePercent = (totalSilence / videoDuration) * 100;
+
+  const analysisInfo = `Adaptive detection: medianMax=${medianMax.toFixed(1)}dB, threshold=${threshold.toFixed(1)}dB${wasAdjusted ? ' (adjusted)' : ''}, ${silences.length} silences (${silencePercent.toFixed(1)}%)`;
+
+  logger.info(`[Adaptive Silence] ${analysisInfo}`);
+
+  return { silences, threshold, analysisInfo };
+}
+
+/**
  * Detect the optimal silence threshold for a video's audio track
  * Uses volumedetect to find the max volume level (peak speech), then sets threshold relative to that.
  *
@@ -72,6 +398,7 @@ export interface ProcessingOptions {
  * Silence/pauses are typically 20-25 dB below speech peaks.
  * This is more reliable than mean because mean gets dragged down by silence.
  *
+ * @deprecated Use detectSilenceAdaptive for more robust detection
  * Performance: Only samples first 30 seconds for fast analysis during bulk processing
  */
 export async function detectNoiseFloor(
@@ -289,6 +616,7 @@ export function getNonSilentSegments(
 
 /**
  * Remove silent parts from video by concatenating non-silent segments
+ * Uses adaptive silence detection when autoSilenceThreshold is enabled
  */
 export async function removeSilence(
   inputPath: string,
@@ -297,18 +625,22 @@ export async function removeSilence(
 ): Promise<string> {
   let threshold = options.silenceThreshold ?? -20;
   const minDuration = options.silenceDuration ?? 0.5;
+  let silences: SilenceInterval[];
+  let duration: number;
 
-  // Auto-detect optimal silence threshold if enabled
+  // Use adaptive detection when auto-detection is enabled (more robust)
   if (options.autoSilenceThreshold) {
-    logger.info(`[Silence Removal] Auto-detecting optimal silence threshold...`);
-    const { recommendedThreshold, noiseFloor: meanVolume } = await detectNoiseFloor(inputPath);
-    threshold = recommendedThreshold;
-    logger.info(`[Silence Removal] Mean volume: ${meanVolume.toFixed(1)} dB, using threshold: ${threshold.toFixed(1)} dB`);
+    logger.info(`[Silence Removal] Using adaptive silence detection...`);
+    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
+    silences = adaptiveResult.silences;
+    threshold = adaptiveResult.threshold;
+    duration = await getVideoDuration(inputPath);
+    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
+  } else {
+    // Manual threshold mode - use legacy detection
+    silences = await detectSilence(inputPath, threshold, minDuration);
+    duration = await getVideoDuration(inputPath);
   }
-
-  // Detect silences
-  const silences = await detectSilence(inputPath, threshold, minDuration);
-  const duration = await getVideoDuration(inputPath);
 
   logger.debug(`[Silence Removal] Video duration: ${duration.toFixed(2)}s`);
   logger.debug(`[Silence Removal] Found ${silences.length} silent intervals`);
