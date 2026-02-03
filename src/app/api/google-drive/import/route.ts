@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Limit number of files per request
-  const maxFiles = 10;
+  const maxFiles = 50;
   if (body.files.length > maxFiles) {
     return NextResponse.json(
       { error: `Maximum ${maxFiles} files per request` },
