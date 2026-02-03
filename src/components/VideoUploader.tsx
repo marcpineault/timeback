@@ -368,14 +368,33 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           resolve({ success: false, error: 'Upload timed out', shouldRetry: true });
         });
 
+        xhr.addEventListener('abort', () => {
+          resolve({ success: false, error: 'Upload was cancelled', shouldRetry: false });
+        });
+
+        // Add a watchdog for when upload completes but S3 doesn't respond
+        // This catches edge cases where load/error/timeout events don't fire
+        xhr.upload.addEventListener('load', () => {
+          // Give S3 60 seconds to respond after upload completes
+          setTimeout(() => {
+            if (xhr.readyState !== 4) {
+              console.warn(`[Upload] S3 not responding after upload complete for ${file.name}, aborting`);
+              xhr.abort();
+            }
+          }, 60000);
+        });
+
         xhr.open('PUT', urlInfo.url);
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
       });
 
       if (result.success) {
-        // Keep status as 'uploading' with 100% progress until batch confirmation succeeds
-        // This shows "Finalizing..." in the UI while we wait for confirmation
+        // Mark file as complete when S3 responds - batch confirm is nearly instant
+        // If batch confirm fails, error handling will mark files appropriately
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
+        ));
         return { index, s3Key: result.s3Key };
       }
 
