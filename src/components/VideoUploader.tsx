@@ -88,6 +88,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   // This ensures the guard check always sees current status, not stale state from old closures
   const isUploadingRef = useRef(false);
 
+  // Ref to hold the latest uploadFiles function - solves stale closure issue
+  // Callbacks can use this ref to always call the current version of uploadFiles
+  const uploadFilesRef = useRef<(files: File[]) => Promise<void>>(null!);
+
   const isUploading = uploadingFiles.some(f => f.status === 'uploading' || f.status === 'pending');
 
   // Get max concurrent uploads based on device type
@@ -97,6 +101,19 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
   // Helper function to delay for retry
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Reset upload state on mount and cleanup on unmount
+  useEffect(() => {
+    // Force reset on mount (handles page refresh and navigation)
+    console.log('[Upload] Component mounted, resetting upload state');
+    isUploadingRef.current = false;
+
+    return () => {
+      // Cleanup on unmount
+      console.log('[Upload] Component unmounting, cleaning up');
+      isUploadingRef.current = false;
+    };
+  }, []);
 
   // Check if S3 is available and detect mobile on mount
   useEffect(() => {
@@ -627,16 +644,19 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   };
 
   const uploadFiles = async (files: File[]) => {
+    console.log(`[Upload] uploadFiles called with ${files.length} files, isUploadingRef.current=${isUploadingRef.current}`);
+
     // Prevent starting a new upload batch while one is in progress
     // Use ref instead of state to avoid stale closure issues with useCallback
     // State check would see old values due to handleFileSelect/handleDrop closures
     if (isUploadingRef.current) {
-      console.warn('[Upload] Upload already in progress, ignoring new upload request');
+      console.warn('[Upload] Upload already in progress (isUploadingRef=true), ignoring new upload request');
       return;
     }
 
     // Mark uploads as in progress immediately using ref
     isUploadingRef.current = true;
+    console.log('[Upload] Starting new upload batch, isUploadingRef set to true');
 
     try {
       setError(null);
@@ -709,18 +729,24 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       }
 
       // Notify parent of completed uploads
+      console.log(`[Upload] Batch finished with ${results.length} successful uploads`);
       if (results.length > 0) {
         onUploadComplete(results);
       }
     } finally {
       // Always reset state - even if an error occurred
       // This prevents uploads from getting permanently stuck
+      console.log('[Upload] Finally block reached, resetting all state...');
       setUploadingFiles([]);
       setIsPreparing(false);
       isUploadingRef.current = false;
-      console.log('[Upload] Upload batch complete, state reset');
+      console.log('[Upload] Upload batch complete, isUploadingRef reset to false');
     }
   };
+
+  // Always keep the ref updated with the latest uploadFiles function
+  // This ensures callbacks always call the current version, avoiding stale closures
+  uploadFilesRef.current = uploadFiles;
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -730,20 +756,20 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      uploadFiles(files);
+      // Use ref to always call the latest uploadFiles function
+      uploadFilesRef.current(files);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, s3Available, isMobile]);
+  }, [disabled]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      uploadFiles(Array.from(files));
+      // Use ref to always call the latest uploadFiles function
+      uploadFilesRef.current(Array.from(files));
     }
     // Reset input so same file can be selected again if needed
     e.target.value = '';
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s3Available, isMobile]);
+  }, []);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
