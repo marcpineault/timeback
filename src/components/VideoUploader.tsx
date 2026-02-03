@@ -45,13 +45,16 @@ const CHUNK_SIZE = 5 * 1024 * 1024;
 
 // Concurrent uploads - allow many parallel uploads for faster batch processing
 const MAX_CONCURRENT_UPLOADS_DESKTOP = 50;
+const MIN_CONCURRENT_UPLOADS_DESKTOP = 10; // Floor for adaptive concurrency
 const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
 
 // Retry configuration for failed uploads
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 1000; // 1 second, doubles each retry
+const INITIAL_RETRY_DELAY_MS = 500; // 500ms initial, doubles each retry (faster recovery)
 
-// Simple upload timeout per file (based on size, calculated per-file)
+// Stall detection - check more frequently for faster recovery
+const STALL_CHECK_INTERVAL_MS = 5000; // Check every 5 seconds (was 10)
+const STALL_TIMEOUT_MS = 45000; // 45 seconds no progress = stalled (was 60)
 
 // Get content type from file, with fallback based on extension
 const getContentType = (file: File): string => {
@@ -387,8 +390,6 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       try {
         // Timeout: 30 seconds per MB, minimum 2 minutes
         const timeoutMs = Math.max(120000, Math.ceil(file.size / (1024 * 1024)) * 30000);
-        // Stall detection: abort if no progress for 60 seconds
-        const STALL_TIMEOUT_MS = 60000;
 
         const uploadResult = await new Promise<boolean>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
@@ -436,14 +437,14 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           xhr.ontimeout = () => settle(() => reject(new Error('Upload timed out')));
           xhr.onabort = () => settle(() => reject(new Error('Upload was aborted')));
 
-          // Stall detection: check every 10 seconds if progress has stalled
+          // Stall detection: check frequently for faster recovery
           stallCheckInterval = setInterval(() => {
             const timeSinceProgress = Date.now() - lastProgressTime;
             if (timeSinceProgress > STALL_TIMEOUT_MS) {
               console.warn(`[Upload] Stall detected for ${file.name}: no progress for ${Math.round(timeSinceProgress / 1000)}s, aborting`);
               xhr.abort();
             }
-          }, 10000);
+          }, STALL_CHECK_INTERVAL_MS);
 
           xhr.open('PUT', urlInfo.url);
           xhr.setRequestHeader('Content-Type', contentType);
@@ -477,10 +478,21 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
     return null;
   };
 
-  // Simple semaphore for concurrency control
-  const createSemaphore = (limit: number) => {
+  // Adaptive semaphore for concurrency control
+  // Starts at max limit, can be reduced on errors for better throughput
+  const createAdaptiveSemaphore = (initialLimit: number, minLimit: number) => {
+    let limit = initialLimit;
     let running = 0;
+    let consecutiveErrors = 0;
     const queue: (() => void)[] = [];
+
+    const tryRunNext = () => {
+      while (running < limit && queue.length > 0) {
+        running++;
+        const next = queue.shift();
+        next?.();
+      }
+    };
 
     return {
       acquire: () => new Promise<void>((resolve) => {
@@ -491,22 +503,36 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           queue.push(resolve);
         }
       }),
-      release: () => {
+      release: (success: boolean = true) => {
         running--;
-        const next = queue.shift();
-        if (next) {
-          running++;
-          next();
+        if (success) {
+          consecutiveErrors = 0;
+          // Gradually increase limit back up on success
+          if (limit < initialLimit) {
+            limit = Math.min(initialLimit, limit + 1);
+          }
+        } else {
+          consecutiveErrors++;
+          // Reduce concurrency on consecutive errors (network congestion)
+          if (consecutiveErrors >= 2 && limit > minLimit) {
+            const newLimit = Math.max(minLimit, Math.floor(limit * 0.7));
+            if (newLimit < limit) {
+              console.log(`[Upload] Reducing concurrency from ${limit} to ${newLimit} due to errors`);
+              limit = newLimit;
+            }
+          }
         }
-      }
+        tryRunNext();
+      },
+      getLimit: () => limit,
     };
   };
 
-  // Simplified batch S3 upload - uses Promise.allSettled with semaphore for cleaner concurrency
+  // Optimized batch S3 upload with adaptive concurrency
   const uploadFilesToS3Batch = async (files: File[], initialState: UploadingFile[]): Promise<UploadedFile[]> => {
     console.log(`[Upload] Starting batch upload for ${files.length} files`);
 
-    // Step 1: Get all presigned URLs in a single request
+    // Step 1: Get all presigned URLs in a single request (server generates in parallel)
     const fileInfos: FileInfo[] = files.map(f => ({
       filename: f.name,
       contentType: getContentType(f),
@@ -522,9 +548,10 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
     console.log(`[Upload] Got ${batchUrlResult.urls.length} presigned URLs, starting uploads...`);
 
-    // Step 2: Upload files with semaphore-controlled concurrency
+    // Step 2: Upload files with adaptive concurrency control
     const maxConcurrent = getMaxConcurrentUploads();
-    const semaphore = createSemaphore(maxConcurrent);
+    const minConcurrent = isMobile ? MAX_CONCURRENT_UPLOADS_MOBILE : MIN_CONCURRENT_UPLOADS_DESKTOP;
+    const semaphore = createAdaptiveSemaphore(maxConcurrent, minConcurrent);
 
     const uploadPromises = files.map(async (file, index) => {
       const urlInfo = batchUrlResult.urls!.find(u => u.index === index);
@@ -539,10 +566,13 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
 
       // Wait for a slot
       await semaphore.acquire();
+      let success = false;
       try {
-        return await uploadSingleFileToS3(file, index, urlInfo);
+        const result = await uploadSingleFileToS3(file, index, urlInfo);
+        success = result !== null;
+        return result;
       } finally {
-        semaphore.release();
+        semaphore.release(success);
       }
     });
 
@@ -707,17 +737,21 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           setError(err instanceof Error ? err.message : 'Upload failed');
         }
       } else {
-        // Fallback: Upload files using semaphore (same pattern as S3 batch)
-        console.log('[Upload] Using fallback upload with semaphore');
+        // Fallback: Upload files using adaptive concurrency (same pattern as S3 batch)
+        console.log('[Upload] Using fallback upload with adaptive concurrency');
         const maxConcurrent = getMaxConcurrentUploads();
-        const semaphore = createSemaphore(maxConcurrent);
+        const minConcurrent = isMobile ? MAX_CONCURRENT_UPLOADS_MOBILE : MIN_CONCURRENT_UPLOADS_DESKTOP;
+        const semaphore = createAdaptiveSemaphore(maxConcurrent, minConcurrent);
 
         const uploadPromises = validFiles.map(async (file, index) => {
           await semaphore.acquire();
+          let success = false;
           try {
-            return await uploadSingleFile(file, index, initialState[index].previewUrl);
+            const result = await uploadSingleFile(file, index, initialState[index].previewUrl);
+            success = result !== null;
+            return result;
           } finally {
-            semaphore.release();
+            semaphore.release(success);
           }
         });
 
