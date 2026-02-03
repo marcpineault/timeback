@@ -98,6 +98,19 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   // Helper function to delay for retry
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Reset upload state on mount and cleanup on unmount
+  useEffect(() => {
+    // Force reset on mount (handles page refresh and navigation)
+    console.log('[Upload] Component mounted, resetting upload state');
+    isUploadingRef.current = false;
+
+    return () => {
+      // Cleanup on unmount
+      console.log('[Upload] Component unmounting, cleaning up');
+      isUploadingRef.current = false;
+    };
+  }, []);
+
   // Check if S3 is available and detect mobile on mount
   useEffect(() => {
     checkS3Available()
@@ -627,16 +640,19 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
   };
 
   const uploadFiles = async (files: File[]) => {
+    console.log(`[Upload] uploadFiles called with ${files.length} files, isUploadingRef.current=${isUploadingRef.current}`);
+
     // Prevent starting a new upload batch while one is in progress
     // Use ref instead of state to avoid stale closure issues with useCallback
     // State check would see old values due to handleFileSelect/handleDrop closures
     if (isUploadingRef.current) {
-      console.warn('[Upload] Upload already in progress, ignoring new upload request');
+      console.warn('[Upload] Upload already in progress (isUploadingRef=true), ignoring new upload request');
       return;
     }
 
     // Mark uploads as in progress immediately using ref
     isUploadingRef.current = true;
+    console.log('[Upload] Starting new upload batch, isUploadingRef set to true');
 
     try {
       setError(null);
@@ -709,16 +725,18 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       }
 
       // Notify parent of completed uploads
+      console.log(`[Upload] Batch finished with ${results.length} successful uploads`);
       if (results.length > 0) {
         onUploadComplete(results);
       }
     } finally {
       // Always reset state - even if an error occurred
       // This prevents uploads from getting permanently stuck
+      console.log('[Upload] Finally block reached, resetting all state...');
       setUploadingFiles([]);
       setIsPreparing(false);
       isUploadingRef.current = false;
-      console.log('[Upload] Upload batch complete, state reset');
+      console.log('[Upload] Upload batch complete, isUploadingRef reset to false');
     }
   };
 
