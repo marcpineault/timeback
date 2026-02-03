@@ -374,8 +374,11 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
       });
 
       if (result.success) {
-        // Keep status as 'uploading' with 100% progress until batch confirmation succeeds
-        // This shows "Finalizing..." in the UI while we wait for confirmation
+        // Mark file as complete when S3 responds - batch confirm is nearly instant
+        // If batch confirm fails, error handling will mark files appropriately
+        setUploadingFiles(prev => prev.map((f, i) =>
+          i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
+        ));
         return { index, s3Key: result.s3Key };
       }
 
