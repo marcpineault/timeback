@@ -189,7 +189,7 @@ export async function confirmS3Upload(
 /**
  * Get presigned URLs for multiple files in a single request (reduces round trips)
  * Uses Promise.allSettled to handle partial failures gracefully
- * Processes in chunks of 10 to avoid timeout issues with large batches
+ * Optimized for desktop: generates all URLs in parallel for maximum speed
  */
 export async function getBatchS3UploadUrls(
   files: FileInfo[]
@@ -205,44 +205,38 @@ export async function getBatchS3UploadUrls(
     }
 
     const maxSize = 1024 * 1024 * 1024;
-    const CHUNK_SIZE = 10; // Process 10 files at a time to avoid timeouts
+
+    // Validate all files first (fast, synchronous checks)
+    for (const file of files) {
+      if (!isValidVideoType(file.contentType, file.filename)) {
+        return { success: false, error: `Invalid file type for ${file.filename}` };
+      }
+      if (file.fileSize > maxSize) {
+        return { success: false, error: `File ${file.filename} too large. Maximum size is 1GB.` };
+      }
+    }
+
+    // Generate all presigned URLs in parallel for maximum speed
+    // Each createUploadUrl call is independent and lightweight
+    const urlPromises = files.map(async (file, index) => {
+      const { url, key } = await createUploadUrl(file.filename, file.contentType);
+      return { url, key, index };
+    });
+
+    const results = await Promise.allSettled(urlPromises);
 
     const urls: Array<{ url: string; key: string; index: number }> = [];
     const errors: string[] = [];
 
-    // Process files in chunks to avoid overwhelming the server
-    for (let i = 0; i < files.length; i += CHUNK_SIZE) {
-      const chunk = files.slice(i, i + CHUNK_SIZE);
-      const chunkStartIndex = i;
-
-      // Generate presigned URLs for this chunk in parallel
-      const urlPromises = chunk.map(async (file, chunkIndex) => {
-        const globalIndex = chunkStartIndex + chunkIndex;
-
-        if (!isValidVideoType(file.contentType, file.filename)) {
-          throw new Error(`Invalid file type for ${file.filename}`);
-        }
-        if (file.fileSize > maxSize) {
-          throw new Error(`File ${file.filename} too large. Maximum size is 1GB.`);
-        }
-
-        const { url, key } = await createUploadUrl(file.filename, file.contentType);
-        return { url, key, index: globalIndex };
-      });
-
-      // Use allSettled to handle partial failures within the chunk
-      const chunkResults = await Promise.allSettled(urlPromises);
-
-      for (let j = 0; j < chunkResults.length; j++) {
-        const result = chunkResults[j];
-        if (result.status === 'fulfilled') {
-          urls.push(result.value);
-        } else {
-          const filename = chunk[j].filename;
-          const errorMsg = result.reason instanceof Error ? result.reason.message : 'Unknown error';
-          errors.push(`${filename}: ${errorMsg}`);
-          console.error(`[Upload] Failed to get URL for ${filename}:`, errorMsg);
-        }
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        urls.push(result.value);
+      } else {
+        const filename = files[i].filename;
+        const errorMsg = result.reason instanceof Error ? result.reason.message : 'Unknown error';
+        errors.push(`${filename}: ${errorMsg}`);
+        console.error(`[Upload] Failed to get URL for ${filename}:`, errorMsg);
       }
     }
 
@@ -251,7 +245,7 @@ export async function getBatchS3UploadUrls(
       return { success: false, error: errors.join('; ') || 'Failed to generate any upload URLs' };
     }
 
-    console.log(`[Upload] Generated ${urls.length}/${files.length} presigned URLs in batch`);
+    console.log(`[Upload] Generated ${urls.length}/${files.length} presigned URLs in parallel`);
     if (errors.length > 0) {
       console.warn(`[Upload] ${errors.length} files failed URL generation:`, errors);
     }
@@ -266,7 +260,7 @@ export async function getBatchS3UploadUrls(
 
 /**
  * Confirm multiple S3 uploads in a single request
- * Processes in chunks to handle large batches
+ * Optimized: processes all confirmations at once (no chunking needed for lightweight operations)
  */
 export async function confirmBatchS3Uploads(
   uploads: Array<{ s3Key: string; originalName: string; size: number }>
@@ -277,29 +271,20 @@ export async function confirmBatchS3Uploads(
       return { success: false, error: 'Unauthorized' };
     }
 
-    const files: S3UploadCompleteResult[] = [];
+    // Process all confirmations at once - this is just string manipulation, very fast
+    const files: S3UploadCompleteResult[] = uploads.map(upload => {
+      const filename = upload.s3Key.split('/').pop() || upload.s3Key;
+      const fileId = filename.replace(/\.[^/.]+$/, '');
 
-    // Process in chunks of 20 for large batches
-    const CHUNK_SIZE = 20;
-    for (let i = 0; i < uploads.length; i += CHUNK_SIZE) {
-      const chunk = uploads.slice(i, i + CHUNK_SIZE);
-
-      const chunkFiles = chunk.map(upload => {
-        const filename = upload.s3Key.split('/').pop() || upload.s3Key;
-        const fileId = filename.replace(/\.[^/.]+$/, '');
-
-        return {
-          success: true,
-          fileId,
-          filename,
-          originalName: upload.originalName,
-          size: upload.size,
-          s3Key: upload.s3Key,
-        };
-      });
-
-      files.push(...chunkFiles);
-    }
+      return {
+        success: true,
+        fileId,
+        filename,
+        originalName: upload.originalName,
+        size: upload.size,
+        s3Key: upload.s3Key,
+      };
+    });
 
     console.log(`[Upload] Batch confirmed ${files.length} uploads to CLOUDFLARE R2`);
 
