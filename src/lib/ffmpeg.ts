@@ -66,11 +66,11 @@ export interface ProcessingOptions {
 
 /**
  * Detect the optimal silence threshold for a video's audio track
- * Uses volumedetect to find the mean volume level, which is a good baseline for silence threshold
+ * Uses volumedetect to find the max volume level (peak speech), then sets threshold relative to that.
  *
- * The logic: mean_volume represents average loudness including speech and pauses.
- * Anything significantly below the mean is likely silence/pauses.
- * We set threshold slightly below mean to catch pauses without cutting quiet speech.
+ * The logic: max_volume represents peak speech levels (the loudest parts).
+ * Silence/pauses are typically 20-25 dB below speech peaks.
+ * This is more reliable than mean because mean gets dragged down by silence.
  *
  * Performance: Only samples first 30 seconds for fast analysis during bulk processing
  */
@@ -84,7 +84,6 @@ export async function detectNoiseFloor(
     logger.debug(`[Audio Analysis] Analyzing audio levels (sampling ${sampleDuration}s)`);
 
     // Use volumedetect filter to get mean and max volume
-    // This is more reliable than astats for determining silence threshold
     const command = ffmpeg(inputPath)
       .inputOptions(['-t', String(sampleDuration)]) // Only sample first N seconds
       .audioFilters('volumedetect')
@@ -102,46 +101,31 @@ export async function detectNoiseFloor(
         const meanMatch = statsOutput.match(/mean_volume:\s*(-?[\d.]+)\s*dB/i);
         const maxMatch = statsOutput.match(/max_volume:\s*(-?[\d.]+)\s*dB/i);
 
-        if (!meanMatch) {
-          logger.debug(`[Audio Analysis] Could not detect mean volume, using defaults`);
+        if (!maxMatch) {
+          logger.debug(`[Audio Analysis] Could not detect max volume, using defaults`);
           resolve({ noiseFloor: -40, recommendedThreshold: -25 });
           return;
         }
 
-        const meanVolume = parseFloat(meanMatch[1]);
-        const maxVolume = maxMatch ? parseFloat(maxMatch[1]) : meanVolume + 10;
+        const maxVolume = parseFloat(maxMatch[1]);
+        const meanVolume = meanMatch ? parseFloat(meanMatch[1]) : maxVolume - 15;
 
-        // Calculate dynamic range (difference between peak and mean)
-        const dynamicRange = maxVolume - meanVolume;
-
-        // The recommended threshold should be:
-        // - At or slightly below the mean volume for typical speech content
-        // - Adjusted based on dynamic range (more range = more room to be aggressive)
+        // Use max volume (peak speech) as reference point
+        // Silence is typically 20-25 dB below peak speech levels
+        // Set threshold at max - 22 dB as a good middle ground
         //
-        // For speech videos:
-        // - Mean is usually -20 to -30 dB
-        // - Pauses are typically 10-20 dB below mean
-        // - We want threshold close to mean to catch pauses effectively
-        //
-        // Threshold = mean_volume - small_offset
-        let recommendedThreshold: number;
-
-        if (dynamicRange > 15) {
-          // High dynamic range (lots of variation) - threshold at mean level
-          recommendedThreshold = meanVolume;
-        } else if (dynamicRange > 8) {
-          // Medium dynamic range - small offset below mean
-          recommendedThreshold = meanVolume - 2;
-        } else {
-          // Low dynamic range (consistent volume) - slightly larger offset
-          recommendedThreshold = meanVolume - 5;
-        }
+        // Examples:
+        // - max = -3 dB (normalized audio) → threshold = -25 dB
+        // - max = -8 dB (slightly quieter) → threshold = -30 dB
+        // - max = 0 dB (loud/clipped) → threshold = -22 dB
+        const offsetFromMax = 22;
+        let recommendedThreshold = maxVolume - offsetFromMax;
 
         // Clamp to reasonable bounds (-50 to -15 dB)
         recommendedThreshold = Math.min(-15, Math.max(-50, recommendedThreshold));
 
-        logger.debug(`[Audio Analysis] Mean volume: ${meanVolume.toFixed(1)} dB, Max volume: ${maxVolume.toFixed(1)} dB, Dynamic range: ${dynamicRange.toFixed(1)} dB`);
-        logger.debug(`[Audio Analysis] Recommended threshold: ${recommendedThreshold.toFixed(1)} dB`);
+        logger.debug(`[Audio Analysis] Max volume: ${maxVolume.toFixed(1)} dB, Mean volume: ${meanVolume.toFixed(1)} dB`);
+        logger.debug(`[Audio Analysis] Recommended threshold: ${recommendedThreshold.toFixed(1)} dB (max - ${offsetFromMax})`);
 
         resolve({ noiseFloor: meanVolume, recommendedThreshold });
       })
