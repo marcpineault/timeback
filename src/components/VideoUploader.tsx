@@ -43,9 +43,9 @@ interface VideoUploaderProps {
 // Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
-// Concurrent uploads - high concurrency for desktop, limited for mobile
-// Mobile networks struggle with many simultaneous large uploads
-const MAX_CONCURRENT_UPLOADS_DESKTOP = 30;
+// Concurrent uploads - browsers limit ~6 connections per domain
+// Keep lower to avoid overwhelming connection pool and ensure responses come back
+const MAX_CONCURRENT_UPLOADS_DESKTOP = 3;
 const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
 
 // Retry configuration for failed uploads
@@ -452,6 +452,12 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
           uploadSingleFileToS3(files[currentIndex], currentIndex, urlInfo)
             .then((result) => {
               allResults[currentIndex] = result;
+            })
+            .catch((err) => {
+              console.error(`[Upload] Error uploading ${files[currentIndex].name}:`, err);
+              allResults[currentIndex] = null;
+            })
+            .finally(() => {
               activeCount--;
 
               // Immediately start next upload when a slot becomes available
@@ -626,6 +632,12 @@ export default function VideoUploader({ onUploadComplete, disabled }: VideoUploa
             uploadSingleFile(validFiles[currentIndex], currentIndex, initialState[currentIndex].previewUrl)
               .then((result) => {
                 allResults[currentIndex] = result;
+              })
+              .catch((err) => {
+                console.error(`[Upload] Error uploading ${validFiles[currentIndex].name}:`, err);
+                allResults[currentIndex] = null;
+              })
+              .finally(() => {
                 activeCount--;
 
                 // Immediately start next upload when a slot becomes available
