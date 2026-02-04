@@ -234,26 +234,30 @@ function calculateAdaptiveThreshold(
   const weights: number[] = [];
 
   // Method 1: Traditional max - offset (original approach, but using median)
-  const traditionalThreshold = medianMax - 22;
+  // Reduced from 22 to 16dB - silences in speech are typically 12-18dB below speaking level
+  const traditionalThreshold = medianMax - 16;
   thresholds.push(traditionalThreshold);
   weights.push(1.0);
 
   // Method 2: Mean-based threshold (relative to average level)
-  const meanBasedThreshold = medianMean - 8;
+  // Reduced from 8 to 5dB - mean is already lower than max, so smaller offset needed
+  const meanBasedThreshold = medianMean - 5;
   thresholds.push(meanBasedThreshold);
   weights.push(0.5);
 
   // Method 3: If we have astats data, use RMS-based calculation
   if (rmsLevel !== undefined && dynamicRange !== undefined) {
-    // RMS represents the "energy" of the audio, silence should be well below RMS
-    const rmsBasedThreshold = rmsLevel - 12;
+    // RMS represents the "energy" of the audio, silence should be below RMS
+    // Reduced from 12 to 8dB for more sensitive detection
+    const rmsBasedThreshold = rmsLevel - 8;
     thresholds.push(rmsBasedThreshold);
     weights.push(0.8);
 
     // If dynamic range is large, we can be more aggressive
     if (dynamicRange > 20) {
       // High dynamic range = clear distinction between speech and silence
-      const aggressiveThreshold = medianMax - 25;
+      // Reduced from 25 to 20dB for high-dynamic-range content
+      const aggressiveThreshold = medianMax - 20;
       thresholds.push(aggressiveThreshold);
       weights.push(0.3);
     }
@@ -272,8 +276,11 @@ function calculateAdaptiveThreshold(
   // Clamp to reasonable bounds (-50 to -15 dB)
   threshold = Math.min(-15, Math.max(-50, threshold));
 
-  logger.debug(`[Adaptive Threshold] Calculated threshold: ${threshold.toFixed(1)} dB`);
-  logger.debug(`[Adaptive Threshold] Component thresholds: ${thresholds.map(t => t.toFixed(1)).join(', ')} dB`);
+  // Enhanced logging for debugging
+  const gapFromMax = medianMax - threshold;
+  logger.info(`[Adaptive Threshold] Input: medianMax=${medianMax.toFixed(1)}dB, medianMean=${medianMean.toFixed(1)}dB${rmsLevel !== undefined ? `, rms=${rmsLevel.toFixed(1)}dB` : ''}${dynamicRange !== undefined ? `, dynamicRange=${dynamicRange.toFixed(1)}dB` : ''}`);
+  logger.info(`[Adaptive Threshold] Methods: ${thresholds.map((t, i) => `${t.toFixed(1)}dB(w=${weights[i]})`).join(', ')}`);
+  logger.info(`[Adaptive Threshold] Result: ${threshold.toFixed(1)}dB (${gapFromMax.toFixed(1)}dB below peak)`);
 
   return threshold;
 }
@@ -298,8 +305,8 @@ async function dualPassSilenceDetection(
 
   logger.debug(`[Dual-Pass] First pass: ${primarySilences.length} silences, ${primarySilencePercent.toFixed(1)}% of video`);
 
-  // Second pass with more sensitive threshold (-3 dB lower)
-  const sensitiveThreshold = primaryThreshold - 3;
+  // Second pass with more sensitive threshold (-5 dB lower for better detection)
+  const sensitiveThreshold = primaryThreshold - 5;
   logger.debug(`[Dual-Pass] Second pass with threshold: ${sensitiveThreshold.toFixed(1)} dB`);
   const sensitiveSilences = await detectSilence(inputPath, sensitiveThreshold, minDuration);
 
@@ -313,8 +320,9 @@ async function dualPassSilenceDetection(
   let finalThreshold = primaryThreshold;
   let wasAdjusted = false;
 
-  // If primary pass found very little silence (<5%) and sensitive pass found significantly more
-  if (primarySilencePercent < 5 && sensitiveSilencePercent > primarySilencePercent * 1.5) {
+  // If primary pass found little silence (<20%) and sensitive pass found significantly more (>1.3x)
+  // Raised from <5% to <20% to catch more cases where threshold is too conservative
+  if (primarySilencePercent < 20 && sensitiveSilencePercent > primarySilencePercent * 1.3) {
     logger.debug(`[Dual-Pass] Primary threshold too conservative, using sensitive results`);
     finalSilences = sensitiveSilences;
     finalThreshold = sensitiveThreshold;
@@ -334,6 +342,10 @@ async function dualPassSilenceDetection(
     finalThreshold = sensitiveThreshold;
     wasAdjusted = true;
   }
+
+  const finalTotalSilence = finalSilences.reduce((sum, s) => sum + (s.end - s.start), 0);
+  const finalSilencePercent = (finalTotalSilence / videoDuration) * 100;
+  logger.info(`[Dual-Pass] Final: ${finalSilences.length} silences (${finalSilencePercent.toFixed(1)}%), threshold=${finalThreshold.toFixed(1)}dB${wasAdjusted ? ' (adjusted)' : ''}`);
 
   return { silences: finalSilences, threshold: finalThreshold, wasAdjusted };
 }
