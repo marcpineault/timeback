@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { GoogleAnalytics } from "@/components/Analytics";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -24,7 +26,10 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className="font-sans antialiased">
-          {children}
+          <GoogleAnalytics />
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </body>
       </html>
     </ClerkProvider>

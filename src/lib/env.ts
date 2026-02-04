@@ -35,6 +35,11 @@ const ENV_VARS: EnvVar[] = [
   { name: 'GOOGLE_CLIENT_ID', required: false, description: 'Google OAuth client ID' },
   { name: 'GOOGLE_CLIENT_SECRET', required: false, description: 'Google OAuth client secret' },
 
+  // Analytics & Monitoring (optional but recommended)
+  { name: 'NEXT_PUBLIC_GA_MEASUREMENT_ID', required: false, description: 'Google Analytics 4 measurement ID' },
+  { name: 'SENTRY_DSN', required: false, description: 'Sentry DSN for server-side error tracking' },
+  { name: 'NEXT_PUBLIC_SENTRY_DSN', required: false, description: 'Sentry DSN for client-side error tracking' },
+
   // App config
   { name: 'NEXT_PUBLIC_APP_URL', required: false, description: 'Public URL of the application' },
 ];

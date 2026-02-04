@@ -181,12 +181,11 @@ export default function VideoSplitter({
         }),
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Split failed');
       }
 
-      const data = await response.json();
       onSplitComplete(data.parts);
     } catch (error) {
       console.error('Split error:', error);

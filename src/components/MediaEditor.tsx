@@ -417,12 +417,11 @@ export default function MediaEditor({
         body: JSON.stringify({ filename, sectionsToRemove: mergedSections }),
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Export failed');
       }
 
-      const data = await response.json();
       onComplete?.(data.filename, {
         sectionsRemoved: data.stats.sectionsRemoved,
         timeRemoved: data.stats.timeRemoved,
