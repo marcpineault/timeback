@@ -282,7 +282,8 @@ export async function POST(request: NextRequest) {
 
     if (needsTranscription) {
       // Use early transcription for hook extraction if available
-      if (useHookAsHeadline && earlyTranscription) {
+      // Always extract hook for filename, even if not displaying it
+      if (earlyTranscription) {
         hookText = extractHook(earlyTranscription.text);
         logger.info('Extracted hook from parallel transcription', { hookText });
       }
@@ -323,7 +324,8 @@ export async function POST(request: NextRequest) {
         transcriptionWords = transcription.words || [];
 
         // Extract hook if not already done from early transcription
-        if (useHookAsHeadline && !hookText) {
+        // Always extract hook for filename, even if not displaying it
+        if (!hookText) {
           hookText = extractHook(transcription.text);
           logger.info('Extracted hook from silence-removed transcription', { hookText });
         }
@@ -504,16 +506,22 @@ export async function POST(request: NextRequest) {
       currentInput = stepOutput;
     }
 
-    // Rename to final output - use headline as filename if available
+    // Rename to final output - use headline or hook as filename if available
+    // Priority: displayed headline > extracted hook > original filename
+    const filenameText = finalHeadline || hookText;
     let outputBaseName = baseName;
-    if (finalHeadline) {
-      // Sanitize headline for use as filename
-      outputBaseName = finalHeadline
+    if (filenameText) {
+      // Sanitize text for use as filename
+      outputBaseName = filenameText
         .replace(/[^\w\s-]/g, '')  // Remove special characters
         .replace(/\s+/g, '_')      // Replace spaces with underscores
         .substring(0, 50)          // Limit length
         .toLowerCase()
         .trim();
+      // Fallback to original if sanitization results in empty string
+      if (!outputBaseName) {
+        outputBaseName = baseName;
+      }
     }
     const finalOutput = path.join(processedDir, `${outputBaseName}_processed.mp4`);
     if (currentInput !== finalOutput) {
