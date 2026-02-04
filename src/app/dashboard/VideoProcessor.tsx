@@ -51,6 +51,8 @@ export default function VideoProcessor({
     failedIds: Set<string>
     skippedIds: Set<string>
   } | null>(null)
+  // State for pending auto-process - stores config when auto-process should trigger after queue update
+  const [pendingAutoProcess, setPendingAutoProcess] = useState<ProcessingConfig | null>(null)
 
   useEffect(() => {
     const ua = navigator.userAgent
@@ -176,6 +178,19 @@ export default function VideoProcessor({
     }
   }, [videoQueue, isQueueLoaded]);
 
+  // Auto-process effect - triggers processing after videos are added to queue
+  // This solves the race condition where handleProcess was called before setVideoQueue completed
+  useEffect(() => {
+    if (pendingAutoProcess && !isProcessing) {
+      const pendingVideos = videoQueue.filter(v => v.status === 'pending')
+      if (pendingVideos.length > 0) {
+        console.log('[VideoProcessor] Auto-process: queue updated with pending videos, starting processing')
+        setPendingAutoProcess(null)
+        handleProcess(pendingAutoProcess)
+      }
+    }
+  }, [videoQueue, pendingAutoProcess, isProcessing])
+
   // Listen for cross-tab storage changes
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -243,7 +258,8 @@ export default function VideoProcessor({
     // Update queue with new videos
     setVideoQueue(prev => [...prev, ...newVideos])
 
-    // If auto-process is enabled, fetch saved preferences and start processing
+    // If auto-process is enabled, fetch saved preferences and set pending auto-process
+    // The actual processing is triggered by a useEffect after the queue state updates
     if (autoProcess && newVideos.length > 0) {
       console.log('[VideoProcessor] Auto-process enabled, fetching saved preferences...')
       try {
@@ -281,11 +297,9 @@ export default function VideoProcessor({
                 aggressiveness: 'moderate',
               },
             }
-            console.log('[VideoProcessor] Starting auto-processing with saved preferences')
-            // Trigger processing with a small delay to ensure state is updated
-            setTimeout(() => {
-              handleProcess(savedConfig)
-            }, 100)
+            console.log('[VideoProcessor] Setting pending auto-process config, will trigger after queue updates')
+            // Set pending auto-process - the useEffect will trigger processing once queue state is updated
+            setPendingAutoProcess(savedConfig)
           } else {
             console.log('[VideoProcessor] No saved preferences found, skipping auto-process')
           }
