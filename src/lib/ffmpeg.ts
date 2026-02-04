@@ -56,7 +56,7 @@ export type HeadlineStyle = 'classic' | 'speech-bubble';
 
 export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
-  silenceDuration?: number; // minimum silence duration in seconds, default 0.5
+  silenceDuration?: number; // minimum silence duration in seconds, default 0.3 (aggressive)
   autoSilenceThreshold?: boolean; // auto-detect optimal threshold based on audio noise floor
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
@@ -66,6 +66,9 @@ export interface ProcessingOptions {
 
 /**
  * Analyze a single chunk of audio and return volume statistics
+ *
+ * NOISE-AWARE: Uses speech-band filtering to focus on voice frequencies
+ * This gives more accurate volume stats by ignoring background noise
  */
 async function analyzeAudioChunk(
   inputPath: string,
@@ -75,9 +78,11 @@ async function analyzeAudioChunk(
   return new Promise((resolve) => {
     let statsOutput = '';
 
+    // Apply speech-band filter before volume detection
+    // This focuses analysis on voice frequencies (200Hz-3500Hz)
     const command = ffmpeg(inputPath)
       .inputOptions(['-ss', String(startTime), '-t', String(duration)])
-      .audioFilters('volumedetect')
+      .audioFilters('highpass=f=200,lowpass=f=3500,volumedetect')
       .format('null')
       .output('/dev/null');
 
@@ -169,6 +174,8 @@ async function analyzeFullVideoAudio(
  * Phase 3: Percentile-based threshold calculation using astats
  * Uses FFmpeg astats to get more detailed audio statistics including RMS levels
  * This is more robust than simple max/mean as it considers the distribution of audio levels
+ *
+ * NOISE-AWARE: Uses speech-band filtering to focus analysis on voice frequencies
  */
 async function analyzeAudioPercentiles(
   inputPath: string,
@@ -179,9 +186,11 @@ async function analyzeAudioPercentiles(
 
     const inputOptions = sampleDuration ? ['-t', String(sampleDuration)] : [];
 
+    // Apply speech-band filter before astats analysis
+    // This focuses on voice frequencies (200Hz-3500Hz) and rejects background noise
     const command = ffmpeg(inputPath)
       .inputOptions(inputOptions)
-      .audioFilters('astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level')
+      .audioFilters('highpass=f=200,lowpass=f=3500,astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level')
       .format('null')
       .output('/dev/null');
 
@@ -222,6 +231,14 @@ async function analyzeAudioPercentiles(
 /**
  * Calculate optimal silence threshold using multiple methods and combine them
  * This is the core of the adaptive threshold calculation
+ *
+ * AGGRESSIVE SETTINGS: Configured to detect and remove more silence
+ * - Lower offsets mean threshold is closer to speech level = more silence detected
+ * - Upper clamp raised to -12dB for more aggressive detection
+ *
+ * NOISE-AWARE: Handles background noise by adjusting strategy based on dynamic range
+ * - Low dynamic range = noisy audio, rely more on peak-based threshold
+ * - High dynamic range = clean audio, can use mean/RMS based thresholds
  */
 function calculateAdaptiveThreshold(
   medianMax: number,
@@ -233,33 +250,55 @@ function calculateAdaptiveThreshold(
   const thresholds: number[] = [];
   const weights: number[] = [];
 
-  // Method 1: Traditional max - offset (original approach, but using median)
-  // Reduced from 22 to 16dB - silences in speech are typically 12-18dB below speaking level
-  const traditionalThreshold = medianMax - 16;
-  thresholds.push(traditionalThreshold);
-  weights.push(1.0);
+  // Detect if audio is noisy based on dynamic range
+  // Low dynamic range (<10dB) means noise floor is close to speech level
+  const isNoisyAudio = dynamicRange !== undefined && dynamicRange < 10;
+  const isModerateNoise = dynamicRange !== undefined && dynamicRange < 15;
 
-  // Method 2: Mean-based threshold (relative to average level)
-  // Reduced from 8 to 5dB - mean is already lower than max, so smaller offset needed
-  const meanBasedThreshold = medianMean - 5;
+  // Method 1: Traditional max - offset (primary method for noisy audio)
+  // For noisy audio: use smaller offset (8dB) since speech-noise gap is small
+  // For clean audio: use 10dB offset
+  const peakOffset = isNoisyAudio ? 8 : (isModerateNoise ? 9 : 10);
+  const traditionalThreshold = medianMax - peakOffset;
+  thresholds.push(traditionalThreshold);
+  // Higher weight for noisy audio since mean/RMS are less reliable
+  weights.push(isNoisyAudio ? 1.5 : 1.0);
+
+  // Method 2: Mean-based threshold (less reliable for noisy audio)
+  // AGGRESSIVE: Reduced from 5 to 2dB - tighter around mean level
+  const meanBasedThreshold = medianMean - 2;
   thresholds.push(meanBasedThreshold);
-  weights.push(0.5);
+  // Lower weight for noisy audio since mean is elevated by noise
+  weights.push(isNoisyAudio ? 0.2 : 0.5);
 
   // Method 3: If we have astats data, use RMS-based calculation
   if (rmsLevel !== undefined && dynamicRange !== undefined) {
     // RMS represents the "energy" of the audio, silence should be below RMS
-    // Reduced from 12 to 8dB for more sensitive detection
-    const rmsBasedThreshold = rmsLevel - 8;
+    // For noisy audio: RMS is elevated, use smaller offset
+    const rmsOffset = isNoisyAudio ? 2 : 4;
+    const rmsBasedThreshold = rmsLevel - rmsOffset;
     thresholds.push(rmsBasedThreshold);
-    weights.push(0.8);
+    // Lower weight for noisy audio
+    weights.push(isNoisyAudio ? 0.3 : 0.8);
 
     // If dynamic range is large, we can be more aggressive
-    if (dynamicRange > 20) {
+    if (dynamicRange > 15) {
       // High dynamic range = clear distinction between speech and silence
-      // Reduced from 25 to 20dB for high-dynamic-range content
-      const aggressiveThreshold = medianMax - 20;
+      // AGGRESSIVE: Use 12dB offset for aggressive silence cutting
+      const aggressiveThreshold = medianMax - 12;
       thresholds.push(aggressiveThreshold);
-      weights.push(0.3);
+      weights.push(0.5);
+    }
+
+    // NOISE-AWARE: For noisy audio, add a peak-relative threshold
+    // This helps when there's constant background noise
+    if (isNoisyAudio && peakLevel !== undefined) {
+      // Use peak level as reference, with small offset
+      // This ensures we only keep the loudest parts (actual speech)
+      const noiseAwareThreshold = peakLevel - 6;
+      thresholds.push(noiseAwareThreshold);
+      weights.push(0.8);  // High weight for noisy scenarios
+      logger.debug(`[Adaptive Threshold] Noisy audio detected (DR=${dynamicRange?.toFixed(1)}dB), adding noise-aware threshold: ${noiseAwareThreshold.toFixed(1)}dB`);
     }
   }
 
@@ -273,14 +312,17 @@ function calculateAdaptiveThreshold(
 
   let threshold = weightedSum / totalWeight;
 
-  // Clamp to reasonable bounds (-50 to -15 dB)
-  threshold = Math.min(-15, Math.max(-50, threshold));
+  // AGGRESSIVE: Clamp to bounds (-50 to -12 dB) - raised upper limit from -15 to -12
+  // For noisy audio, allow even higher threshold (up to -10dB)
+  const upperLimit = isNoisyAudio ? -10 : -12;
+  threshold = Math.min(upperLimit, Math.max(-50, threshold));
 
   // Enhanced logging for debugging
   const gapFromMax = medianMax - threshold;
-  logger.info(`[Adaptive Threshold] Input: medianMax=${medianMax.toFixed(1)}dB, medianMean=${medianMean.toFixed(1)}dB${rmsLevel !== undefined ? `, rms=${rmsLevel.toFixed(1)}dB` : ''}${dynamicRange !== undefined ? `, dynamicRange=${dynamicRange.toFixed(1)}dB` : ''}`);
+  const noiseStatus = isNoisyAudio ? ' [NOISY AUDIO]' : (isModerateNoise ? ' [MODERATE NOISE]' : '');
+  logger.info(`[Adaptive Threshold] Input: medianMax=${medianMax.toFixed(1)}dB, medianMean=${medianMean.toFixed(1)}dB${rmsLevel !== undefined ? `, rms=${rmsLevel.toFixed(1)}dB` : ''}${dynamicRange !== undefined ? `, dynamicRange=${dynamicRange.toFixed(1)}dB` : ''}${noiseStatus}`);
   logger.info(`[Adaptive Threshold] Methods: ${thresholds.map((t, i) => `${t.toFixed(1)}dB(w=${weights[i]})`).join(', ')}`);
-  logger.info(`[Adaptive Threshold] Result: ${threshold.toFixed(1)}dB (${gapFromMax.toFixed(1)}dB below peak)`);
+  logger.info(`[Adaptive Threshold] Result: ${threshold.toFixed(1)}dB (${gapFromMax.toFixed(1)}dB below peak) [AGGRESSIVE MODE]${noiseStatus}`);
 
   return threshold;
 }
@@ -289,6 +331,8 @@ function calculateAdaptiveThreshold(
  * Phase 2: Dual-pass detection with verification
  * Runs silence detection twice with different thresholds and verifies results
  * If the more sensitive pass finds significantly more silences, the threshold may be too conservative
+ *
+ * AGGRESSIVE MODE: Prefers finding more silence to cut
  */
 async function dualPassSilenceDetection(
   inputPath: string,
@@ -305,8 +349,9 @@ async function dualPassSilenceDetection(
 
   logger.debug(`[Dual-Pass] First pass: ${primarySilences.length} silences, ${primarySilencePercent.toFixed(1)}% of video`);
 
-  // Second pass with more sensitive threshold (-5 dB lower for better detection)
-  const sensitiveThreshold = primaryThreshold - 5;
+  // AGGRESSIVE: Second pass with even more sensitive threshold (-3 dB, was -5)
+  // Smaller delta means we're already close to optimal with the aggressive primary
+  const sensitiveThreshold = primaryThreshold - 3;
   logger.debug(`[Dual-Pass] Second pass with threshold: ${sensitiveThreshold.toFixed(1)} dB`);
   const sensitiveSilences = await detectSilence(inputPath, sensitiveThreshold, minDuration);
 
@@ -315,23 +360,23 @@ async function dualPassSilenceDetection(
 
   logger.debug(`[Dual-Pass] Second pass: ${sensitiveSilences.length} silences, ${sensitiveSilencePercent.toFixed(1)}% of video`);
 
-  // Decision logic
+  // Decision logic - AGGRESSIVE: prefer whichever finds more silence
   let finalSilences = primarySilences;
   let finalThreshold = primaryThreshold;
   let wasAdjusted = false;
 
-  // If primary pass found little silence (<20%) and sensitive pass found significantly more (>1.3x)
-  // Raised from <5% to <20% to catch more cases where threshold is too conservative
-  if (primarySilencePercent < 20 && sensitiveSilencePercent > primarySilencePercent * 1.3) {
-    logger.debug(`[Dual-Pass] Primary threshold too conservative, using sensitive results`);
+  // AGGRESSIVE: If primary found less than 40% silence and sensitive found more (>1.15x)
+  // Much more willing to use the sensitive (higher threshold) results
+  if (primarySilencePercent < 40 && sensitiveSilencePercent > primarySilencePercent * 1.15) {
+    logger.debug(`[Dual-Pass] Using more aggressive sensitive results for better silence removal`);
     finalSilences = sensitiveSilences;
     finalThreshold = sensitiveThreshold;
     wasAdjusted = true;
   }
 
-  // If primary found too much silence (>80%), threshold might be too aggressive
-  // In this case, stick with primary but log a warning
-  if (primarySilencePercent > 80) {
+  // If primary found too much silence (>85%), threshold might be too aggressive
+  // But this is rare with our settings - only warn at very high levels
+  if (primarySilencePercent > 85) {
     logger.warn(`[Dual-Pass] Warning: Very high silence percentage (${primarySilencePercent.toFixed(1)}%), audio may be very quiet`);
   }
 
@@ -345,7 +390,7 @@ async function dualPassSilenceDetection(
 
   const finalTotalSilence = finalSilences.reduce((sum, s) => sum + (s.end - s.start), 0);
   const finalSilencePercent = (finalTotalSilence / videoDuration) * 100;
-  logger.info(`[Dual-Pass] Final: ${finalSilences.length} silences (${finalSilencePercent.toFixed(1)}%), threshold=${finalThreshold.toFixed(1)}dB${wasAdjusted ? ' (adjusted)' : ''}`);
+  logger.info(`[Dual-Pass] Final: ${finalSilences.length} silences (${finalSilencePercent.toFixed(1)}%), threshold=${finalThreshold.toFixed(1)}dB${wasAdjusted ? ' (adjusted)' : ''} [AGGRESSIVE]`);
 
   return { silences: finalSilences, threshold: finalThreshold, wasAdjusted };
 }
@@ -358,7 +403,7 @@ async function dualPassSilenceDetection(
  */
 export async function detectSilenceAdaptive(
   inputPath: string,
-  minDuration: number = 0.5
+  minDuration: number = 0.3  // AGGRESSIVE: Reduced from 0.5 to catch shorter silences
 ): Promise<{ silences: SilenceInterval[]; threshold: number; analysisInfo: string }> {
   // Get video duration first
   const videoDuration = await getVideoDuration(inputPath);
@@ -479,20 +524,34 @@ export async function detectNoiseFloor(
 
 /**
  * Detect silent intervals in a video
+ *
+ * NOISE-AWARE: Uses speech-band filtering (200Hz-3500Hz) to focus on voice frequencies
+ * and ignore background noise (low rumble, high hiss) that can interfere with detection
  */
 export async function detectSilence(
   inputPath: string,
   threshold: number = -20,
-  minDuration: number = 0.5
+  minDuration: number = 0.3,  // AGGRESSIVE: Reduced from 0.5 to catch shorter silences
+  useSpeechBandFilter: boolean = true  // Filter to speech frequencies for noise rejection
 ): Promise<SilenceInterval[]> {
   return new Promise((resolve, reject) => {
     const silences: SilenceInterval[] = [];
     let currentSilenceStart: number | null = null;
 
-    logger.debug(`[Silence Detection] Starting with threshold=${threshold}dB, minDuration=${minDuration}s`);
+    // Build audio filter chain
+    // Speech band: 200Hz - 3500Hz covers fundamental frequencies and harmonics of human voice
+    // This helps reject:
+    // - Low frequency rumble (AC hum, traffic, HVAC) below 200Hz
+    // - High frequency hiss (electronics, wind) above 3500Hz
+    const speechBandFilter = useSpeechBandFilter
+      ? 'highpass=f=200,lowpass=f=3500,'
+      : '';
+    const audioFilter = `${speechBandFilter}silencedetect=noise=${threshold}dB:d=${minDuration}`;
+
+    logger.debug(`[Silence Detection] Starting with threshold=${threshold}dB, minDuration=${minDuration}s, speechBand=${useSpeechBandFilter}`);
 
     ffmpeg(inputPath)
-      .audioFilters(`silencedetect=noise=${threshold}dB:d=${minDuration}`)
+      .audioFilters(audioFilter)
       .format('null')
       .output('/dev/null')
       .on('stderr', (line: string) => {
@@ -538,16 +597,19 @@ export async function getVideoDuration(inputPath: string): Promise<number> {
 /**
  * Calculate non-silent segments from silence intervals
  * Includes padding and filtering for more accurate cuts
+ *
+ * AGGRESSIVE MODE: Tighter padding = more silence removed
  */
 export function getNonSilentSegments(
   silences: SilenceInterval[],
   totalDuration: number,
   options: { padding?: number; minSegmentDuration?: number; mergeGap?: number; timebackPadding?: number } = {}
 ): SilenceInterval[] {
-  const padding = options.padding ?? 0.05; // 50ms padding around speech
-  const minSegmentDuration = options.minSegmentDuration ?? 0.15; // Ignore segments shorter than 150ms
-  const mergeGap = options.mergeGap ?? 0.1; // Merge segments less than 100ms apart
-  const timebackPadding = options.timebackPadding ?? 0.15; // 150ms extra padding to make cuts less harsh
+  // AGGRESSIVE: Reduced all padding values for tighter cuts
+  const padding = options.padding ?? 0.025; // 25ms padding around speech (was 50ms)
+  const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms (was 150ms)
+  const mergeGap = options.mergeGap ?? 0.05; // Merge segments less than 50ms apart (was 100ms)
+  const timebackPadding = options.timebackPadding ?? 0.08; // 80ms extra padding (was 150ms) - tighter cuts
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
@@ -636,7 +698,7 @@ export async function removeSilence(
   options: ProcessingOptions = {}
 ): Promise<string> {
   let threshold = options.silenceThreshold ?? -20;
-  const minDuration = options.silenceDuration ?? 0.5;
+  const minDuration = options.silenceDuration ?? 0.3;  // AGGRESSIVE: Reduced from 0.5
   let silences: SilenceInterval[];
   let duration: number;
 
