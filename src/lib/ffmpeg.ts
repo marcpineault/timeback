@@ -611,11 +611,11 @@ export function getNonSilentSegments(
   totalDuration: number,
   options: { padding?: number; minSegmentDuration?: number; mergeGap?: number; timebackPadding?: number } = {}
 ): SilenceInterval[] {
-  // AGGRESSIVE: Reduced all padding values for tighter cuts
-  const padding = options.padding ?? 0.025; // 25ms padding around speech (was 50ms)
-  const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms (was 150ms)
-  const mergeGap = options.mergeGap ?? 0.05; // Merge segments less than 50ms apart (was 100ms)
-  const timebackPadding = options.timebackPadding ?? 0.08; // 80ms extra padding (was 150ms) - tighter cuts
+  // Balanced padding: aggressive detection but natural-sounding cuts
+  const padding = options.padding ?? 0.015; // 15ms trim into speech edges (minimal, detector boundaries are accurate)
+  const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms
+  const mergeGap = options.mergeGap ?? 0.075; // Merge segments less than 75ms apart (reduces choppiness)
+  const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room around speech (prevents clipping)
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
