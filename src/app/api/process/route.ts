@@ -162,6 +162,44 @@ export async function POST(request: NextRequest) {
       }
     };
 
+    // Atomic helper to claim video for processing (idempotency check)
+    // Returns true if successfully claimed, false if already being processed
+    const claimVideoForProcessing = async (): Promise<boolean> => {
+      if (!videoRecordId) return true; // No video record to claim
+
+      try {
+        // Use atomic update with condition - only update if status is PENDING
+        const result = await prisma.video.updateMany({
+          where: {
+            id: videoRecordId,
+            status: 'PENDING',
+          },
+          data: {
+            status: 'PROCESSING',
+          },
+        });
+
+        if (result.count === 0) {
+          // No rows updated means video was not in PENDING state
+          const video = await prisma.video.findUnique({
+            where: { id: videoRecordId },
+            select: { status: true },
+          });
+          logger.warn('Failed to claim video for processing - already in progress or completed', {
+            videoId: videoRecordId,
+            currentStatus: video?.status,
+          });
+          return false;
+        }
+
+        logger.info('Successfully claimed video for processing', { videoId: videoRecordId });
+        return true;
+      } catch (error) {
+        logger.error('Error claiming video for processing', { videoId: videoRecordId, error: String(error) });
+        return false;
+      }
+    };
+
     logger.debug('Processing request received', { fileId, filename, s3Key: s3Key || 'NOT PROVIDED' });
 
     // If file is in S3, download it first
@@ -203,8 +241,20 @@ export async function POST(request: NextRequest) {
     inputFilePath = inputPath; // Track for cleanup on error
     logger.debug('Acquired file lock for processing', { inputPath });
 
-    // Update status to PROCESSING
-    await updateVideoStatus('PROCESSING');
+    // Atomically claim video for processing (idempotency check)
+    // This prevents duplicate processing from multiple tabs or retried requests
+    const claimed = await claimVideoForProcessing();
+    if (!claimed) {
+      // Release the lock since we're not processing
+      if (lockedFilePath) {
+        releaseFileLock(lockedFilePath);
+        lockedFilePath = null;
+      }
+      return NextResponse.json(
+        { error: 'Video is already being processed', code: 'ALREADY_PROCESSING' },
+        { status: 409 }
+      );
+    }
 
     const baseName = path.basename(inputPath, path.extname(inputPath));
     let currentInput = inputPath;

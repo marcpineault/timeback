@@ -15,8 +15,29 @@ const cleanupRegistry = new Map<string, number>();
 let cleanupIntervalStarted = false;
 const CLEANUP_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 const CLEANUP_CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
+const MAX_CLEANUP_REGISTRY_SIZE = 1000; // Prevent unbounded memory growth
 
 function scheduleFileCleanup(filepath: string) {
+  // Prevent unbounded registry growth - if at limit, force cleanup of oldest entries
+  if (cleanupRegistry.size >= MAX_CLEANUP_REGISTRY_SIZE) {
+    const entries = Array.from(cleanupRegistry.entries());
+    // Sort by scheduled time (oldest first) and remove oldest 10%
+    entries.sort((a, b) => a[1] - b[1]);
+    const toRemove = Math.ceil(MAX_CLEANUP_REGISTRY_SIZE * 0.1);
+    for (let i = 0; i < toRemove && i < entries.length; i++) {
+      const [oldPath] = entries[i];
+      cleanupRegistry.delete(oldPath);
+      try {
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+          console.log(`[Download] Force cleaned up file due to registry limit: ${oldPath}`);
+        }
+      } catch {
+        // Best effort cleanup
+      }
+    }
+  }
+
   cleanupRegistry.set(filepath, Date.now() + CLEANUP_DELAY_MS);
 
   // Start the cleanup interval if not already running
@@ -26,21 +47,24 @@ function scheduleFileCleanup(filepath: string) {
       const now = Date.now();
       const toDelete: string[] = [];
 
-      for (const [path, scheduledTime] of cleanupRegistry.entries()) {
+      for (const [filePath, scheduledTime] of cleanupRegistry.entries()) {
         if (now >= scheduledTime) {
-          toDelete.push(path);
+          toDelete.push(filePath);
         }
       }
 
-      for (const path of toDelete) {
-        cleanupRegistry.delete(path);
+      for (const filePath of toDelete) {
         try {
-          if (fs.existsSync(path)) {
-            fs.unlinkSync(path);
-            console.log(`[Download] Cleaned up processed file: ${path}`);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`[Download] Cleaned up processed file: ${filePath}`);
           }
+          // Only delete from registry after successful cleanup or if file doesn't exist
+          cleanupRegistry.delete(filePath);
         } catch (err) {
-          console.error(`[Download] Failed to clean up file: ${path}`, err);
+          console.error(`[Download] Failed to clean up file: ${filePath}`, err);
+          // Retry later by extending the scheduled time
+          cleanupRegistry.set(filePath, now + CLEANUP_DELAY_MS);
         }
       }
     }, CLEANUP_CHECK_INTERVAL_MS);

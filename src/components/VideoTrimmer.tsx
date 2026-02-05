@@ -177,12 +177,11 @@ export default function VideoTrimmer({
         }),
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Trim failed');
       }
 
-      const data = await response.json();
       onTrimComplete(data.filename);
     } catch (error) {
       console.error('Trim error:', error);

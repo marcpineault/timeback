@@ -57,20 +57,54 @@ export async function POST(req: Request) {
             // Get price to determine plan
             const priceId = subscription.items.data[0]?.price.id
 
-            let plan: 'FREE' | 'PRO' | 'CREATOR' = 'FREE'
+            if (!priceId) {
+              logger.error('No price ID found in subscription update', {
+                subscriptionId: subscription.id,
+                customerId
+              })
+              break
+            }
+
+            let plan: 'FREE' | 'PRO' | 'CREATOR' | null = null
             if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
               plan = 'PRO'
             } else if (priceId === process.env.STRIPE_CREATOR_PRICE_ID) {
               plan = 'CREATOR'
             }
 
-            await prisma.user.update({
-              where: { id: user.id },
-              data: {
-                plan,
-                stripeSubscriptionId: subscription.id,
-              },
-            })
+            // Only update if we recognized the plan - don't silently downgrade to FREE
+            if (plan === null) {
+              logger.error('Unknown price ID in subscription - not updating plan', {
+                priceId,
+                subscriptionId: subscription.id,
+                customerId,
+                currentPlan: user.plan,
+                knownPriceIds: {
+                  pro: process.env.STRIPE_PRO_PRICE_ID ? 'set' : 'not set',
+                  creator: process.env.STRIPE_CREATOR_PRICE_ID ? 'set' : 'not set'
+                }
+              })
+              // Still update the subscription ID but preserve existing plan
+              await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  stripeSubscriptionId: subscription.id,
+                },
+              })
+            } else {
+              logger.info('Updating user plan from subscription', {
+                userId: user.id,
+                oldPlan: user.plan,
+                newPlan: plan
+              })
+              await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  plan,
+                  stripeSubscriptionId: subscription.id,
+                },
+              })
+            }
           }
         }
         break
@@ -80,13 +114,36 @@ export async function POST(req: Request) {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
 
-        await prisma.user.updateMany({
+        // Find users first to log what's being changed
+        const affectedUsers = await prisma.user.findMany({
           where: { stripeCustomerId: customerId },
-          data: {
-            plan: 'FREE',
-            stripeSubscriptionId: null,
-          },
+          select: { id: true, plan: true, email: true }
         })
+
+        if (affectedUsers.length > 0) {
+          logger.info('Subscription deleted, downgrading users to FREE', {
+            customerId,
+            subscriptionId: subscription.id,
+            affectedUsers: affectedUsers.map(u => ({
+              id: u.id,
+              previousPlan: u.plan,
+              email: u.email
+            }))
+          })
+
+          await prisma.user.updateMany({
+            where: { stripeCustomerId: customerId },
+            data: {
+              plan: 'FREE',
+              stripeSubscriptionId: null,
+            },
+          })
+        } else {
+          logger.warn('Subscription deleted but no users found with customer ID', {
+            customerId,
+            subscriptionId: subscription.id
+          })
+        }
         break
       }
 

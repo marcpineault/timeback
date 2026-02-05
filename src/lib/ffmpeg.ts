@@ -121,6 +121,12 @@ async function analyzeFullVideoAudio(
   videoDuration: number,
   chunkDuration: number = 30
 ): Promise<{ maxVolumes: number[]; meanVolumes: number[]; medianMax: number; medianMean: number }> {
+  // Guard against invalid duration values
+  if (!Number.isFinite(videoDuration) || videoDuration <= 0) {
+    logger.warn('[Audio Analysis] Invalid video duration, using default values', { videoDuration });
+    return { maxVolumes: [], meanVolumes: [], medianMax: -25, medianMean: -30 };
+  }
+
   const numChunks = Math.ceil(videoDuration / chunkDuration);
   const maxVolumes: number[] = [];
   const meanVolumes: number[] = [];
