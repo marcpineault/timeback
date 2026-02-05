@@ -615,7 +615,8 @@ export function getNonSilentSegments(
   const padding = options.padding ?? 0.015; // 15ms trim into speech edges (minimal, detector boundaries are accurate)
   const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms
   const mergeGap = options.mergeGap ?? 0.075; // Merge segments less than 75ms apart (reduces choppiness)
-  const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room around speech (prevents clipping)
+  const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room before speech
+  const timebackPaddingEnd = 0.25; // 250ms after speech — speech trails off naturally, needs more room
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
@@ -664,11 +665,11 @@ export function getNonSilentSegments(
     segments = mergedSegments;
   }
 
-  // Apply timeback padding to expand segments (makes cuts less harsh)
-  if (timebackPadding > 0) {
+  // Apply timeback padding to expand segments (asymmetric: more room at end for speech trailing off)
+  if (timebackPadding > 0 || timebackPaddingEnd > 0) {
     const expandedSegments = segments.map(seg => ({
       start: Math.max(0, seg.start - timebackPadding),
-      end: Math.min(totalDuration, seg.end + timebackPadding),
+      end: Math.min(totalDuration, seg.end + timebackPaddingEnd),
     }));
 
     // Re-merge any segments that now overlap after expansion
@@ -689,7 +690,7 @@ export function getNonSilentSegments(
     segments = finalSegments;
   }
 
-  logger.debug(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s, timebackPadding=${timebackPadding}s)`);
+  logger.debug(`[Segments] After filtering: ${segments.length} segments (padding=${padding}s, minDuration=${minSegmentDuration}s, mergeGap=${mergeGap}s, timebackPadding=${timebackPadding}s, timebackPaddingEnd=${timebackPaddingEnd}s)`);
 
   return segments;
 }
