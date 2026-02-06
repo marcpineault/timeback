@@ -579,7 +579,11 @@ export async function POST(request: NextRequest) {
         outputBaseName = baseName;
       }
     }
-    const finalOutput = path.join(processedDir, `${outputBaseName}_processed.mp4`);
+    // Include a short unique suffix from the fileId to prevent filename collisions
+    // when the same video is processed multiple times (same headline → same base name).
+    // This ensures each processed video has a distinct download URL and file path.
+    const shortId = fileId ? fileId.substring(0, 8) : Date.now().toString(36);
+    const finalOutput = path.join(processedDir, `${outputBaseName}_${shortId}_processed.mp4`);
     if (currentInput !== finalOutput) {
       await fs.rename(currentInput, finalOutput);
     }
