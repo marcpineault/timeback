@@ -202,10 +202,14 @@ export function generateSrt(
     shortSegments.push(...split);
   }
 
+  // Breathing room: extend caption end times so they don't vanish the instant the last word ends
+  const captionEndPadding = 0.4; // 400ms extra after the last word
   const srtContent = shortSegments
     .map((segment, index) => {
+      const nextStart = index < shortSegments.length - 1 ? shortSegments[index + 1].start : Infinity;
+      const paddedEnd = Math.min(segment.end + captionEndPadding, nextStart);
       return `${index + 1}\n${formatSrtTime(segment.start)} --> ${formatSrtTime(
-        segment.end
+        paddedEnd
       )}\n${segment.text}\n`;
     })
     .join('\n');
@@ -287,9 +291,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   // Generate dialogue events for each line
   const events: string[] = [];
 
-  for (const line of lines) {
+  // Breathing room: extend caption end times so they don't vanish the instant the last word ends
+  const captionEndPadding = 0.4; // 400ms extra after the last word
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx];
+    const nextLineStart = lineIdx < lines.length - 1 ? lines[lineIdx + 1].start : Infinity;
+    // Extend end time by padding, but don't overlap the next caption
+    const paddedEnd = Math.min(line.end + captionEndPadding, nextLineStart);
+
     const startTime = formatAssTime(line.start);
-    const endTime = formatAssTime(line.end);
+    const endTime = formatAssTime(paddedEnd);
 
     // Build the text with karaoke timing tags
     // Each word gets a \kf tag with duration in centiseconds
