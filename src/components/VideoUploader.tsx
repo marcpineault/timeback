@@ -13,6 +13,7 @@ import {
   confirmBatchS3Uploads,
   initiateS3MultipartUpload,
   completeS3MultipartUpload,
+  abortS3MultipartUpload,
   type FileInfo
 } from '@/app/actions/upload';
 
@@ -536,6 +537,7 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
 
   // Multipart upload for large files — uploads in 10MB parts so R2 processes
   // incrementally. The final "complete" call is near-instant (no long finalization).
+  // Includes stall detection per-part and aborts the R2 multipart upload on failure.
   const uploadSingleFileToS3Multipart = async (
     file: File,
     index: number,
@@ -590,7 +592,27 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
               const timeoutMs = Math.max(60000, Math.ceil(partBlob.size / (1024 * 1024)) * 30000);
               xhr.timeout = timeoutMs;
 
+              let lastProgressTime = Date.now();
+              let stallCheckInterval: ReturnType<typeof setInterval> | null = null;
+              let isSettled = false;
+
+              const cleanup = () => {
+                if (stallCheckInterval) {
+                  clearInterval(stallCheckInterval);
+                  stallCheckInterval = null;
+                }
+              };
+
+              const settle = (fn: () => void) => {
+                if (!isSettled) {
+                  isSettled = true;
+                  cleanup();
+                  fn();
+                }
+              };
+
               xhr.upload.onprogress = (event) => {
+                lastProgressTime = Date.now();
                 if (event.lengthComputable) {
                   partBytesUploaded[i] = event.loaded;
                   const totalUploaded = partBytesUploaded.reduce((sum, b) => sum + b, 0);
@@ -603,15 +625,24 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
 
               xhr.onload = () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
-                  resolve();
+                  settle(() => resolve());
                 } else {
-                  reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+                  settle(() => reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`)));
                 }
               };
 
-              xhr.onerror = () => reject(new Error('Network error'));
-              xhr.ontimeout = () => reject(new Error('Part upload timed out'));
-              xhr.onabort = () => reject(new Error('Part upload aborted'));
+              xhr.onerror = () => settle(() => reject(new Error('Network error')));
+              xhr.ontimeout = () => settle(() => reject(new Error('Part upload timed out')));
+              xhr.onabort = () => settle(() => reject(new Error('Part upload stalled')));
+
+              // Stall detection: abort if no progress for 60s
+              stallCheckInterval = setInterval(() => {
+                const timeSinceProgress = Date.now() - lastProgressTime;
+                if (timeSinceProgress > STALL_TIMEOUT_MS) {
+                  console.warn(`[Upload] Part ${i + 1} stall detected for ${file.name}: no progress for ${Math.round(timeSinceProgress / 1000)}s`);
+                  xhr.abort();
+                }
+              }, STALL_CHECK_INTERVAL_MS);
 
               xhr.open('PUT', partUrl);
               xhr.send(partBlob);
@@ -652,6 +683,13 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Upload failed';
       console.error(`[Upload] Multipart upload failed for ${file.name}: ${errorMsg}`);
+      // Abort the multipart upload in R2 to clean up incomplete parts
+      if (key && uploadId) {
+        console.log(`[Upload] Aborting multipart upload in R2 for ${file.name}`);
+        abortS3MultipartUpload(key, uploadId).catch(() => {
+          // Best-effort cleanup — don't block error reporting
+        });
+      }
       setUploadingFiles(prev => prev.map((f, i) =>
         i === index ? { ...f, status: 'error' as const, error: errorMsg } : f
       ));
