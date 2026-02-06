@@ -63,6 +63,18 @@ export default function VideoProcessor({
     } else {
       setPlatform('desktop')
     }
+
+    // Pre-fetch user preferences on mount so auto-process doesn't block after upload
+    fetch('/api/user/preferences')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.preferences) {
+          cachedPreferencesRef.current = data.preferences
+        }
+      })
+      .catch(() => {
+        // Will fall back to defaults in handleUploadComplete
+      })
   }, [])
   const [videosRemaining, setVideosRemaining] = useState(initialVideosRemaining)
   const [isQueueLoaded, setIsQueueLoaded] = useState(false)
@@ -75,6 +87,10 @@ export default function VideoProcessor({
     totalCount: 0,
     isCancelled: false,
   })
+
+  // Cached user preferences for auto-process — fetched on mount so handleUploadComplete
+  // doesn't need a blocking network request after uploads finish
+  const cachedPreferencesRef = useRef<Record<string, unknown> | null>(null)
 
   // Version counter for localStorage sync
   const queueVersionRef = useRef(0)
@@ -231,7 +247,7 @@ export default function VideoProcessor({
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const handleUploadComplete = async (files: UploadedFile[], autoProcess?: boolean) => {
+  const handleUploadComplete = (files: UploadedFile[], autoProcess?: boolean) => {
     // Get existing original names to detect duplicates
     const existingNames = new Set(videoQueue.map(v => v.file.originalName.toLowerCase()))
 
@@ -258,11 +274,10 @@ export default function VideoProcessor({
     // Update queue with new videos
     setVideoQueue(prev => [...prev, ...newVideos])
 
-    // If auto-process is enabled, fetch saved preferences and set pending auto-process
-    // The actual processing is triggered by a useEffect after the queue state updates
+    // If auto-process is enabled, build config from cached preferences (pre-fetched on mount)
+    // and set pending auto-process immediately — no blocking network request needed.
+    // The actual processing is triggered by a useEffect after the queue state updates.
     if (autoProcess && newVideos.length > 0) {
-      console.log('[VideoProcessor] Auto-process enabled, fetching saved preferences...')
-
       // Default config used when no saved preferences exist
       const defaultConfig: ProcessingConfig = {
         generateCaptions: true,
@@ -294,45 +309,30 @@ export default function VideoProcessor({
         },
       }
 
-      try {
-        const response = await fetch('/api/user/preferences')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.preferences) {
-            // Build ProcessingConfig from saved preferences
-            const savedConfig: ProcessingConfig = {
-              generateCaptions: data.preferences.generateCaptions ?? defaultConfig.generateCaptions,
-              headline: '', // Always empty for auto-process
-              headlinePosition: data.preferences.headlinePosition ?? defaultConfig.headlinePosition,
-              headlineStyle: data.preferences.headlineStyle ?? defaultConfig.headlineStyle,
-              captionStyle: data.preferences.captionStyle ?? defaultConfig.captionStyle,
-              silenceThreshold: data.preferences.silenceThreshold ?? defaultConfig.silenceThreshold,
-              silenceDuration: data.preferences.silenceDuration ?? defaultConfig.silenceDuration,
-              autoSilenceThreshold: data.preferences.autoSilenceThreshold ?? defaultConfig.autoSilenceThreshold,
-              useHookAsHeadline: data.preferences.useHookAsHeadline ?? defaultConfig.useHookAsHeadline,
-              generateAIHeadline: data.preferences.generateAIHeadline ?? defaultConfig.generateAIHeadline,
-              generateBRoll: data.preferences.generateBRoll ?? defaultConfig.generateBRoll,
-              bRollConfig: defaultConfig.bRollConfig,
-              normalizeAudio: data.preferences.normalizeAudio ?? defaultConfig.normalizeAudio,
-              aspectRatio: data.preferences.aspectRatio ?? defaultConfig.aspectRatio,
-              speechCorrection: data.preferences.speechCorrection ?? defaultConfig.speechCorrection,
-              speechCorrectionConfig: data.preferences.speechCorrectionConfig ?? defaultConfig.speechCorrectionConfig,
-            }
-            console.log('[VideoProcessor] Setting pending auto-process config from saved preferences')
-            setPendingAutoProcess(savedConfig)
-          } else {
-            // No saved preferences — use defaults instead of skipping
-            console.log('[VideoProcessor] No saved preferences found, using defaults for auto-process')
-            setPendingAutoProcess(defaultConfig)
-          }
-        } else {
-          // Server error — still auto-process with defaults rather than silently skipping
-          console.warn('[VideoProcessor] Failed to fetch preferences (status:', response.status, '), using defaults')
-          setPendingAutoProcess(defaultConfig)
+      const prefs = cachedPreferencesRef.current
+      if (prefs) {
+        const savedConfig: ProcessingConfig = {
+          generateCaptions: (prefs.generateCaptions as boolean) ?? defaultConfig.generateCaptions,
+          headline: '', // Always empty for auto-process
+          headlinePosition: (prefs.headlinePosition as ProcessingConfig['headlinePosition']) ?? defaultConfig.headlinePosition,
+          headlineStyle: (prefs.headlineStyle as ProcessingConfig['headlineStyle']) ?? defaultConfig.headlineStyle,
+          captionStyle: (prefs.captionStyle as ProcessingConfig['captionStyle']) ?? defaultConfig.captionStyle,
+          silenceThreshold: (prefs.silenceThreshold as number) ?? defaultConfig.silenceThreshold,
+          silenceDuration: (prefs.silenceDuration as number) ?? defaultConfig.silenceDuration,
+          autoSilenceThreshold: (prefs.autoSilenceThreshold as boolean) ?? defaultConfig.autoSilenceThreshold,
+          useHookAsHeadline: (prefs.useHookAsHeadline as boolean) ?? defaultConfig.useHookAsHeadline,
+          generateAIHeadline: (prefs.generateAIHeadline as boolean) ?? defaultConfig.generateAIHeadline,
+          generateBRoll: (prefs.generateBRoll as boolean) ?? defaultConfig.generateBRoll,
+          bRollConfig: defaultConfig.bRollConfig,
+          normalizeAudio: (prefs.normalizeAudio as boolean) ?? defaultConfig.normalizeAudio,
+          aspectRatio: (prefs.aspectRatio as ProcessingConfig['aspectRatio']) ?? defaultConfig.aspectRatio,
+          speechCorrection: (prefs.speechCorrection as boolean) ?? defaultConfig.speechCorrection,
+          speechCorrectionConfig: (prefs.speechCorrectionConfig as ProcessingConfig['speechCorrectionConfig']) ?? defaultConfig.speechCorrectionConfig,
         }
-      } catch (err) {
-        // Network error — still auto-process with defaults rather than silently skipping
-        console.error('[VideoProcessor] Failed to fetch preferences for auto-process:', err)
+        console.log('[VideoProcessor] Auto-process: using cached preferences')
+        setPendingAutoProcess(savedConfig)
+      } else {
+        console.log('[VideoProcessor] Auto-process: no cached preferences, using defaults')
         setPendingAutoProcess(defaultConfig)
       }
     }
