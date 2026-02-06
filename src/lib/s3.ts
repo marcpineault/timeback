@@ -185,7 +185,7 @@ export async function listUploadParts(
   const bucket = getS3Bucket();
 
   const parts: { PartNumber: number; ETag: string }[] = [];
-  let partNumberMarker: number | undefined;
+  let partNumberMarker: string | undefined;
 
   // ListParts is paginated (max 1000 per page), loop to get all
   do {
@@ -206,7 +206,9 @@ export async function listUploadParts(
       }
     }
 
-    partNumberMarker = response.IsTruncated ? response.NextPartNumberMarker : undefined;
+    partNumberMarker = response.IsTruncated && response.NextPartNumberMarker != null
+      ? String(response.NextPartNumberMarker)
+      : undefined;
   } while (partNumberMarker !== undefined);
 
   return parts;
