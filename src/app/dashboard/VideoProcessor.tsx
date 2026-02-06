@@ -589,6 +589,22 @@ export default function VideoProcessor({
   }
 
   // Save videos to camera roll one by one (mobile only)
+  // Direct URL download fallback for mobile - bypasses fetch/CORS/memory issues
+  // by letting the browser handle the download natively (including redirects to presigned URLs)
+  const triggerDirectDownload = (url: string, filename: string) => {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    if (platform === 'ios') {
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+    }
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
   const handleSaveAll = async () => {
     const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
     setIsSavingAll(true)
@@ -652,6 +668,13 @@ export default function VideoProcessor({
         }
 
         if (!response?.ok) {
+          // On mobile, fall back to direct URL download instead of marking as failed.
+          // This handles CORS failures on presigned S3/R2 URL redirects and memory issues.
+          if (platform !== 'desktop' && video.downloadUrl) {
+            triggerDirectDownload(video.downloadUrl, video.outputFilename || 'video.mp4')
+            savedIds.add(video.file.fileId)
+            continue
+          }
           console.error('Save failed:', response?.status || lastError?.message)
           failedIds.add(video.file.fileId)
           continue
@@ -674,11 +697,20 @@ export default function VideoProcessor({
               skippedIds.add(video.file.fileId)
               continue
             }
-            // Other share error - mark as failed
-            failedIds.add(video.file.fileId)
+            // Share failed - fall back to direct download on mobile
+            if (platform !== 'desktop' && video.downloadUrl) {
+              triggerDirectDownload(video.downloadUrl, video.outputFilename || 'video.mp4')
+              savedIds.add(video.file.fileId)
+            } else {
+              failedIds.add(video.file.fileId)
+            }
           }
+        } else if (platform !== 'desktop' && video.downloadUrl) {
+          // Mobile without Web Share API - use direct download
+          triggerDirectDownload(video.downloadUrl, video.outputFilename || 'video.mp4')
+          savedIds.add(video.file.fileId)
         } else {
-          // Fallback: try standard download on mobile
+          // Desktop: blob download
           const blobUrl = URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = blobUrl
@@ -690,7 +722,13 @@ export default function VideoProcessor({
           savedIds.add(video.file.fileId)
         }
       } catch (err) {
-        failedIds.add(video.file.fileId)
+        // On mobile, fall back to direct download on any error
+        if (platform !== 'desktop' && video.downloadUrl) {
+          triggerDirectDownload(video.downloadUrl, video.outputFilename || 'video.mp4')
+          savedIds.add(video.file.fileId)
+        } else {
+          failedIds.add(video.file.fileId)
+        }
       }
     }
 
@@ -775,6 +813,12 @@ export default function VideoProcessor({
         }
 
         if (!response?.ok) {
+          // On mobile, fall back to direct URL download
+          if (platform !== 'desktop' && video.downloadUrl) {
+            triggerDirectDownload(video.downloadUrl, video.outputFilename || 'video.mp4')
+            savedIds.add(video.file.fileId)
+            continue
+          }
           console.error('Download failed:', response?.status || lastError?.message)
           failedIds.add(video.file.fileId)
           continue
@@ -791,8 +835,14 @@ export default function VideoProcessor({
         URL.revokeObjectURL(blobUrl)
         savedIds.add(video.file.fileId)
       } catch (err) {
-        console.error('Download failed:', err)
-        failedIds.add(video.file.fileId)
+        // On mobile, fall back to direct download on any error
+        if (platform !== 'desktop' && video.downloadUrl) {
+          triggerDirectDownload(video.downloadUrl, video.outputFilename || 'video.mp4')
+          savedIds.add(video.file.fileId)
+        } else {
+          console.error('Download failed:', err)
+          failedIds.add(video.file.fileId)
+        }
       }
     }
 

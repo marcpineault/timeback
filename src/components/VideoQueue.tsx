@@ -39,6 +39,25 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
     };
   }, []);
 
+  /**
+   * Fallback: trigger a direct browser navigation to the download URL.
+   * Bypasses fetch/CORS/memory issues by letting the browser handle
+   * the download natively (including following redirects to presigned S3/R2 URLs).
+   */
+  const triggerDirectDownload = useCallback((url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    if (platform === 'ios') {
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+    }
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, [platform]);
+
   const saveToDevice = useCallback(async (video: QueuedVideo) => {
     if (!video.downloadUrl || !video.outputFilename) return;
 
@@ -88,6 +107,12 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
       }
 
       if (!response || !response.ok) {
+        // On mobile, fall back to direct URL navigation instead of showing an error.
+        // This handles CORS failures on presigned S3/R2 URL redirects and memory issues.
+        if (platform === 'ios' || platform === 'android') {
+          triggerDirectDownload(video.downloadUrl, video.outputFilename);
+          return;
+        }
         console.error('Download failed:', response?.status, response?.statusText);
         setSaveError('Download failed. Please try again.');
         return;
@@ -109,11 +134,19 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
           if (err instanceof Error && err.name === 'AbortError') {
             return;
           }
-          // Fall through to download fallback
+          // Share failed - fall back to direct download on mobile
+          triggerDirectDownload(video.downloadUrl, video.outputFilename);
+          return;
         }
       }
 
-      // Desktop/fallback: Trigger download
+      // Mobile without Web Share API - use direct download
+      if (platform === 'ios' || platform === 'android') {
+        triggerDirectDownload(video.downloadUrl, video.outputFilename);
+        return;
+      }
+
+      // Desktop: Trigger blob download
       const url = URL.createObjectURL(blob);
       blobUrlRef.current = url;
 
@@ -134,14 +167,21 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
       }, 1000);
     } catch (err) {
       // User cancelled is not an error
-      if (err instanceof Error && err.name !== 'AbortError') {
-        console.error('Save failed:', err);
-        setSaveError('Save failed. Please try again.');
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
       }
+      // On mobile, fall back to direct download on any error
+      // (blob memory exhaustion, CORS on redirected presigned URLs, etc.)
+      if ((platform === 'ios' || platform === 'android') && video.downloadUrl && video.outputFilename) {
+        triggerDirectDownload(video.downloadUrl, video.outputFilename);
+        return;
+      }
+      console.error('Save failed:', err);
+      setSaveError('Save failed. Please try again.');
     } finally {
       setSavingVideoId(null);
     }
-  }, [platform]);
+  }, [platform, triggerDirectDownload]);
 
   if (videos.length === 0) return null;
 
