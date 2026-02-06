@@ -19,9 +19,6 @@ import { acquireFileLock, releaseFileLock } from '@/lib/fileLock';
 export const maxDuration = 600;
 
 export async function POST(request: NextRequest) {
-  // Run cleanup of old files in background (non-blocking)
-  setImmediate(() => cleanupOldFiles());
-
   // Track locked file path for cleanup in error handler
   let lockedFilePath: string | null = null;
   // Track video record ID for per-video error handling
@@ -30,6 +27,8 @@ export async function POST(request: NextRequest) {
   const intermediateFiles: string[] = [];
   // Track input file path for cleanup
   let inputFilePath: string | null = null;
+  // Track whether file was downloaded from S3 (for cleanup decisions)
+  let downloadedFromS3 = false;
 
   try {
     const body = await request.json();
@@ -111,7 +110,6 @@ export async function POST(request: NextRequest) {
     await fs.mkdir(processedDir, { recursive: true });
 
     let inputPath = path.join(uploadsDir, filename);
-    let downloadedFromS3 = false;
 
     // Create or reuse video record
     let isReprocess = false;  // Track if this is a reprocess (don't count against limit)
@@ -202,6 +200,18 @@ export async function POST(request: NextRequest) {
 
     logger.debug('Processing request received', { fileId, filename, s3Key: s3Key || 'NOT PROVIDED' });
 
+    // Acquire file lock EARLY to prevent cleanup from deleting the file
+    // during S3 download or other async operations below.
+    // This must happen before any cleanup can run.
+    acquireFileLock(inputPath, undefined, videoRecordId || undefined);
+    lockedFilePath = inputPath;
+    inputFilePath = inputPath; // Track for cleanup on error
+    logger.debug('Acquired file lock for processing', { inputPath });
+
+    // Run cleanup of old files in background AFTER acquiring lock
+    // This ensures our file is protected from cleanup
+    setImmediate(() => cleanupOldFiles());
+
     // If file is in S3, download it first
     if (s3Key && isS3Configured()) {
       logger.info('Downloading from Cloudflare R2', { s3Key });
@@ -217,6 +227,8 @@ export async function POST(request: NextRequest) {
       } catch (s3Error) {
         logger.error('Failed to download from S3', { error: String(s3Error) });
         await updateVideoStatus('FAILED', { errorMessage: 'Failed to download file from storage' });
+        if (lockedFilePath) releaseFileLock(lockedFilePath);
+        lockedFilePath = null;
         return NextResponse.json(
           { error: 'Failed to download file from storage' },
           { status: 500 }
@@ -229,27 +241,21 @@ export async function POST(request: NextRequest) {
     // Verify file exists (either local or downloaded from S3)
     if (!existsSync(inputPath)) {
       await updateVideoStatus('FAILED', { errorMessage: 'Video file not found' });
+      if (lockedFilePath) releaseFileLock(lockedFilePath);
+      lockedFilePath = null;
       return NextResponse.json(
         { error: 'Video file not found' },
         { status: 404 }
       );
     }
 
-    // Acquire file lock to prevent cleanup during processing
-    acquireFileLock(inputPath, undefined, videoRecordId || undefined);
-    lockedFilePath = inputPath;
-    inputFilePath = inputPath; // Track for cleanup on error
-    logger.debug('Acquired file lock for processing', { inputPath });
-
     // Atomically claim video for processing (idempotency check)
     // This prevents duplicate processing from multiple tabs or retried requests
     const claimed = await claimVideoForProcessing();
     if (!claimed) {
-      // Release the lock since we're not processing
-      if (lockedFilePath) {
-        releaseFileLock(lockedFilePath);
-        lockedFilePath = null;
-      }
+      // Do NOT release the file lock here - another request may be actively
+      // processing this file. The lock will auto-expire after 15 minutes.
+      lockedFilePath = null;
       return NextResponse.json(
         { error: 'Video is already being processed', code: 'ALREADY_PROCESSING' },
         { status: 409 }
@@ -670,11 +676,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Clean up input file if it was downloaded from S3
-    if (inputFilePath && existsSync(inputFilePath)) {
+    // Only clean up input file if it was downloaded from S3 (temporary local copy).
+    // Do NOT delete locally uploaded files on error - they may be needed for retry.
+    if (downloadedFromS3 && inputFilePath && existsSync(inputFilePath)) {
       try {
         await fs.unlink(inputFilePath);
-        logger.debug('Cleaned up input file after error', { inputFilePath });
+        logger.debug('Cleaned up S3-downloaded input file after error', { inputFilePath });
       } catch (cleanupErr) {
         logger.warn('Failed to clean up input file', { inputFilePath, error: String(cleanupErr) });
       }
