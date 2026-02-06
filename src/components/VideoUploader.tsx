@@ -44,11 +44,11 @@ interface VideoUploaderProps {
 // Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
-// Concurrent uploads - browsers limit ~6 connections per domain for HTTP/1.1
-// Even with HTTP/2 multiplexing, too many concurrent uploads saturate bandwidth
-// and trigger stall detection. Keep concurrency reasonable for reliability.
-const MAX_CONCURRENT_UPLOADS_DESKTOP = 6;
-const MIN_CONCURRENT_UPLOADS_DESKTOP = 2; // Floor for adaptive concurrency
+// Concurrent uploads - too many concurrent large video uploads saturate bandwidth,
+// causing each upload to crawl and triggering false stall detections + retries.
+// 3 concurrent uploads balances parallelism with per-upload throughput.
+const MAX_CONCURRENT_UPLOADS_DESKTOP = 3;
+const MIN_CONCURRENT_UPLOADS_DESKTOP = 1; // Floor for adaptive concurrency
 const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
 
 // Retry configuration for failed uploads
