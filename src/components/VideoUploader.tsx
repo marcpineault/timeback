@@ -868,9 +868,9 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                   } catch {
                     // localStorage not available
                   }
-                  // Save to server in background
+                  // Save to server in background (PATCH only updates this field, not all preferences)
                   fetch('/api/user/preferences', {
-                    method: 'PUT',
+                    method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ autoProcessOnUpload: enabled }),
                   }).catch(() => {

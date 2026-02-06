@@ -807,7 +807,8 @@ export function calculateSegmentsToKeep(
   mistakes: SpeechMistake[],
   totalDuration: number,
   padding: number = 0.03, // Small padding for clean cuts around mistakes
-  timebackPadding: number = 0.25 // Extra padding on kept segments for smoother transitions
+  timebackPadding: number = 0.25, // Extra padding before speech for smoother transitions
+  timebackPaddingEnd: number = 0.4 // More padding after speech — sentences trail off naturally
 ): Array<{ start: number; end: number }> {
   if (mistakes.length === 0) {
     return [{ start: 0, end: totalDuration }];
@@ -858,10 +859,10 @@ export function calculateSegmentsToKeep(
   // Filter out very short segments (less than 50ms)
   const filteredSegments = segmentsToKeep.filter(seg => (seg.end - seg.start) >= 0.05);
 
-  // Apply timeback padding to expand segments (makes cuts less harsh)
+  // Apply timeback padding to expand segments (asymmetric: more room at end for speech trailing off)
   const paddedSegments = filteredSegments.map(seg => ({
     start: Math.max(0, seg.start - timebackPadding),
-    end: Math.min(totalDuration, seg.end + timebackPadding),
+    end: Math.min(totalDuration, seg.end + timebackPaddingEnd),
   }));
 
   // Merge any segments that now overlap after padding expansion
@@ -880,7 +881,7 @@ export function calculateSegmentsToKeep(
     }
   }
 
-  console.log(`[Speech Correction] Keeping ${finalSegments.length} segments (with ${timebackPadding}s timeback padding):`);
+  console.log(`[Speech Correction] Keeping ${finalSegments.length} segments (with ${timebackPadding}s/${timebackPaddingEnd}s start/end timeback padding):`);
   finalSegments.forEach((seg, i) => {
     console.log(`  Segment ${i + 1}: ${seg.start.toFixed(2)}s - ${seg.end.toFixed(2)}s (${(seg.end - seg.start).toFixed(2)}s)`);
   });

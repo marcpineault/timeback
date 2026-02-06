@@ -262,6 +262,38 @@ export default function VideoProcessor({
     // The actual processing is triggered by a useEffect after the queue state updates
     if (autoProcess && newVideos.length > 0) {
       console.log('[VideoProcessor] Auto-process enabled, fetching saved preferences...')
+
+      // Default config used when no saved preferences exist
+      const defaultConfig: ProcessingConfig = {
+        generateCaptions: true,
+        headline: '',
+        headlinePosition: 'top',
+        headlineStyle: 'speech-bubble',
+        captionStyle: 'instagram',
+        silenceThreshold: -25,
+        silenceDuration: 0.5,
+        autoSilenceThreshold: true,
+        useHookAsHeadline: false,
+        generateAIHeadline: false,
+        generateBRoll: false,
+        bRollConfig: {
+          style: 'dynamic',
+          intensity: 'medium',
+          maxMoments: 3,
+        },
+        normalizeAudio: true,
+        aspectRatio: 'original',
+        speechCorrection: false,
+        speechCorrectionConfig: {
+          removeFillerWords: true,
+          removeRepeatedWords: true,
+          removeRepeatedPhrases: true,
+          removeFalseStarts: true,
+          removeSelfCorrections: true,
+          aggressiveness: 'moderate',
+        },
+      }
+
       try {
         const response = await fetch('/api/user/preferences')
         if (response.ok) {
@@ -269,43 +301,39 @@ export default function VideoProcessor({
           if (data.preferences) {
             // Build ProcessingConfig from saved preferences
             const savedConfig: ProcessingConfig = {
-              generateCaptions: data.preferences.generateCaptions ?? true,
+              generateCaptions: data.preferences.generateCaptions ?? defaultConfig.generateCaptions,
               headline: '', // Always empty for auto-process
-              headlinePosition: data.preferences.headlinePosition ?? 'top',
-              headlineStyle: data.preferences.headlineStyle ?? 'speech-bubble',
-              captionStyle: data.preferences.captionStyle ?? 'instagram',
-              silenceThreshold: data.preferences.silenceThreshold ?? -25,
-              silenceDuration: data.preferences.silenceDuration ?? 0.5,
-              autoSilenceThreshold: data.preferences.autoSilenceThreshold ?? true,
-              useHookAsHeadline: data.preferences.useHookAsHeadline ?? false,
-              generateAIHeadline: data.preferences.generateAIHeadline ?? false,
-              generateBRoll: data.preferences.generateBRoll ?? false,
-              bRollConfig: {
-                style: 'dynamic',
-                intensity: 'medium',
-                maxMoments: 3,
-              },
-              normalizeAudio: data.preferences.normalizeAudio ?? true,
-              aspectRatio: data.preferences.aspectRatio ?? 'original',
-              speechCorrection: data.preferences.speechCorrection ?? false,
-              speechCorrectionConfig: data.preferences.speechCorrectionConfig ?? {
-                removeFillerWords: true,
-                removeRepeatedWords: true,
-                removeRepeatedPhrases: true,
-                removeFalseStarts: true,
-                removeSelfCorrections: true,
-                aggressiveness: 'moderate',
-              },
+              headlinePosition: data.preferences.headlinePosition ?? defaultConfig.headlinePosition,
+              headlineStyle: data.preferences.headlineStyle ?? defaultConfig.headlineStyle,
+              captionStyle: data.preferences.captionStyle ?? defaultConfig.captionStyle,
+              silenceThreshold: data.preferences.silenceThreshold ?? defaultConfig.silenceThreshold,
+              silenceDuration: data.preferences.silenceDuration ?? defaultConfig.silenceDuration,
+              autoSilenceThreshold: data.preferences.autoSilenceThreshold ?? defaultConfig.autoSilenceThreshold,
+              useHookAsHeadline: data.preferences.useHookAsHeadline ?? defaultConfig.useHookAsHeadline,
+              generateAIHeadline: data.preferences.generateAIHeadline ?? defaultConfig.generateAIHeadline,
+              generateBRoll: data.preferences.generateBRoll ?? defaultConfig.generateBRoll,
+              bRollConfig: defaultConfig.bRollConfig,
+              normalizeAudio: data.preferences.normalizeAudio ?? defaultConfig.normalizeAudio,
+              aspectRatio: data.preferences.aspectRatio ?? defaultConfig.aspectRatio,
+              speechCorrection: data.preferences.speechCorrection ?? defaultConfig.speechCorrection,
+              speechCorrectionConfig: data.preferences.speechCorrectionConfig ?? defaultConfig.speechCorrectionConfig,
             }
-            console.log('[VideoProcessor] Setting pending auto-process config, will trigger after queue updates')
-            // Set pending auto-process - the useEffect will trigger processing once queue state is updated
+            console.log('[VideoProcessor] Setting pending auto-process config from saved preferences')
             setPendingAutoProcess(savedConfig)
           } else {
-            console.log('[VideoProcessor] No saved preferences found, skipping auto-process')
+            // No saved preferences — use defaults instead of skipping
+            console.log('[VideoProcessor] No saved preferences found, using defaults for auto-process')
+            setPendingAutoProcess(defaultConfig)
           }
+        } else {
+          // Server error — still auto-process with defaults rather than silently skipping
+          console.warn('[VideoProcessor] Failed to fetch preferences (status:', response.status, '), using defaults')
+          setPendingAutoProcess(defaultConfig)
         }
       } catch (err) {
+        // Network error — still auto-process with defaults rather than silently skipping
         console.error('[VideoProcessor] Failed to fetch preferences for auto-process:', err)
+        setPendingAutoProcess(defaultConfig)
       }
     }
   }
