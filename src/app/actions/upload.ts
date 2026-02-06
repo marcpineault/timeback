@@ -5,7 +5,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { auth } from '@clerk/nextjs/server';
-import { createUploadUrl, isS3Configured } from '@/lib/s3';
+import { createUploadUrl, isS3Configured, initiateMultipartUpload, createPartUploadUrl, listUploadParts, completeMultipartS3Upload, abortMultipartS3Upload } from '@/lib/s3';
 
 // Valid video MIME types - expanded for iOS compatibility
 // iOS can report various MIME types for videos from the photo album
@@ -97,6 +97,22 @@ export interface BatchPresignedUrlResult {
 export interface BatchConfirmResult {
   success: boolean;
   files?: Array<S3UploadCompleteResult>;
+  error?: string;
+}
+
+export interface MultipartInitResult {
+  success: boolean;
+  uploadId?: string;
+  key?: string;
+  partUrls?: Array<{ partNumber: number; url: string }>;
+  error?: string;
+}
+
+export interface MultipartCompleteResult {
+  success: boolean;
+  fileId?: string;
+  filename?: string;
+  s3Key?: string;
   error?: string;
 }
 
@@ -292,6 +308,100 @@ export async function confirmBatchS3Uploads(
   } catch (error) {
     console.error('Batch confirm upload error:', error);
     return { success: false, error: 'Failed to confirm uploads' };
+  }
+}
+
+/**
+ * Initiate a multipart upload to S3/R2.
+ * Returns the uploadId, key, and presigned URLs for each part.
+ * Multipart uploads avoid the long finalization wait of single PUT because
+ * R2 processes parts as they arrive.
+ */
+export async function initiateS3MultipartUpload(
+  filename: string,
+  contentType: string,
+  fileSize: number,
+  partSize: number = 10 * 1024 * 1024,
+): Promise<MultipartInitResult> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    if (!isS3Configured()) {
+      return { success: false, error: 'S3 is not configured' };
+    }
+
+    if (!isValidVideoType(contentType, filename)) {
+      return { success: false, error: 'Invalid file type. Please upload MP4, MOV, WebM, or AVI.' };
+    }
+
+    const maxSize = 1024 * 1024 * 1024;
+    if (fileSize > maxSize) {
+      return { success: false, error: 'File too large. Maximum size is 1GB.' };
+    }
+
+    const { uploadId, key } = await initiateMultipartUpload(filename, contentType);
+
+    // Generate presigned URLs for all parts in parallel
+    const totalParts = Math.ceil(fileSize / partSize);
+    const urlPromises = Array.from({ length: totalParts }, (_, i) =>
+      createPartUploadUrl(key, uploadId, i + 1).then(url => ({
+        partNumber: i + 1,
+        url,
+      }))
+    );
+
+    const partUrls = await Promise.all(urlPromises);
+
+    console.log(`[Upload] Initiated multipart upload: ${totalParts} parts for ${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
+
+    return { success: true, uploadId, key, partUrls };
+  } catch (error) {
+    console.error('Initiate multipart upload error:', error);
+    return { success: false, error: 'Failed to initiate multipart upload' };
+  }
+}
+
+/**
+ * Complete a multipart upload by listing parts (server-side, no CORS needed for ETags)
+ * and assembling them.
+ */
+export async function completeS3MultipartUpload(
+  key: string,
+  uploadId: string,
+): Promise<MultipartCompleteResult> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // List parts server-side to get ETags (avoids browser CORS issues)
+    const parts = await listUploadParts(key, uploadId);
+    if (parts.length === 0) {
+      return { success: false, error: 'No parts found for multipart upload' };
+    }
+
+    // Complete the multipart upload
+    await completeMultipartS3Upload(key, uploadId, parts);
+
+    const filename = key.split('/').pop() || key;
+    const fileId = filename.replace(/\.[^/.]+$/, '');
+
+    console.log(`[Upload] Completed multipart upload: ${parts.length} parts for ${key}`);
+
+    return { success: true, fileId, filename, s3Key: key };
+  } catch (error) {
+    console.error('Complete multipart upload error:', error);
+    // Try to abort the upload to clean up
+    try {
+      await abortMultipartS3Upload(key, uploadId);
+    } catch {
+      // Ignore abort errors
+    }
+    return { success: false, error: 'Failed to complete multipart upload' };
   }
 }
 
