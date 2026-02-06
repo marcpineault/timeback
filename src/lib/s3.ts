@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand, ListObjectsV2Command, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListPartsCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand, ListObjectsV2Command, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListPartsCommand, ListMultipartUploadsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomBytes } from 'crypto';
@@ -254,6 +254,71 @@ export async function abortMultipartS3Upload(
   });
 
   await client.send(command);
+}
+
+/**
+ * Clean up stale multipart uploads older than the given age.
+ * Incomplete multipart uploads accumulate when clients disconnect or uploads fail
+ * without calling abort. This finds and aborts them to free storage.
+ */
+export async function cleanupStaleMultipartUploads(
+  maxAgeMs: number = 60 * 60 * 1000, // Default: 1 hour
+): Promise<number> {
+  if (!isS3Configured()) return 0;
+
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+  const cutoff = new Date(Date.now() - maxAgeMs);
+  let abortedCount = 0;
+  let keyMarker: string | undefined;
+  let uploadIdMarker: string | undefined;
+
+  try {
+    do {
+      const command = new ListMultipartUploadsCommand({
+        Bucket: bucket,
+        KeyMarker: keyMarker,
+        UploadIdMarker: uploadIdMarker,
+      });
+
+      const response = await client.send(command);
+
+      if (response.Uploads) {
+        for (const upload of response.Uploads) {
+          if (!upload.Key || !upload.UploadId) continue;
+
+          // Abort uploads older than the cutoff
+          if (upload.Initiated && upload.Initiated < cutoff) {
+            try {
+              await abortMultipartS3Upload(upload.Key, upload.UploadId);
+              abortedCount++;
+              logger.info('Aborted stale multipart upload', {
+                key: upload.Key,
+                uploadId: upload.UploadId,
+                initiated: upload.Initiated.toISOString(),
+              });
+            } catch (err) {
+              logger.warn('Failed to abort stale multipart upload', {
+                key: upload.Key,
+                error: String(err),
+              });
+            }
+          }
+        }
+      }
+
+      if (response.IsTruncated) {
+        keyMarker = response.NextKeyMarker;
+        uploadIdMarker = response.NextUploadIdMarker;
+      } else {
+        keyMarker = undefined;
+      }
+    } while (keyMarker !== undefined);
+  } catch (err) {
+    logger.warn('Failed to list multipart uploads for cleanup', { error: String(err) });
+  }
+
+  return abortedCount;
 }
 
 /**
