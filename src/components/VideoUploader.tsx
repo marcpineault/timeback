@@ -46,8 +46,8 @@ const CHUNK_SIZE = 5 * 1024 * 1024;
 
 // Concurrent uploads - too many concurrent large video uploads saturate bandwidth,
 // causing each upload to crawl and triggering false stall detections + retries.
-// 3 concurrent uploads balances parallelism with per-upload throughput.
-const MAX_CONCURRENT_UPLOADS_DESKTOP = 3;
+// 2 concurrent uploads balances parallelism with per-upload throughput on both platforms.
+const MAX_CONCURRENT_UPLOADS_DESKTOP = 2;
 const MIN_CONCURRENT_UPLOADS_DESKTOP = 1; // Floor for adaptive concurrency
 const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
 
