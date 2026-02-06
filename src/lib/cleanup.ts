@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { logger } from './logger';
 import { isFileLocked } from './fileLock';
+import { cleanupStaleMultipartUploads } from './s3';
 
 const MAX_FILE_AGE_HOURS = 1; // Delete files older than 1 hour
 const CONCURRENCY_LIMIT = 5; // Process 5 files at a time
@@ -61,5 +62,13 @@ export async function cleanupOldFiles(): Promise<void> {
   await Promise.all([
     cleanupDir(uploadsDir),
     cleanupDir(processedDir),
+    // Abort incomplete multipart uploads older than 1 hour in R2
+    cleanupStaleMultipartUploads(MAX_FILE_AGE_HOURS * 60 * 60 * 1000).then(count => {
+      if (count > 0) {
+        logger.info(`Cleaned up ${count} stale multipart upload(s) in R2`);
+      }
+    }).catch(err => {
+      logger.warn('Multipart upload cleanup failed', { error: String(err) });
+    }),
   ]);
 }
