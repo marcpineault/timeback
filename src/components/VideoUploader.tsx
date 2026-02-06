@@ -11,6 +11,8 @@ import {
   confirmS3Upload,
   getBatchS3UploadUrls,
   confirmBatchS3Uploads,
+  initiateS3MultipartUpload,
+  completeS3MultipartUpload,
   type FileInfo
 } from '@/app/actions/upload';
 
@@ -58,6 +60,11 @@ const INITIAL_RETRY_DELAY_MS = 500; // 500ms initial, doubles each retry (faster
 // Stall detection
 const STALL_CHECK_INTERVAL_MS = 10000; // Check every 10 seconds
 const STALL_TIMEOUT_MS = 60000; // 60 seconds no progress = stalled
+
+// Multipart upload - avoids long "Finalizing..." wait on R2 for large files.
+// R2 processes each part as it arrives, so the final "complete" call is near-instant.
+const MULTIPART_THRESHOLD = 10 * 1024 * 1024; // 10MB - use multipart for files above this
+const MULTIPART_PART_SIZE = 10 * 1024 * 1024; // 10MB parts
 
 // Get content type from file, with fallback based on extension
 const getContentType = (file: File): string => {
@@ -527,6 +534,131 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
     return null;
   };
 
+  // Multipart upload for large files — uploads in 10MB parts so R2 processes
+  // incrementally. The final "complete" call is near-instant (no long finalization).
+  const uploadSingleFileToS3Multipart = async (
+    file: File,
+    index: number,
+  ): Promise<{ index: number; s3Key: string } | null> => {
+    const contentType = getContentType(file);
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+
+    console.log(`[Upload] Starting multipart upload for ${file.name} (${fileSizeMB}MB, type: ${contentType})`);
+
+    setUploadingFiles(prev => prev.map((f, i) =>
+      i === index ? { ...f, status: 'uploading' as const, progress: 0 } : f
+    ));
+
+    let uploadId: string | undefined;
+    let key: string | undefined;
+
+    try {
+      // Step 1: Initiate multipart upload and get part URLs
+      const initResult = await initiateS3MultipartUpload(file.name, contentType, file.size, MULTIPART_PART_SIZE);
+      if (!initResult.success || !initResult.uploadId || !initResult.key || !initResult.partUrls) {
+        throw new Error(initResult.error || 'Failed to initiate multipart upload');
+      }
+
+      uploadId = initResult.uploadId;
+      key = initResult.key;
+      const { partUrls } = initResult;
+      const totalParts = partUrls.length;
+
+      console.log(`[Upload] Multipart initiated for ${file.name}: ${totalParts} parts, key=${key}`);
+
+      // Step 2: Upload parts sequentially (file-level concurrency handles parallelism)
+      const partBytesUploaded = new Array(totalParts).fill(0);
+
+      for (let i = 0; i < totalParts; i++) {
+        const start = i * MULTIPART_PART_SIZE;
+        const end = Math.min(start + MULTIPART_PART_SIZE, file.size);
+        const partBlob = file.slice(start, end);
+        const partUrl = partUrls.find(p => p.partNumber === i + 1)!.url;
+        const partSizeMB = ((end - start) / (1024 * 1024)).toFixed(1);
+
+        let partUploaded = false;
+        for (let attempt = 0; attempt <= MAX_RETRIES && !partUploaded; attempt++) {
+          if (attempt > 0) {
+            const retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+            console.log(`[Upload] Retry part ${i + 1} attempt ${attempt} for ${file.name} after ${retryDelay}ms`);
+            await delay(retryDelay);
+          }
+
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              const timeoutMs = Math.max(60000, Math.ceil(partBlob.size / (1024 * 1024)) * 30000);
+              xhr.timeout = timeoutMs;
+
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  partBytesUploaded[i] = event.loaded;
+                  const totalUploaded = partBytesUploaded.reduce((sum, b) => sum + b, 0);
+                  const progress = Math.round((totalUploaded / file.size) * 100);
+                  setUploadingFiles(prev => prev.map((f, idx) =>
+                    idx === index ? { ...f, progress: Math.min(progress, 99) } : f
+                  ));
+                }
+              };
+
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  resolve();
+                } else {
+                  reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+                }
+              };
+
+              xhr.onerror = () => reject(new Error('Network error'));
+              xhr.ontimeout = () => reject(new Error('Part upload timed out'));
+              xhr.onabort = () => reject(new Error('Part upload aborted'));
+
+              xhr.open('PUT', partUrl);
+              xhr.send(partBlob);
+            });
+
+            partBytesUploaded[i] = end - start; // Mark full part size
+            partUploaded = true;
+            console.log(`[Upload] Part ${i + 1}/${totalParts} (${partSizeMB}MB) uploaded for ${file.name}`);
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Part upload failed';
+            console.warn(`[Upload] Part ${i + 1} attempt ${attempt + 1} failed for ${file.name}: ${errorMsg}`);
+            if (errorMsg.startsWith('HTTP 4')) break; // Don't retry client errors
+            if (attempt === MAX_RETRIES) throw err;
+          }
+        }
+        if (!partUploaded) {
+          throw new Error(`Failed to upload part ${i + 1} after retries`);
+        }
+      }
+
+      // Step 3: Complete multipart upload (server lists parts for ETags, then assembles)
+      console.log(`[Upload] All parts uploaded for ${file.name}, completing multipart upload...`);
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, progress: 100 } : f
+      ));
+
+      const completeResult = await completeS3MultipartUpload(key, uploadId);
+      if (!completeResult.success) {
+        throw new Error(completeResult.error || 'Failed to complete multipart upload');
+      }
+
+      console.log(`[Upload] Multipart upload complete for ${file.name}`);
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'complete' as const, progress: 100 } : f
+      ));
+
+      return { index, s3Key: key };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+      console.error(`[Upload] Multipart upload failed for ${file.name}: ${errorMsg}`);
+      setUploadingFiles(prev => prev.map((f, i) =>
+        i === index ? { ...f, status: 'error' as const, error: errorMsg } : f
+      ));
+      return null;
+    }
+  };
+
   // Adaptive semaphore for concurrency control
   // Starts at max limit, can be reduced on errors for better throughput
   const createAdaptiveSemaphore = (initialLimit: number, minLimit: number) => {
@@ -577,47 +709,73 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
     };
   };
 
-  // Optimized batch S3 upload with adaptive concurrency
+  // Optimized batch S3 upload with adaptive concurrency.
+  // Uses multipart upload for large files to avoid the long R2 finalization wait.
   const uploadFilesToS3Batch = async (files: File[], initialState: UploadingFile[]): Promise<UploadedFile[]> => {
     console.log(`[Upload] Starting batch upload for ${files.length} files`);
 
-    // Step 1: Get all presigned URLs in a single request (server generates in parallel)
-    const fileInfos: FileInfo[] = files.map(f => ({
-      filename: f.name,
-      contentType: getContentType(f),
-      fileSize: f.size,
-    }));
+    // Separate files into small (single PUT) and large (multipart)
+    const smallFiles = files.map((f, i) => ({ file: f, index: i })).filter(({ file }) => file.size < MULTIPART_THRESHOLD);
+    const largeFiles = files.map((f, i) => ({ file: f, index: i })).filter(({ file }) => file.size >= MULTIPART_THRESHOLD);
 
-    console.log('[Upload] Requesting presigned URLs...');
-    const batchUrlResult = await getBatchS3UploadUrls(fileInfos);
-    if (!batchUrlResult.success || !batchUrlResult.urls) {
-      console.error('[Upload] Failed to get presigned URLs:', batchUrlResult.error);
-      throw new Error(batchUrlResult.error || 'Failed to get upload URLs');
+    console.log(`[Upload] ${smallFiles.length} small files (single PUT), ${largeFiles.length} large files (multipart)`);
+
+    // Step 1: Get presigned PUT URLs for small files only
+    let smallFileUrlMap = new Map<number, { url: string; key: string }>();
+    if (smallFiles.length > 0) {
+      const fileInfos: FileInfo[] = smallFiles.map(({ file }) => ({
+        filename: file.name,
+        contentType: getContentType(file),
+        fileSize: file.size,
+      }));
+
+      console.log('[Upload] Requesting presigned URLs for small files...');
+      const batchUrlResult = await getBatchS3UploadUrls(fileInfos);
+      if (batchUrlResult.success && batchUrlResult.urls) {
+        for (const urlInfo of batchUrlResult.urls) {
+          // Map batch index back to original file index
+          const originalIndex = smallFiles[urlInfo.index].index;
+          smallFileUrlMap.set(originalIndex, { url: urlInfo.url, key: urlInfo.key });
+        }
+        console.log(`[Upload] Got ${batchUrlResult.urls.length} presigned URLs for small files`);
+      } else {
+        console.error('[Upload] Failed to get presigned URLs:', batchUrlResult.error);
+        // Mark small files as errors
+        for (const { index } of smallFiles) {
+          setUploadingFiles(prev => prev.map((f, i) =>
+            i === index ? { ...f, status: 'error' as const, error: 'Failed to get upload URL' } : f
+          ));
+        }
+      }
     }
 
-    console.log(`[Upload] Got ${batchUrlResult.urls.length} presigned URLs, starting uploads...`);
-
-    // Step 2: Upload files with adaptive concurrency control
+    // Step 2: Upload all files with adaptive concurrency control
     const maxConcurrent = getMaxConcurrentUploads();
     const minConcurrent = isMobile ? MAX_CONCURRENT_UPLOADS_MOBILE : MIN_CONCURRENT_UPLOADS_DESKTOP;
     const semaphore = createAdaptiveSemaphore(maxConcurrent, minConcurrent);
 
     const uploadPromises = files.map(async (file, index) => {
-      const urlInfo = batchUrlResult.urls!.find(u => u.index === index);
-      if (!urlInfo) {
-        // Mark file as failed - no presigned URL was generated for it
-        console.error(`[Upload] No URL info for file ${file.name} at index ${index}`);
-        setUploadingFiles(prev => prev.map((f, i) =>
-          i === index ? { ...f, status: 'error' as const, error: 'Failed to get upload URL' } : f
-        ));
-        return null;
-      }
-
-      // Wait for a slot
       await semaphore.acquire();
       let success = false;
       try {
-        const result = await uploadSingleFileToS3(file, index, urlInfo);
+        let result: { index: number; s3Key: string } | null = null;
+
+        if (file.size >= MULTIPART_THRESHOLD) {
+          // Large file: use multipart upload (handles its own initiation)
+          result = await uploadSingleFileToS3Multipart(file, index);
+        } else {
+          // Small file: use single PUT with presigned URL
+          const urlInfo = smallFileUrlMap.get(index);
+          if (!urlInfo) {
+            console.error(`[Upload] No URL info for file ${file.name} at index ${index}`);
+            setUploadingFiles(prev => prev.map((f, i) =>
+              i === index ? { ...f, status: 'error' as const, error: 'Failed to get upload URL' } : f
+            ));
+            return null;
+          }
+          result = await uploadSingleFileToS3(file, index, urlInfo);
+        }
+
         success = result !== null;
         return result;
       } finally {
@@ -639,7 +797,9 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
       return [];
     }
 
-    // Step 3: Confirm all uploads in a single request
+    // Step 3: Confirm all uploads in a single batch request.
+    // For multipart files this is just extracting fileId from the key (already stored).
+    // For single PUT files this confirms the upload.
     console.log('[Upload] Confirming batch uploads with server...');
     const confirmData = successfulUploads.map(u => ({
       s3Key: u.s3Key,

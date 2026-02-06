@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, DeleteObjectCommand, PutObjectCommand, ListObjectsV2Command, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListPartsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomBytes } from 'crypto';
@@ -119,6 +119,139 @@ export async function createUploadUrl(
   const url = await getSignedUrl(client, command, { expiresIn: 3600 });
 
   return { url, key, method: 'PUT' };
+}
+
+/**
+ * Initiate a multipart upload for direct browser-to-R2/S3 uploads.
+ * Multipart uploads avoid the long "Finalizing..." wait that single PUT has
+ * because R2 processes each part as it arrives instead of waiting for the full file.
+ */
+export async function initiateMultipartUpload(
+  filename: string,
+  contentType: string,
+): Promise<{ uploadId: string; key: string }> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  const timestamp = Date.now();
+  const randomId = randomBytes(16).toString('hex');
+  const ext = getValidExtension(filename);
+  const key = `uploads/${timestamp}-${randomId}.${ext}`;
+
+  const command = new CreateMultipartUploadCommand({
+    Bucket: bucket,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  const response = await client.send(command);
+  if (!response.UploadId) {
+    throw new Error('Failed to initiate multipart upload: no UploadId returned');
+  }
+
+  return { uploadId: response.UploadId, key };
+}
+
+/**
+ * Generate a presigned URL for uploading a single part of a multipart upload
+ */
+export async function createPartUploadUrl(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+): Promise<string> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  const command = new UploadPartCommand({
+    Bucket: bucket,
+    Key: key,
+    UploadId: uploadId,
+    PartNumber: partNumber,
+  });
+
+  return await getSignedUrl(client, command, { expiresIn: 3600 });
+}
+
+/**
+ * List uploaded parts and their ETags for a multipart upload.
+ * Used server-side to get ETags without requiring browser CORS access to response headers.
+ */
+export async function listUploadParts(
+  key: string,
+  uploadId: string,
+): Promise<{ PartNumber: number; ETag: string }[]> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  const parts: { PartNumber: number; ETag: string }[] = [];
+  let partNumberMarker: number | undefined;
+
+  // ListParts is paginated (max 1000 per page), loop to get all
+  do {
+    const command = new ListPartsCommand({
+      Bucket: bucket,
+      Key: key,
+      UploadId: uploadId,
+      PartNumberMarker: partNumberMarker,
+    });
+
+    const response = await client.send(command);
+
+    if (response.Parts) {
+      for (const part of response.Parts) {
+        if (part.PartNumber && part.ETag) {
+          parts.push({ PartNumber: part.PartNumber, ETag: part.ETag });
+        }
+      }
+    }
+
+    partNumberMarker = response.IsTruncated ? response.NextPartNumberMarker : undefined;
+  } while (partNumberMarker !== undefined);
+
+  return parts;
+}
+
+/**
+ * Complete a multipart upload by assembling all parts
+ */
+export async function completeMultipartS3Upload(
+  key: string,
+  uploadId: string,
+  parts: { PartNumber: number; ETag: string }[],
+): Promise<void> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  const command = new CompleteMultipartUploadCommand({
+    Bucket: bucket,
+    Key: key,
+    UploadId: uploadId,
+    MultipartUpload: {
+      Parts: parts.sort((a, b) => a.PartNumber - b.PartNumber),
+    },
+  });
+
+  await client.send(command);
+}
+
+/**
+ * Abort a multipart upload and clean up any uploaded parts
+ */
+export async function abortMultipartS3Upload(
+  key: string,
+  uploadId: string,
+): Promise<void> {
+  const client = getS3Client();
+  const bucket = getS3Bucket();
+
+  const command = new AbortMultipartUploadCommand({
+    Bucket: bucket,
+    Key: key,
+    UploadId: uploadId,
+  });
+
+  await client.send(command);
 }
 
 /**
