@@ -68,7 +68,62 @@ export async function GET() {
   }
 }
 
-// PUT - Save user's processing preferences
+// PATCH - Partially update user's processing preferences (only updates fields that are sent)
+export async function PATCH(request: Request) {
+  try {
+    const { userId: clerkId } = await auth();
+
+    if (!clerkId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await getOrCreateUser();
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const body = await request.json();
+
+    // Only include fields that were actually sent in the request
+    const updateData: Record<string, unknown> = {};
+    if (body.autoProcessOnUpload !== undefined) updateData.autoProcessOnUpload = body.autoProcessOnUpload;
+    if (body.activePreset !== undefined) updateData.activePreset = body.activePreset;
+    if (body.generateCaptions !== undefined) updateData.generateCaptions = body.generateCaptions;
+    if (body.captionStyle !== undefined) updateData.captionStyle = body.captionStyle;
+    if (body.headline !== undefined) updateData.headline = body.headline;
+    if (body.headlinePosition !== undefined) updateData.headlinePosition = body.headlinePosition;
+    if (body.headlineStyle !== undefined) updateData.headlineStyle = body.headlineStyle;
+    if (body.useHookAsHeadline !== undefined) updateData.useHookAsHeadline = body.useHookAsHeadline;
+    if (body.generateAIHeadline !== undefined) updateData.generateAIHeadline = body.generateAIHeadline;
+    if (body.silenceThreshold !== undefined) updateData.silenceThreshold = body.silenceThreshold;
+    if (body.silenceDuration !== undefined) updateData.silenceDuration = body.silenceDuration;
+    if (body.autoSilenceThreshold !== undefined) updateData.autoSilenceThreshold = body.autoSilenceThreshold;
+    if (body.normalizeAudio !== undefined) updateData.normalizeAudio = body.normalizeAudio;
+    if (body.aspectRatio !== undefined) updateData.aspectRatio = body.aspectRatio;
+    if (body.speechCorrection !== undefined) updateData.speechCorrection = body.speechCorrection;
+    if (body.generateBRoll !== undefined) updateData.generateBRoll = body.generateBRoll;
+
+    // Upsert: create with defaults if not exists, otherwise only update sent fields
+    const preferences = await prisma.userProcessingPreferences.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        ...updateData,
+      },
+      update: updateData,
+    });
+
+    return NextResponse.json({ success: true, preferences: { autoProcessOnUpload: preferences.autoProcessOnUpload } });
+  } catch (error) {
+    console.error('Error patching preferences:', error);
+    return NextResponse.json(
+      { error: 'Failed to update preferences' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Save user's full processing preferences (replaces all fields)
 export async function PUT(request: Request) {
   try {
     const { userId: clerkId } = await auth();
