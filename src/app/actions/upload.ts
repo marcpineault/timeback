@@ -405,6 +405,29 @@ export async function completeS3MultipartUpload(
   }
 }
 
+/**
+ * Abort an in-progress multipart upload to clean up parts in R2.
+ * Called by the client when a multipart upload fails or is cancelled.
+ */
+export async function abortS3MultipartUpload(
+  key: string,
+  uploadId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    await abortMultipartS3Upload(key, uploadId);
+    console.log(`[Upload] Aborted multipart upload: ${key}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Abort multipart upload error:', error);
+    return { success: false, error: 'Failed to abort multipart upload' };
+  }
+}
+
 // Initialize a chunked upload - creates the temp file
 export async function initChunkedUpload(
   originalName: string,
