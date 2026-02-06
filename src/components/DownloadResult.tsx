@@ -55,7 +55,7 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
       {success && (
         <p className="text-green-400 text-sm">
           {platform === 'ios'
-            ? 'Tap "Save Video" in the share menu to save to your Camera Roll'
+            ? 'Tap "Save Video" in the share menu, or long-press the video to save'
             : 'Video saved successfully!'
           }
         </p>

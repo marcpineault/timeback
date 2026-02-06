@@ -187,10 +187,35 @@ export function useDownload(options: DownloadOptions = {}) {
   }, [cancel]);
 
   /**
+   * Fallback: trigger a direct browser navigation to the download URL.
+   * This bypasses fetch/CORS/memory issues by letting the browser handle
+   * the download natively (including following redirects to presigned S3/R2 URLs).
+   */
+  const triggerDirectDownload = useCallback(
+    (url: string, filename: string) => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      // Use target=_blank on iOS where the download attribute is often ignored,
+      // so the browser opens the URL and the user can long-press to save.
+      if (platform === 'ios') {
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+      }
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    },
+    [platform]
+  );
+
+  /**
    * Download and save a video file
    * - iOS: Opens share sheet for "Save Video" to Camera Roll
    * - Android: Downloads to Downloads folder, with share fallback
    * - Desktop: Standard browser download
+   * - Mobile fallback: Direct URL navigation if blob fetch or share fails
    */
   const downloadVideo = useCallback(
     async (url: string, filename: string) => {
@@ -228,6 +253,19 @@ export function useDownload(options: DownloadOptions = {}) {
         );
 
         if (!response.ok) {
+          // On mobile, fall back to direct download instead of showing an error
+          // This handles cases where fetch fails due to CORS on presigned URL redirects
+          if (platform !== 'desktop') {
+            triggerDirectDownload(url, filename);
+            setState({
+              isDownloading: false,
+              progress: 100,
+              error: null,
+              success: true,
+            });
+            onSuccess?.();
+            return;
+          }
           const errorMsg = getErrorMessage(response.status, platform);
           setState((prev) => ({ ...prev, isDownloading: false, error: errorMsg }));
           onError?.(errorMsg);
@@ -268,12 +306,32 @@ export function useDownload(options: DownloadOptions = {}) {
                 setState((prev) => ({ ...prev, isDownloading: false }));
                 return;
               }
-              // Fall through to download fallback
+              // Share failed (not cancelled) - fall back to direct download
+              triggerDirectDownload(url, filename);
+              setState({
+                isDownloading: false,
+                progress: 100,
+                error: null,
+                success: true,
+              });
+              onSuccess?.();
+              return;
             }
           }
+
+          // Web Share API not available on this mobile browser - use direct download
+          triggerDirectDownload(url, filename);
+          setState({
+            isDownloading: false,
+            progress: 100,
+            error: null,
+            success: true,
+          });
+          onSuccess?.();
+          return;
         }
 
-        // Fallback: trigger standard download
+        // Desktop: trigger standard blob download
         const blobUrl = URL.createObjectURL(blob);
         blobUrlRef.current = blobUrl;
 
@@ -307,10 +365,23 @@ export function useDownload(options: DownloadOptions = {}) {
           return;
         }
 
-        const errorMsg =
-          platform === 'ios'
-            ? 'Download failed. Check your connection and try again.'
-            : 'Download failed. Please check your connection and try again.';
+        // On mobile, fall back to direct URL download instead of showing an error.
+        // This handles blob memory exhaustion, CORS failures on redirected
+        // presigned URLs, and other fetch-level failures that don't occur
+        // when the browser navigates to the URL natively.
+        if (platform !== 'desktop') {
+          triggerDirectDownload(url, filename);
+          setState({
+            isDownloading: false,
+            progress: 100,
+            error: null,
+            success: true,
+          });
+          onSuccess?.();
+          return;
+        }
+
+        const errorMsg = 'Download failed. Please check your connection and try again.';
 
         setState({
           isDownloading: false,
@@ -323,7 +394,7 @@ export function useDownload(options: DownloadOptions = {}) {
         abortControllerRef.current = null;
       }
     },
-    [platform, maxRetries, retryDelayMs, timeoutMs, cancel, onSuccess, onError]
+    [platform, maxRetries, retryDelayMs, timeoutMs, cancel, triggerDirectDownload, onSuccess, onError]
   );
 
   return {
