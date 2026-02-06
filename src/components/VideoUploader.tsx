@@ -44,18 +44,20 @@ interface VideoUploaderProps {
 // Base64 encoding adds ~33% overhead, so actual data per request is ~3.75MB
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
-// Concurrent uploads - allow many parallel uploads for faster batch processing
-const MAX_CONCURRENT_UPLOADS_DESKTOP = 50;
-const MIN_CONCURRENT_UPLOADS_DESKTOP = 10; // Floor for adaptive concurrency
+// Concurrent uploads - browsers limit ~6 connections per domain for HTTP/1.1
+// Even with HTTP/2 multiplexing, too many concurrent uploads saturate bandwidth
+// and trigger stall detection. Keep concurrency reasonable for reliability.
+const MAX_CONCURRENT_UPLOADS_DESKTOP = 6;
+const MIN_CONCURRENT_UPLOADS_DESKTOP = 2; // Floor for adaptive concurrency
 const MAX_CONCURRENT_UPLOADS_MOBILE = 2;
 
 // Retry configuration for failed uploads
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 500; // 500ms initial, doubles each retry (faster recovery)
 
-// Stall detection - check more frequently for faster recovery
-const STALL_CHECK_INTERVAL_MS = 5000; // Check every 5 seconds (was 10)
-const STALL_TIMEOUT_MS = 45000; // 45 seconds no progress = stalled (was 60)
+// Stall detection
+const STALL_CHECK_INTERVAL_MS = 10000; // Check every 10 seconds
+const STALL_TIMEOUT_MS = 60000; // 60 seconds no progress = stalled
 
 // Get content type from file, with fallback based on extension
 const getContentType = (file: File): string => {

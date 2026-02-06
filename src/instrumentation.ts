@@ -36,11 +36,9 @@ export async function register() {
         tags: { type: 'uncaught_exception', origin },
       });
 
-      // Give Sentry time to send the error before crashing
-      // In production, process managers like PM2 will restart the process
-      setTimeout(() => {
-        process.exit(1);
-      }, 2000);
+      // Log but don't exit - Next.js handles its own process lifecycle.
+      // Calling process.exit() here would kill the server during active
+      // requests (uploads, processing), causing user-visible failures.
     });
 
     // Handle SIGTERM gracefully (for container orchestration)
