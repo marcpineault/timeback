@@ -704,6 +704,9 @@ export async function removeSilence(
   outputPath: string,
   options: ProcessingOptions = {}
 ): Promise<string> {
+  // Validate input file exists before spawning any ffmpeg processes
+  validateFileExists(inputPath, 'silence removal');
+
   let threshold = options.silenceThreshold ?? -20;
   const minDuration = options.silenceDuration ?? 0.3;  // AGGRESSIVE: Reduced from 0.5
   let silences: SilenceInterval[];
@@ -818,6 +821,7 @@ export async function burnCaptions(
   srtPath: string,
   style: string = 'default'
 ): Promise<string> {
+  validateFileExists(inputPath, 'burn captions');
   // Check if this is an animated ASS file
   const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
 
@@ -950,6 +954,7 @@ export async function addHeadline(
   captionStyle: string = 'instagram',
   headlineStyle: HeadlineStyle = 'speech-bubble'
 ): Promise<string> {
+  validateFileExists(inputPath, 'add headline');
   // Validate input file exists
   if (!fs.existsSync(inputPath)) {
     throw new Error(`[Headline] Input file does not exist: ${inputPath}`);
@@ -1315,6 +1320,7 @@ export async function normalizeAudio(
   inputPath: string,
   outputPath: string
 ): Promise<string> {
+  validateFileExists(inputPath, 'normalize audio');
   logger.debug(`[Audio] Normalizing audio levels...`);
 
   const processConfig: FFmpegProcessConfig = {
@@ -1374,6 +1380,7 @@ export async function convertAspectRatio(
   outputPath: string,
   targetRatio: AspectRatioPreset
 ): Promise<string> {
+  validateFileExists(inputPath, 'convert aspect ratio');
   if (targetRatio === 'original') {
     logger.debug(`[Aspect] Keeping original aspect ratio`);
     fs.copyFileSync(inputPath, outputPath);

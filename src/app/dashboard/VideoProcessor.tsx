@@ -711,34 +711,101 @@ export default function VideoProcessor({
     setIsSavingAll(false)
   }
 
-  // Desktop: download all videos sequentially
+  // Desktop: download all videos sequentially with retry and timeout
   const handleDownloadAll = async () => {
     const completedVideos = videoQueue.filter(v => v.status === 'complete' && v.downloadUrl)
     setIsSavingAll(true)
 
+    const savedIds = new Set<string>()
+    const failedIds = new Set<string>()
+
+    setSaveProgress({
+      current: 0,
+      total: completedVideos.length,
+      savedIds,
+      failedIds,
+      skippedIds: new Set(),
+    })
+
+    const TIMEOUT_MS = 180000 // 3 minutes per download
+
     for (let i = 0; i < completedVideos.length; i++) {
       const video = completedVideos[i]
+
+      setSaveProgress({
+        current: i + 1,
+        total: completedVideos.length,
+        savedIds: new Set(savedIds),
+        failedIds: new Set(failedIds),
+        skippedIds: new Set(),
+      })
+
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, 500))
       }
+
       try {
-        const response = await fetch(video.downloadUrl!)
-        if (!response.ok) {
-          console.error('Download failed:', response.status, response.statusText)
+        // Cache-busting to avoid stale responses
+        const url = video.downloadUrl!.includes('?')
+          ? `${video.downloadUrl}&_t=${Date.now()}`
+          : `${video.downloadUrl}?_t=${Date.now()}`
+
+        let response: Response | null = null
+        let lastError: Error | null = null
+
+        // Retry up to 3 times with exponential backoff
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
+          try {
+            response = await fetch(url, { signal: controller.signal })
+            clearTimeout(timeoutId)
+            if (response.ok) break
+
+            if (response.status >= 400 && response.status < 500) break // Don't retry client errors
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+          } catch (err) {
+            clearTimeout(timeoutId)
+            lastError = err instanceof Error ? err : new Error('Network error')
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+            }
+          }
+        }
+
+        if (!response?.ok) {
+          console.error('Download failed:', response?.status || lastError?.message)
+          failedIds.add(video.file.fileId)
           continue
         }
+
         const blob = await response.blob()
-        const url = URL.createObjectURL(blob)
+        const blobUrl = URL.createObjectURL(blob)
         const link = document.createElement('a')
-        link.href = url
+        link.href = blobUrl
         link.download = video.outputFilename || 'video.mp4'
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        URL.revokeObjectURL(url)
+        URL.revokeObjectURL(blobUrl)
+        savedIds.add(video.file.fileId)
       } catch (err) {
         console.error('Download failed:', err)
+        failedIds.add(video.file.fileId)
       }
+    }
+
+    setSaveProgress({
+      current: completedVideos.length,
+      total: completedVideos.length,
+      savedIds: new Set(savedIds),
+      failedIds: new Set(failedIds),
+      skippedIds: new Set(),
+    })
+
+    if (failedIds.size === 0) {
+      setTimeout(() => setSaveProgress(null), 2000)
     }
 
     setIsSavingAll(false)
@@ -918,28 +985,56 @@ export default function VideoProcessor({
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={handleDownloadAll}
-                  disabled={isSavingAll}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  {isSavingAll ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Downloading...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download All
-                    </>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleDownloadAll}
+                    disabled={isSavingAll}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isSavingAll ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {saveProgress
+                          ? `Downloading ${saveProgress.current}/${saveProgress.total}...`
+                          : 'Downloading...'}
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download All
+                      </>
+                    )}
+                  </button>
+                  {saveProgress && !isSavingAll && (
+                    <div className="text-xs text-gray-400 text-center">
+                      {saveProgress.failedIds.size > 0 ? (
+                        <p className="text-amber-400">
+                          {saveProgress.savedIds.size} downloaded, {saveProgress.failedIds.size} failed
+                        </p>
+                      ) : saveProgress.savedIds.size > 0 ? (
+                        <p className="text-green-400">
+                          All {saveProgress.savedIds.size} videos downloaded!
+                        </p>
+                      ) : null}
+                    </div>
                   )}
-                </button>
+                  {saveProgress && saveProgress.failedIds.size > 0 && !isSavingAll && (
+                    <button
+                      onClick={handleDownloadAll}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Retry ({saveProgress.failedIds.size})
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             {/* Review tip - platform specific */}
