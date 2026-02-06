@@ -450,6 +450,11 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
 
           xhr.timeout = timeoutMs;
 
+          // Track when browser finishes sending all bytes to the network layer.
+          // After this point, we're just waiting for S3 to process and respond —
+          // stall detection must NOT abort during this phase.
+          let uploadSendComplete = false;
+
           xhr.upload.onprogress = (event) => {
             lastProgressTime = Date.now(); // Reset stall timer on progress
             if (event.lengthComputable) {
@@ -458,6 +463,11 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                 i === index ? { ...f, progress } : f
               ));
             }
+          };
+
+          xhr.upload.onloadend = () => {
+            uploadSendComplete = true;
+            console.log(`[Upload] Send complete for ${file.name}, waiting for S3 response...`);
           };
 
           xhr.onload = () => {
@@ -473,8 +483,11 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
           xhr.ontimeout = () => settle(() => reject(new Error('Upload timed out')));
           xhr.onabort = () => settle(() => reject(new Error('Upload was aborted')));
 
-          // Stall detection: check frequently for faster recovery
+          // Stall detection: abort if no upload progress for 60s.
+          // Once the browser finishes sending bytes (uploadSendComplete), we're
+          // just waiting for S3 to respond — the XHR timeout handles that phase.
           stallCheckInterval = setInterval(() => {
+            if (uploadSendComplete) return; // Trust XHR timeout for response phase
             const timeSinceProgress = Date.now() - lastProgressTime;
             if (timeSinceProgress > STALL_TIMEOUT_MS) {
               console.warn(`[Upload] Stall detected for ${file.name}: no progress for ${Math.round(timeSinceProgress / 1000)}s, aborting`);
