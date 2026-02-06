@@ -808,7 +808,7 @@ export function calculateSegmentsToKeep(
   totalDuration: number,
   padding: number = 0.03, // Small padding for clean cuts around mistakes
   timebackPadding: number = 0.25, // Extra padding before speech for smoother transitions
-  timebackPaddingEnd: number = 0.325 // More padding after speech — sentences trail off naturally
+  timebackPaddingEnd: number = 0.2 // 200ms — punchier cuts at end of sentences
 ): Array<{ start: number; end: number }> {
   if (mistakes.length === 0) {
     return [{ start: 0, end: totalDuration }];
