@@ -114,5 +114,6 @@ export async function getUserUsage(userId: string) {
     videosUsed: user.videosThisMonth,
     videosRemaining,
     recentVideos: user.videos,
+    hasCompletedOnboarding: user.hasCompletedOnboarding,
   }
 }
