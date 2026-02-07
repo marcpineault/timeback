@@ -137,7 +137,17 @@ export async function POST(request: NextRequest) {
 
         // Generate file ID and filename
         const fileId = uuidv4();
-        const ext = path.extname(file.name) || '.mp4';
+        const ext = (path.extname(file.name) || '.mp4').toLowerCase();
+        // SECURITY: Validate file extension against allowed video types
+        const allowedExtensions = ['.mp4', '.mov', '.webm', '.avi'];
+        if (!allowedExtensions.includes(ext)) {
+          results.push({
+            success: false,
+            originalName: file.name,
+            error: `Unsupported file type: ${ext}. Allowed: ${allowedExtensions.join(', ')}`,
+          });
+          continue;
+        }
         const filename = `${fileId}${ext}`;
 
         if (useS3) {

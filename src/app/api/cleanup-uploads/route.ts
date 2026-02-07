@@ -4,8 +4,9 @@ import { cleanupStaleMultipartUploads } from '@/lib/s3';
 
 /**
  * POST /api/cleanup-uploads
- * Aborts all incomplete multipart uploads in R2.
- * Requires authentication.
+ * Aborts stale incomplete multipart uploads in R2.
+ * Requires authentication. Only cleans up uploads older than 1 hour
+ * to avoid disrupting other users' in-progress uploads.
  */
 export async function POST() {
   try {
@@ -14,8 +15,10 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Abort ALL incomplete multipart uploads (maxAge = 0 means everything)
-    const abortedCount = await cleanupStaleMultipartUploads(0);
+    // SECURITY: Only abort multipart uploads older than 1 hour to avoid
+    // disrupting other users' in-progress uploads
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const abortedCount = await cleanupStaleMultipartUploads(ONE_HOUR_MS);
 
     return NextResponse.json({
       success: true,

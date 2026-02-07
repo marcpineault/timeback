@@ -37,7 +37,15 @@ export async function cleanupOldFiles(): Promise<void> {
           }
 
           try {
-            const stat = await fs.stat(filepath);
+            // SECURITY: Use lstat instead of stat to detect symlinks
+            const stat = await fs.lstat(filepath);
+
+            // Skip symlinks to prevent following malicious links
+            if (stat.isSymbolicLink()) {
+              logger.warn('Skipping symlink during cleanup', { filepath });
+              return;
+            }
+
             const fileAge = now - stat.mtimeMs;
 
             if (fileAge > maxAge) {
