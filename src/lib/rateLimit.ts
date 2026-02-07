@@ -78,6 +78,7 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   upload: { maxRequests: 10, windowMs: 60 * 1000 }, // 10 uploads per minute
   process: { maxRequests: 5, windowMs: 60 * 1000 }, // 5 processing requests per minute
   googleDrive: { maxRequests: 20, windowMs: 60 * 1000 }, // 20 Google Drive operations per minute
+  webhook: { maxRequests: 30, windowMs: 60 * 1000 }, // 30 webhook calls per minute per IP
   default: { maxRequests: 100, windowMs: 60 * 1000 }, // 100 requests per minute for other endpoints
 };
 

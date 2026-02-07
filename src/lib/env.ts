@@ -42,6 +42,9 @@ const ENV_VARS: EnvVar[] = [
 
   // App config
   { name: 'NEXT_PUBLIC_APP_URL', required: false, description: 'Public URL of the application' },
+
+  // Signup security (optional)
+  { name: 'SIGNUP_ALLOWLIST', required: false, description: 'Comma-separated emails/domains allowed to sign up (e.g. "user@example.com,@mycompany.com"). Leave empty for open registration.' },
 ];
 
 export interface EnvValidationResult {
