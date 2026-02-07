@@ -4,6 +4,7 @@ import { getOrCreateUser, getUserUsage } from '@/lib/user'
 import { PLANS } from '@/lib/plans'
 import { getEnabledFeatures } from '@/lib/featureFlags'
 import VideoProcessor from './VideoProcessor'
+import WelcomeOverlay from '@/components/WelcomeOverlay'
 // Google Drive disabled - will be enabled later
 // import DriveSettings from '@/components/DriveSettings'
 import Link from 'next/link'
@@ -57,8 +58,11 @@ export default async function DashboardPage() {
     ? (usage.videosUsed / usage.planDetails.videosPerMonth) * 100
     : 0
 
+  const isNewUser = !usage.hasCompletedOnboarding && usage.recentVideos.length === 0
+
   return (
     <div className="min-h-screen bg-[#0F0F14]">
+      <WelcomeOverlay isNewUser={isNewUser} />
       {/* Header */}
       <header className="border-b border-gray-800">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">

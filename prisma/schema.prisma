@@ -17,6 +17,7 @@ model User {
   stripeSubscriptionId String?
   videosThisMonth Int       @default(0)
   resetDate       DateTime  @default(now())
+  hasCompletedOnboarding Boolean @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   videos          Video[]

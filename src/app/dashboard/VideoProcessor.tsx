@@ -956,6 +956,23 @@ export default function VideoProcessor({
             showAutoProcessOption={true}
           />
 
+          {/* Empty-state guidance for new users */}
+          {videoQueue.length === 0 && (
+            <div className="text-center py-2">
+              <p className="text-gray-400 text-sm">
+                Upload a video to get started — we&apos;ll remove the silence automatically.
+              </p>
+              <a
+                href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+              >
+                Need help? Watch tutorials
+              </a>
+            </div>
+          )}
+
           {/* Duplicate upload warning */}
           {uploadError && (
             <div className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-400 text-sm flex items-center justify-between">
