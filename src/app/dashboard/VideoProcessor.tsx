@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import VideoUploader, { UploadedFile } from '@/components/VideoUploader'
 import ProcessingOptions, { ProcessingConfig } from '@/components/ProcessingOptions'
 import VideoQueue, { QueuedVideo } from '@/components/VideoQueue'
@@ -91,6 +91,61 @@ export default function VideoProcessor({
   // Cached user preferences for auto-process — fetched on mount so handleUploadComplete
   // doesn't need a blocking network request after uploads finish
   const cachedPreferencesRef = useRef<Record<string, unknown> | null>(null)
+
+  // Progress polling interval ref
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Poll processing progress for videos that are currently being processed
+  const pollProgress = useCallback(async () => {
+    setVideoQueue((prev: QueuedVideo[]) => {
+      const processing = prev.filter((v: QueuedVideo) => v.status === 'processing')
+      if (processing.length === 0) return prev
+
+      // Fire off progress fetches for each processing video (non-blocking)
+      for (const video of processing) {
+        fetch(`/api/process/progress?fileId=${video.file.fileId}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data?.progress) {
+              setVideoQueue((current: QueuedVideo[]) =>
+                current.map((v: QueuedVideo) =>
+                  v.file.fileId === video.file.fileId && v.status === 'processing'
+                    ? { ...v, progress: data.progress }
+                    : v
+                )
+              )
+            }
+          })
+          .catch(() => {
+            // Ignore polling errors - progress display is best-effort
+          })
+      }
+
+      return prev // No immediate update; fetches update state asynchronously
+    })
+  }, [])
+
+  // Start/stop polling when processing state changes
+  useEffect(() => {
+    if (isProcessing) {
+      // Poll every 2 seconds while processing
+      progressIntervalRef.current = setInterval(pollProgress, 2000)
+      // Also poll immediately
+      pollProgress()
+    } else {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current)
+        progressIntervalRef.current = null
+      }
+    }
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current)
+        progressIntervalRef.current = null
+      }
+    }
+  }, [isProcessing, pollProgress])
 
   // Version counter for localStorage sync
   const queueVersionRef = useRef(0)
@@ -469,6 +524,7 @@ export default function VideoProcessor({
         ...video,
         status: 'complete',
         error: undefined, // Clear any previous error on success
+        progress: undefined, // Clear progress on completion
         downloadUrl: data.downloadUrl,
         outputFilename: data.outputFilename,
         completedAt: Date.now(), // Track completion time for stale detection
@@ -477,6 +533,7 @@ export default function VideoProcessor({
       return {
         ...video,
         status: 'error',
+        progress: undefined, // Clear progress on error
         error: err instanceof Error ? err.message : 'Processing failed',
       }
     }
@@ -953,12 +1010,37 @@ export default function VideoProcessor({
             <div className="animate-spin h-6 w-6 sm:h-8 sm:w-8 border-4 border-blue-500 border-t-transparent rounded-full flex-shrink-0" />
             <div className="min-w-0">
               <p className="text-white font-medium text-sm sm:text-base">Processing videos...</p>
-              <p className="text-gray-400 text-xs sm:text-sm truncate">{processingStatus || 'This may take a few minutes'}</p>
+              <p className="text-gray-400 text-xs sm:text-sm truncate">{processingStatus || 'Starting...'}</p>
             </div>
           </div>
-          <div className="mt-3 sm:mt-4 text-xs text-gray-500 overflow-x-auto">
-            <p className="whitespace-nowrap sm:whitespace-normal">Silence removal → Audio → Transcription → Captions → Final output</p>
-          </div>
+          {/* Per-video progress indicators */}
+          {(() => {
+            const processingVideos = videoQueue.filter((v: QueuedVideo) => v.status === 'processing' && v.progress)
+            if (processingVideos.length === 0) return null
+            return (
+              <div className="mt-3 sm:mt-4 space-y-2">
+                {processingVideos.map(v => (
+                  <div key={v.file.fileId} className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-400 truncate mr-2">{v.file.originalName}</span>
+                        <span className="text-blue-400 flex-shrink-0">
+                          {v.progress!.step}/{v.progress!.totalSteps}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-1.5">
+                        <div
+                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                          style={{ width: `${(v.progress!.step / v.progress!.totalSteps) * 100}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{v.progress!.stepLabel}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       )}
 

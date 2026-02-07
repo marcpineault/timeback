@@ -832,7 +832,7 @@ export async function removeSilence(
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '28',
-          '-threads', '2',  // Limit threads to reduce memory pressure
+          '-threads', '4',  // Balance speed vs memory pressure
           '-max_muxing_queue_size', '512',  // Limit muxing buffer
           '-bufsize', '1M',  // Limit rate control buffer
           '-c:a', 'aac',
@@ -927,7 +927,7 @@ export async function burnCaptions(
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '28',
-          '-threads', '2',
+          '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
           '-c:a', 'copy',
@@ -1114,7 +1114,7 @@ export async function addHeadline(
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '28',
-          '-threads', '2',
+          '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
           '-c:a', 'copy',
@@ -1335,7 +1335,7 @@ async function overlayAnimationOnVideo(
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-crf', '28',
-    '-threads', '2',
+    '-threads', '4',
     '-c:a', 'copy',
     '-shortest',
     outputPath
@@ -1494,7 +1494,7 @@ export async function convertAspectRatio(
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '28',
-          '-threads', '2',
+          '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-c:a', 'copy',
         ])
@@ -1648,7 +1648,7 @@ export async function applyCombinedFilters(
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '28',
-          '-threads', '2',
+          '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
           '-c:a', 'copy',

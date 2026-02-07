@@ -388,7 +388,7 @@ export function getMemoryEfficientOptions(): string[] {
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-crf', '28',
-    '-threads', '2',           // Limit CPU threads
+    '-threads', '4',           // Balance speed vs memory
     '-max_muxing_queue_size', '512',  // Limit muxing buffer
     '-bufsize', '1M',          // Limit rate control buffer
   ];
