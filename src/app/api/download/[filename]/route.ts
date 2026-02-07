@@ -289,9 +289,9 @@ export async function GET(
     });
   } catch (error) {
     console.error('Download error:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    // SECURITY: Do not expose internal error details to the client
     return NextResponse.json(
-      { error: 'Failed to download file', details: message },
+      { error: 'Failed to download file' },
       { status: 500 }
     );
   }

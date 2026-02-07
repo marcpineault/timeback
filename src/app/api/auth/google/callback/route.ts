@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { exchangeCodeForTokens, saveGoogleTokens } from '@/lib/google-drive';
 import { prisma } from '@/lib/db';
 
-/**
- * Validate that a string is a valid UUID v4 format
- */
-function isValidUUID(str: string): boolean {
-  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  // Also accept cuid format used by Prisma
-  const cuidRegex = /^c[a-z0-9]{24}$/i;
-  return uuidV4Regex.test(str) || cuidRegex.test(str);
-}
-
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY: Verify the authenticated user matches the state parameter
+    // to prevent CSRF / account takeover attacks
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.redirect(
+        new URL('/sign-in', request.url)
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state'); // This is the user ID
@@ -32,32 +32,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Validate state is a valid user ID format to prevent injection attacks
-    if (!isValidUUID(state)) {
-      console.error('Invalid state parameter format:', state);
-      return NextResponse.redirect(
-        new URL('/dashboard?google_error=invalid_state', request.url)
-      );
-    }
-
-    // Verify the user exists before saving tokens
-    const userExists = await prisma.user.findUnique({
-      where: { id: state },
+    // Look up the authenticated user's database record
+    const authenticatedUser = await prisma.user.findUnique({
+      where: { clerkId },
       select: { id: true },
     });
 
-    if (!userExists) {
-      console.error('User not found for state:', state);
+    if (!authenticatedUser) {
+      console.error('Authenticated user not found in database:', clerkId);
       return NextResponse.redirect(
         new URL('/dashboard?google_error=user_not_found', request.url)
+      );
+    }
+
+    // SECURITY: Verify the state parameter matches the authenticated user's ID
+    // This prevents an attacker from substituting a victim's user ID in the state
+    if (state !== authenticatedUser.id) {
+      console.error('OAuth state mismatch: state does not match authenticated user', {
+        stateUserId: state,
+        authenticatedUserId: authenticatedUser.id,
+      });
+      return NextResponse.redirect(
+        new URL('/dashboard?google_error=invalid_state', request.url)
       );
     }
 
     // Exchange code for tokens
     const tokens = await exchangeCodeForTokens(code);
 
-    // Save tokens for the user (now validated)
-    await saveGoogleTokens(state, tokens);
+    // Save tokens for the authenticated user
+    await saveGoogleTokens(authenticatedUser.id, tokens);
 
     // Redirect back to dashboard with success message
     return NextResponse.redirect(

@@ -31,22 +31,17 @@ export async function GET() {
     if (!user || !user.googleDriveAccessToken) {
       return NextResponse.json({
         connected: false,
-        accessToken: null,
       });
     }
 
-    // Check if token is expired and needs refresh
+    // Proactively refresh token if expired so connection status is accurate
     const tokenExpiry = user.googleDriveTokenExpiry;
     const isExpired = tokenExpiry && tokenExpiry < new Date(Date.now() + 5 * 60 * 1000);
-
-    let accessToken = user.googleDriveAccessToken;
 
     if (isExpired && user.googleDriveRefreshToken) {
       try {
         const newCredentials = await refreshAccessToken(user.googleDriveRefreshToken);
         if (newCredentials.access_token) {
-          accessToken = newCredentials.access_token;
-          // Update tokens in database
           await prisma.user.update({
             where: { clerkId },
             data: {
@@ -62,15 +57,15 @@ export async function GET() {
         console.error('[Google Drive] Token refresh failed:', refreshError);
         return NextResponse.json({
           connected: false,
-          accessToken: null,
           needsReconnect: true,
         });
       }
     }
 
+    // SECURITY: Do not expose the raw access token to the client.
+    // The client only needs to know if the connection is active.
     return NextResponse.json({
       connected: true,
-      accessToken,
     });
   } catch (error) {
     console.error('[Google Drive] Token fetch error:', error);

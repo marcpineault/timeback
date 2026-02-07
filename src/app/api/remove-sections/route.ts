@@ -21,6 +21,16 @@ interface Section {
  */
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Check authentication before parsing body to avoid
+    // consuming server resources for unauthenticated requests
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { filename, sectionsToRemove } = body;
 
@@ -72,15 +82,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-    }
-
-    // Check authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
     }
 
     // Sanitize filename - prevent path traversal

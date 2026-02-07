@@ -84,6 +84,34 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
 
+    // SECURITY: Validate input types before passing to Prisma
+    const booleanFields = [
+      'autoProcessOnUpload', 'generateCaptions', 'useHookAsHeadline',
+      'generateAIHeadline', 'autoSilenceThreshold', 'normalizeAudio',
+      'speechCorrection', 'generateBRoll',
+    ] as const;
+    const stringFields = [
+      'activePreset', 'captionStyle', 'headline', 'headlinePosition',
+      'headlineStyle', 'aspectRatio',
+    ] as const;
+    const numberFields = ['silenceThreshold', 'silenceDuration'] as const;
+
+    for (const field of booleanFields) {
+      if (body[field] !== undefined && typeof body[field] !== 'boolean') {
+        return NextResponse.json({ error: `${field} must be a boolean` }, { status: 400 });
+      }
+    }
+    for (const field of stringFields) {
+      if (body[field] !== undefined && typeof body[field] !== 'string') {
+        return NextResponse.json({ error: `${field} must be a string` }, { status: 400 });
+      }
+    }
+    for (const field of numberFields) {
+      if (body[field] !== undefined && (typeof body[field] !== 'number' || !Number.isFinite(body[field]))) {
+        return NextResponse.json({ error: `${field} must be a finite number` }, { status: 400 });
+      }
+    }
+
     // Only include fields that were actually sent in the request
     const updateData: Record<string, unknown> = {};
     if (body.autoProcessOnUpload !== undefined) updateData.autoProcessOnUpload = body.autoProcessOnUpload;
