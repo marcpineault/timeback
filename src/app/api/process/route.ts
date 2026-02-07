@@ -14,6 +14,7 @@ import { isS3Configured, getS3ObjectStream, deleteS3Object, uploadProcessedVideo
 import { logger } from '@/lib/logger';
 import { checkRateLimit, rateLimitResponse, getRateLimitIdentifier } from '@/lib/rateLimit';
 import { acquireFileLock, releaseFileLock } from '@/lib/fileLock';
+import { setProgress, clearProgress } from '@/lib/progressStore';
 
 // Allow up to 10 minutes for video processing (transcription, silence removal, etc.)
 export const maxDuration = 600;
@@ -29,11 +30,13 @@ export async function POST(request: NextRequest) {
   let inputFilePath: string | null = null;
   // Track whether file was downloaded from S3 (for cleanup decisions)
   let downloadedFromS3 = false;
+  // Track fileId for progress cleanup in error handler
+  let fileId: string | null = null;
 
   try {
     const body = await request.json();
+    fileId = body.fileId || null;
     const {
-      fileId,
       filename,
       originalName,  // Original filename for display in dashboard
       s3Key,  // S3 key if file was uploaded to S3
@@ -280,6 +283,27 @@ export async function POST(request: NextRequest) {
     const needsTranscription = generateCaptions || useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll || speechCorrection;
     const needsEarlyTranscription = useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll; // These can use original video transcription
 
+    // Determine the headline we'll use (before step counting so we know if we need captions+headline)
+    // Note: AI headline text will be determined later, but we know if we need the step
+    const willHaveHeadline = headline || useHookAsHeadline || shouldGenerateAIHeadline;
+
+    // Calculate total processing steps for progress reporting
+    let totalSteps = 1; // Step 1: Silence removal (always)
+    if (shouldNormalizeAudio) totalSteps++;
+    if (needsTranscription) totalSteps++; // Transcription
+    if (speechCorrection) totalSteps++; // Speech correction
+    // Captions and headline are now combined into a single step when both are present
+    if (generateCaptions || willHaveHeadline) totalSteps++; // Captions/Headline (combined pass)
+    if (aspectRatio && aspectRatio !== 'original') totalSteps++; // Aspect ratio
+
+    let currentStep = 0;
+    const reportProgress = (label: string) => {
+      currentStep++;
+      if (fileId) {
+        setProgress(fileId, { step: currentStep, totalSteps, stepLabel: label });
+      }
+    };
+
     // OPTIMIZATION: Run silence removal and early transcription in parallel
     // Hook extraction and B-roll identification don't need exact timestamps from silence-removed video
     let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[] }> | null = null;
@@ -294,6 +318,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Remove silence (runs in parallel with early transcription if applicable)
+    reportProgress('Removing silence...');
     logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     intermediateFiles.push(stepOutput); // Track for cleanup on error
@@ -308,6 +333,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1.5: Normalize audio levels if enabled
     if (shouldNormalizeAudio) {
+      reportProgress('Normalizing audio...');
       logger.info('Step 1.5: Normalizing audio levels');
       stepOutput = path.join(processedDir, `${baseName}_normalized.mp4`);
       intermediateFiles.push(stepOutput); // Track for cleanup on error
@@ -337,6 +363,8 @@ export async function POST(request: NextRequest) {
     let transcriptionWords: TranscriptionWord[] = [];
 
     if (needsTranscription) {
+      reportProgress('Transcribing audio...');
+
       // Use early transcription for hook extraction if available
       // Always extract hook for filename, even if not displaying it
       if (earlyTranscription) {
@@ -406,6 +434,7 @@ export async function POST(request: NextRequest) {
 
       // Step 2.5: Apply AI Speech Correction if enabled
       if (speechCorrection && transcriptionWords.length > 0) {
+        reportProgress('Correcting speech...');
         logger.info('Step 2.5: Applying AI speech correction');
 
         // Parse speech correction config
@@ -464,12 +493,35 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Step 3: Burn captions if enabled
-      if (generateCaptions && srtPath) {
-        logger.info('Step 3: Burning captions');
-        stepOutput = path.join(processedDir, `${baseName}_captioned.mp4`);
-        intermediateFiles.push(stepOutput); // Track for cleanup on error
-        await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
+      // Clean up SRT file reference (actual deletion handled after combined pass)
+    }
+
+    // Priority: AI headline > Hook from video > Manual headline
+    const finalHeadline = shouldGenerateAIHeadline ? aiHeadlineText : (useHookAsHeadline ? hookText : options.headline);
+
+    // Step 3+4 COMBINED: Apply captions and/or headline in a single FFmpeg pass
+    // This avoids two separate re-encodes and significantly speeds up processing
+    const hasCaptions = generateCaptions && srtPath;
+    const hasHeadline = !!finalHeadline;
+
+    if (hasCaptions || hasHeadline) {
+      const parts: string[] = [];
+      if (hasCaptions) parts.push('captions');
+      if (hasHeadline) parts.push('headline');
+      reportProgress(`Adding ${parts.join(' & ')}...`);
+      logger.info(`Combined pass: Adding ${parts.join(' + ')}`, { headline: finalHeadline || 'none' });
+
+      stepOutput = path.join(processedDir, `${baseName}_filtered.mp4`);
+      intermediateFiles.push(stepOutput);
+
+      try {
+        await applyCombinedFilters(currentInput, stepOutput, {
+          srtPath: hasCaptions ? srtPath : undefined,
+          headline: hasHeadline ? finalHeadline : undefined,
+          headlinePosition: options.headlinePosition,
+          headlineStyle: options.headlineStyle,
+          captionStyle: options.captionStyle,
+        });
         // Clean up intermediate file (and remove from tracking)
         if (currentInput !== inputPath) {
           await fs.unlink(currentInput).catch(() => {});
@@ -477,16 +529,17 @@ export async function POST(request: NextRequest) {
           if (idx > -1) intermediateFiles.splice(idx, 1);
         }
         currentInput = stepOutput;
-      }
-
-      // Clean up SRT file
-      if (srtPath && existsSync(srtPath)) {
-        await fs.unlink(srtPath).catch(() => {});
+      } catch (combinedErr) {
+        logger.error('Combined captions/headline pass failed, continuing without', { error: String(combinedErr) });
+        const idx = intermediateFiles.indexOf(stepOutput);
+        if (idx > -1) intermediateFiles.splice(idx, 1);
       }
     }
 
-    // Priority: AI headline > Hook from video > Manual headline
-    const finalHeadline = shouldGenerateAIHeadline ? aiHeadlineText : (useHookAsHeadline ? hookText : options.headline);
+    // Clean up SRT file
+    if (srtPath && existsSync(srtPath)) {
+      await fs.unlink(srtPath).catch(() => {});
+    }
 
     // Step 3.5: AI B-Roll - TEMPORARILY DISABLED
     // TODO: Re-enable once animation generation is stable
@@ -524,31 +577,9 @@ export async function POST(request: NextRequest) {
     }
     */
 
-    // Step 4: Add headline if provided or using hook
-    // Wrapped in try-catch so headline failures don't crash the entire pipeline
-    if (finalHeadline) {
-      logger.info('Step 4: Adding headline', { headline: finalHeadline });
-      stepOutput = path.join(processedDir, `${baseName}_final.mp4`);
-      intermediateFiles.push(stepOutput); // Track for cleanup on error
-      try {
-        await addHeadline(currentInput, stepOutput, finalHeadline, options.headlinePosition, captionStyle, options.headlineStyle);
-        // Clean up intermediate file (and remove from tracking)
-        if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {});
-          const idx = intermediateFiles.indexOf(currentInput);
-          if (idx > -1) intermediateFiles.splice(idx, 1);
-        }
-        currentInput = stepOutput;
-      } catch (headlineErr) {
-        logger.error('Step 4: Headline failed, continuing without headline', { error: String(headlineErr) });
-        // Remove the failed output from tracking since it wasn't created
-        const idx = intermediateFiles.indexOf(stepOutput);
-        if (idx > -1) intermediateFiles.splice(idx, 1);
-      }
-    }
-
     // Step 5: Convert aspect ratio if specified
     if (aspectRatio && aspectRatio !== 'original') {
+      reportProgress('Converting aspect ratio...');
       logger.info('Step 5: Converting aspect ratio', { aspectRatio });
       stepOutput = path.join(processedDir, `${baseName}_aspect.mp4`);
       intermediateFiles.push(stepOutput); // Track for cleanup on error
@@ -647,6 +678,9 @@ export async function POST(request: NextRequest) {
     releaseFileLock(inputPath);
     logger.debug('Released file lock after successful processing', { inputPath });
 
+    // Clear progress tracking on completion
+    if (fileId) clearProgress(fileId);
+
     logger.info('Processing complete', { outputFilename, processedUrl, videoId: videoRecordId });
     return NextResponse.json({
       success: true,
@@ -658,6 +692,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Processing error', { error: errorMessage, videoId: videoRecordId });
+
+    // Clear progress tracking on error
+    if (fileId) clearProgress(fileId);
 
     // Release file lock if one was acquired
     if (lockedFilePath) {

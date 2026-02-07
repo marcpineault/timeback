@@ -12,6 +12,12 @@ export interface QueuedVideo {
   outputFilename?: string;
   /** Timestamp when video was completed (for detecting stale entries) */
   completedAt?: number;
+  /** Current processing progress (only set while status === 'processing') */
+  progress?: {
+    step: number;
+    totalSteps: number;
+    stepLabel: string;
+  };
 }
 
 interface VideoQueueProps {
@@ -196,15 +202,17 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const getStatusBadge = (status: QueuedVideo['status']) => {
-    switch (status) {
+  const getStatusBadge = (video: QueuedVideo) => {
+    switch (video.status) {
       case 'pending':
         return <span className="px-2 py-0.5 text-xs rounded-full bg-gray-600 text-gray-300">Pending</span>;
       case 'processing':
         return (
           <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400 flex items-center gap-1">
             <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            Processing
+            {video.progress
+              ? `Step ${video.progress.step}/${video.progress.totalSteps}`
+              : 'Processing'}
           </span>
         );
       case 'complete':
@@ -277,14 +285,17 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
               <p className="text-xs sm:text-sm text-white truncate">{video.file.originalName}</p>
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <span>{formatFileSize(video.file.size)}</span>
-                <span className="sm:hidden">{getStatusBadge(video.status)}</span>
+                <span className="sm:hidden">{getStatusBadge(video)}</span>
               </div>
+              {video.status === 'processing' && video.progress && (
+                <p className="text-xs text-blue-400 truncate">{video.progress.stepLabel}</p>
+              )}
               {video.error && <p className="text-xs text-red-400 truncate">{video.error}</p>}
             </div>
 
             {/* Status - hidden on mobile (shown inline above) */}
             <div className="hidden sm:flex items-center gap-3">
-              {getStatusBadge(video.status)}
+              {getStatusBadge(video)}
             </div>
 
             {/* Actions */}
