@@ -58,6 +58,15 @@ export default async function PricingPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-8 sm:py-16">
         <div className="text-center mb-8 sm:mb-12">
+          {/* Promotion Banner */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 sm:mb-6 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-full">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <span className="text-amber-400 text-sm sm:text-base font-semibold">50% OFF all plans — This week only!</span>
+          </div>
+
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-3 sm:mb-4">Simple, Transparent Pricing</h1>
           <p className="text-gray-400 text-base sm:text-lg">Start free. Upgrade when you need more.</p>
           <p className="text-green-400 text-sm sm:text-base mt-2 flex items-center justify-center gap-2">
@@ -121,9 +130,13 @@ export default async function PricingPage() {
                 Current Plan
               </span>
             )}
-            <h3 className="text-xl font-semibold text-white mb-2">{PLANS.PRO.name}</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-xl font-semibold text-white">{PLANS.PRO.name}</h3>
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-bold rounded-full">50% OFF</span>
+            </div>
             <div className="mb-4">
-              <span className="text-4xl font-bold text-white">${PLANS.PRO.price}</span>
+              <span className="text-lg text-gray-500 line-through mr-2">${PLANS.PRO.price}</span>
+              <span className="text-4xl font-bold text-white">${(PLANS.PRO.price / 2).toFixed(2).replace(/\.00$/, '')}</span>
               <span className="text-gray-400">/month</span>
             </div>
             <ul className="space-y-3 mb-6">
@@ -169,9 +182,13 @@ export default async function PricingPage() {
                 Current Plan
               </span>
             )}
-            <h3 className="text-xl font-semibold text-white mb-2">{PLANS.CREATOR.name}</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-xl font-semibold text-white">{PLANS.CREATOR.name}</h3>
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-bold rounded-full">50% OFF</span>
+            </div>
             <div className="mb-4">
-              <span className="text-4xl font-bold text-white">${PLANS.CREATOR.price}</span>
+              <span className="text-lg text-gray-500 line-through mr-2">${PLANS.CREATOR.price}</span>
+              <span className="text-4xl font-bold text-white">${(PLANS.CREATOR.price / 2).toFixed(2).replace(/\.00$/, '')}</span>
               <span className="text-gray-400">/month</span>
             </div>
             <ul className="space-y-3 mb-6">
@@ -217,7 +234,10 @@ export default async function PricingPage() {
                 Current Plan
               </span>
             )}
-            <h3 className="text-xl font-semibold text-white mb-2">{PLANS.ENTERPRISE.name}</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-xl font-semibold text-white">{PLANS.ENTERPRISE.name}</h3>
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-bold rounded-full">50% OFF</span>
+            </div>
             <div className="mb-4">
               <span className="text-4xl font-bold text-white">Custom</span>
             </div>
