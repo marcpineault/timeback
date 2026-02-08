@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { GoogleAnalytics } from "@/components/Analytics";
+import { FacebookPixel } from "@/components/FacebookPixel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 
@@ -27,6 +28,7 @@ export default function RootLayout({
       <html lang="en">
         <body className="font-sans antialiased">
           <GoogleAnalytics />
+          <FacebookPixel />
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
