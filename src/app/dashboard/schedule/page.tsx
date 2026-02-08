@@ -1,0 +1,59 @@
+import { redirect } from 'next/navigation'
+import { getOrCreateUser } from '@/lib/user'
+import { getEnabledFeatures } from '@/lib/featureFlags'
+import Link from 'next/link'
+import { UserButton } from '@clerk/nextjs'
+import ScheduleDashboard from './ScheduleDashboard'
+
+export default async function SchedulePage() {
+  const user = await getOrCreateUser()
+
+  if (!user) {
+    redirect('/sign-in')
+  }
+
+  const features = getEnabledFeatures(user.email)
+
+  if (!features.instagramScheduling) {
+    redirect('/dashboard')
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0F0F14]">
+      {/* Header */}
+      <header className="border-b border-gray-800">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <img src="/logo.svg" alt="TimeBack" className="w-8 h-8" />
+            <span className="text-xl font-bold text-white">TimeBack</span>
+          </Link>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              href="/dashboard"
+              className="text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              Editor
+            </Link>
+            <Link
+              href="/dashboard/schedule"
+              className="text-white font-medium text-sm"
+            >
+              Schedule
+            </Link>
+            <Link
+              href="/account/subscription"
+              className="text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              Subscription
+            </Link>
+            <UserButton afterSignOutUrl="/" />
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <ScheduleDashboard />
+      </div>
+    </div>
+  )
+}

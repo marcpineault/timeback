@@ -73,6 +73,14 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Google Drive disabled - will be enabled later */}
             {/* <DriveSettings /> */}
+            {getEnabledFeatures(user.email).instagramScheduling && (
+              <Link
+                href="/dashboard/schedule"
+                className="text-gray-400 hover:text-white transition-colors text-sm"
+              >
+                Schedule
+              </Link>
+            )}
             <a
               href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
               target="_blank"

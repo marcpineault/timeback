@@ -9,6 +9,8 @@ const isPublicRoute = createRouteMatcher([
   '/api/webhooks(.*)',
   '/api/upload', // Upload route handles its own auth after parsing body
   '/api/health', // Health check endpoint for monitoring
+  '/api/instagram/callback', // Instagram OAuth callback
+  '/api/cron(.*)', // Cron endpoints (auth via CRON_SECRET header)
 ])
 
 export default clerkMiddleware(async (auth, request) => {
