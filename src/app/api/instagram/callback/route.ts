@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { exchangeCodeForLongLivedToken, discoverInstagramAccounts } from '@/lib/instagram';
 
+function redirectToSchedule(path: string): NextResponse {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://timebackvideo.com';
+  return NextResponse.redirect(`${baseUrl}${path}`);
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,15 +15,11 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error');
 
     if (error) {
-      return NextResponse.redirect(
-        new URL(`/dashboard/schedule?error=${encodeURIComponent(error)}`, request.url)
-      );
+      return redirectToSchedule(`/dashboard/schedule?error=${encodeURIComponent(error)}`);
     }
 
     if (!code || !state) {
-      return NextResponse.redirect(
-        new URL('/dashboard/schedule?error=missing_params', request.url)
-      );
+      return redirectToSchedule('/dashboard/schedule?error=missing_params');
     }
 
     // Decode state to get clerkId
@@ -26,9 +27,7 @@ export async function GET(request: NextRequest) {
     try {
       statePayload = JSON.parse(Buffer.from(state, 'base64url').toString());
     } catch {
-      return NextResponse.redirect(
-        new URL('/dashboard/schedule?error=invalid_state', request.url)
-      );
+      return redirectToSchedule('/dashboard/schedule?error=invalid_state');
     }
 
     // Find user by clerkId
@@ -37,9 +36,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.redirect(
-        new URL('/dashboard/schedule?error=user_not_found', request.url)
-      );
+      return redirectToSchedule('/dashboard/schedule?error=user_not_found');
     }
 
     // Exchange code for long-lived token
@@ -49,9 +46,7 @@ export async function GET(request: NextRequest) {
     const igAccounts = await discoverInstagramAccounts(accessToken);
 
     if (igAccounts.length === 0) {
-      return NextResponse.redirect(
-        new URL('/dashboard/schedule?error=no_instagram_business_account', request.url)
-      );
+      return redirectToSchedule('/dashboard/schedule?error=no_instagram_business_account');
     }
 
     // Store each discovered account (upsert to handle reconnections)
@@ -81,13 +76,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.redirect(
-      new URL('/dashboard/schedule?connected=true', request.url)
-    );
+    return redirectToSchedule('/dashboard/schedule?connected=true');
   } catch (error) {
     console.error('Instagram callback error:', error);
-    return NextResponse.redirect(
-      new URL('/dashboard/schedule?error=connection_failed', request.url)
-    );
+    return redirectToSchedule('/dashboard/schedule?error=connection_failed');
   }
 }
