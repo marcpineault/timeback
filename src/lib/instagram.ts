@@ -38,8 +38,6 @@ export function getInstagramAuthUrl(state: string): string {
   const scopes = [
     'instagram_basic',
     'instagram_content_publish',
-    'pages_show_list',
-    'pages_read_engagement',
   ].join(',');
 
   const params = new URLSearchParams({
