@@ -10,6 +10,8 @@ export interface QueuedVideo {
   error?: string;
   downloadUrl?: string;
   outputFilename?: string;
+  /** Database Video record ID (returned from /api/process) */
+  videoId?: string;
   /** Timestamp when video was completed (for detecting stale entries) */
   completedAt?: number;
   /** Current processing progress (only set while status === 'processing') */
