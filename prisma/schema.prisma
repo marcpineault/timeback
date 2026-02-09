@@ -23,6 +23,13 @@ model User {
   videos          Video[]
   processingPreferences UserProcessingPreferences?
 
+  // Instagram scheduling
+  instagramAccounts   InstagramAccount[]
+  scheduledPosts      ScheduledPost[]
+  scheduleSlots       ScheduleSlot[]
+  captionPreferences  CaptionPreferences?
+  notifications       Notification[]
+
   // Google Drive integration
   googleDriveAccessToken  String?
   googleDriveRefreshToken String?
@@ -91,6 +98,8 @@ model Video {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
+  scheduledPosts  ScheduledPost[]
+
   // Indexes for query performance
   @@index([userId])           // Speed up user's video listing
   @@index([processedUrl])     // Speed up download ownership check
@@ -108,4 +117,140 @@ enum VideoStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+// ─── Instagram Scheduling ───────────────────────────────────────────
+
+model InstagramAccount {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  instagramUserId       String   @unique
+  instagramUsername      String
+  instagramProfilePic   String?
+
+  facebookPageId        String
+  facebookPageName      String?
+
+  accessToken           String
+  tokenExpiresAt        DateTime
+
+  isActive              Boolean  @default(true)
+  lastPublishedAt       DateTime?
+  lastError             String?
+
+  scheduledPosts        ScheduledPost[]
+  scheduleSlots         ScheduleSlot[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model ScheduleSlot {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  instagramAccountId    String
+  instagramAccount      InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+
+  dayOfWeek             Int      // 0=Sunday ... 6=Saturday
+  timeOfDay             String   // "09:00" 24h format
+  timezone              String   // e.g. "America/New_York"
+
+  isActive              Boolean  @default(true)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([instagramAccountId, dayOfWeek, timeOfDay])
+  @@index([userId])
+  @@index([instagramAccountId])
+}
+
+model ScheduledPost {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  instagramAccountId    String
+  instagramAccount      InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+
+  videoId               String
+  video                 Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  caption               String
+  captionGenerated      Boolean  @default(true)
+  hashtags              String[]
+  coverImageUrl         String?
+
+  scheduledFor          DateTime
+  publishedAt           DateTime?
+  status                PostStatus @default(QUEUED)
+
+  igContainerId         String?
+  igMediaId             String?
+  igPermalink           String?
+
+  retryCount            Int      @default(0)
+  lastError             String?
+  lastAttemptAt         DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+  @@index([instagramAccountId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([status, scheduledFor])
+}
+
+model CaptionPreferences {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  brandVoice            String   @default("casual")
+  niche                 String   @default("")
+  captionStyle          String   @default("hook-based")
+
+  hashtagCount          Int      @default(25)
+  customHashtags        String[]
+  blockedHashtags       String[]
+
+  defaultCTA            String   @default("")
+  includeCTA            Boolean  @default(true)
+
+  exampleCaptions       String[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+enum PostStatus {
+  QUEUED
+  SCHEDULED
+  PROCESSING_VIDEO
+  UPLOADING
+  PUBLISHED
+  FAILED
+  CANCELLED
 }

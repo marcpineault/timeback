@@ -11,6 +11,7 @@ import GoogleDriveImport from '@/components/GoogleDriveImport'
 
 interface EnabledFeatures {
   speechCorrection: boolean
+  instagramScheduling: boolean
 }
 
 // localStorage key for persisting video queue
@@ -33,7 +34,7 @@ export default function VideoProcessor({
   canProcess,
   videosRemaining: initialVideosRemaining,
   hasWatermark,
-  enabledFeatures = { speechCorrection: false },
+  enabledFeatures = { speechCorrection: false, instagramScheduling: false },
 }: VideoProcessorProps) {
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
   const [isProcessing, setIsProcessing] = useState(false)

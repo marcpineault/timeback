@@ -1,0 +1,378 @@
+/**
+ * Instagram Graph API Helper
+ *
+ * Handles OAuth, token management, and content publishing
+ * via the Instagram Graph API (Business/Creator accounts).
+ */
+
+import { prisma } from './db';
+import { logger } from './logger';
+
+const GRAPH_API_VERSION = 'v21.0';
+const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+
+// ─── Configuration ──────────────────────────────────────────────────
+
+export function getInstagramConfig() {
+  const appId = process.env.FACEBOOK_APP_ID;
+  const appSecret = process.env.FACEBOOK_APP_SECRET;
+  const redirectUri =
+    process.env.INSTAGRAM_REDIRECT_URI ||
+    `${process.env.NEXT_PUBLIC_APP_URL}/api/instagram/callback`;
+
+  if (!appId || !appSecret) {
+    throw new Error('Facebook App credentials not configured (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET)');
+  }
+
+  return { appId, appSecret, redirectUri };
+}
+
+// ─── OAuth ──────────────────────────────────────────────────────────
+
+/**
+ * Generate the Facebook OAuth URL for Instagram Business account connection.
+ */
+export function getInstagramAuthUrl(state: string): string {
+  const { appId, redirectUri } = getInstagramConfig();
+
+  const scopes = [
+    'instagram_basic',
+    'instagram_content_publish',
+    'pages_show_list',
+    'pages_read_engagement',
+  ].join(',');
+
+  const params = new URLSearchParams({
+    client_id: appId,
+    redirect_uri: redirectUri,
+    scope: scopes,
+    response_type: 'code',
+    state,
+  });
+
+  return `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?${params.toString()}`;
+}
+
+/**
+ * Exchange an OAuth authorization code for a short-lived token,
+ * then exchange that for a long-lived token (~60 days).
+ */
+export async function exchangeCodeForLongLivedToken(code: string): Promise<{
+  accessToken: string;
+  expiresIn: number;
+}> {
+  const { appId, appSecret, redirectUri } = getInstagramConfig();
+
+  // Step 1: Exchange code for short-lived token
+  const shortLivedRes = await fetch(
+    `${GRAPH_API_BASE}/oauth/access_token?` +
+      new URLSearchParams({
+        client_id: appId,
+        client_secret: appSecret,
+        redirect_uri: redirectUri,
+        code,
+      })
+  );
+
+  if (!shortLivedRes.ok) {
+    const err = await shortLivedRes.json();
+    logger.error('Failed to exchange code for short-lived token', err);
+    throw new Error(err.error?.message || 'Failed to exchange authorization code');
+  }
+
+  const shortLivedData = await shortLivedRes.json();
+
+  // Step 2: Exchange short-lived token for long-lived token
+  const longLivedRes = await fetch(
+    `${GRAPH_API_BASE}/oauth/access_token?` +
+      new URLSearchParams({
+        grant_type: 'fb_exchange_token',
+        client_id: appId,
+        client_secret: appSecret,
+        fb_exchange_token: shortLivedData.access_token,
+      })
+  );
+
+  if (!longLivedRes.ok) {
+    const err = await longLivedRes.json();
+    logger.error('Failed to exchange for long-lived token', err);
+    throw new Error(err.error?.message || 'Failed to get long-lived token');
+  }
+
+  const longLivedData = await longLivedRes.json();
+
+  return {
+    accessToken: longLivedData.access_token,
+    expiresIn: longLivedData.expires_in || 5184000, // Default 60 days
+  };
+}
+
+/**
+ * Refresh a long-lived token before it expires.
+ * Long-lived tokens can be refreshed once per day, as long as they haven't expired.
+ */
+export async function refreshLongLivedToken(currentToken: string): Promise<{
+  accessToken: string;
+  expiresIn: number;
+}> {
+  const { appId, appSecret } = getInstagramConfig();
+
+  const res = await fetch(
+    `${GRAPH_API_BASE}/oauth/access_token?` +
+      new URLSearchParams({
+        grant_type: 'fb_exchange_token',
+        client_id: appId,
+        client_secret: appSecret,
+        fb_exchange_token: currentToken,
+      })
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || 'Failed to refresh token');
+  }
+
+  const data = await res.json();
+  return {
+    accessToken: data.access_token,
+    expiresIn: data.expires_in || 5184000,
+  };
+}
+
+// ─── Account Discovery ──────────────────────────────────────────────
+
+interface FacebookPage {
+  id: string;
+  name: string;
+  access_token: string;
+}
+
+interface InstagramBusinessAccount {
+  instagramUserId: string;
+  instagramUsername: string;
+  instagramProfilePic: string | null;
+  facebookPageId: string;
+  facebookPageName: string;
+  pageAccessToken: string;
+}
+
+/**
+ * After OAuth, discover the user's Facebook Pages and their linked
+ * Instagram Business/Creator accounts.
+ */
+export async function discoverInstagramAccounts(
+  userAccessToken: string
+): Promise<InstagramBusinessAccount[]> {
+  // Get user's Facebook Pages
+  const pagesRes = await fetch(
+    `${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`
+  );
+
+  if (!pagesRes.ok) {
+    const err = await pagesRes.json();
+    throw new Error(err.error?.message || 'Failed to fetch Facebook Pages');
+  }
+
+  const pagesData = await pagesRes.json();
+  const pages: FacebookPage[] = pagesData.data || [];
+
+  const accounts: InstagramBusinessAccount[] = [];
+
+  for (const page of pages) {
+    // Check if this page has a linked Instagram Business account
+    const igRes = await fetch(
+      `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
+    );
+
+    if (!igRes.ok) continue;
+
+    const igData = await igRes.json();
+    const igAccountId = igData.instagram_business_account?.id;
+    if (!igAccountId) continue;
+
+    // Get Instagram account details
+    const profileRes = await fetch(
+      `${GRAPH_API_BASE}/${igAccountId}?fields=id,username,profile_picture_url&access_token=${page.access_token}`
+    );
+
+    if (!profileRes.ok) continue;
+
+    const profile = await profileRes.json();
+
+    accounts.push({
+      instagramUserId: profile.id,
+      instagramUsername: profile.username,
+      instagramProfilePic: profile.profile_picture_url || null,
+      facebookPageId: page.id,
+      facebookPageName: page.name,
+      pageAccessToken: page.access_token,
+    });
+  }
+
+  return accounts;
+}
+
+// ─── Content Publishing ─────────────────────────────────────────────
+
+interface PublishReelParams {
+  instagramUserId: string;
+  accessToken: string;
+  videoUrl: string;
+  caption: string;
+  coverUrl?: string;
+}
+
+interface PublishResult {
+  containerId: string;
+  mediaId: string;
+  permalink: string;
+}
+
+/**
+ * Publish a Reel to Instagram using the Content Publishing API.
+ *
+ * Flow:
+ * 1. Create media container with video URL
+ * 2. Poll until container is ready (FINISHED status)
+ * 3. Publish the container
+ */
+export async function publishReel(params: PublishReelParams): Promise<PublishResult> {
+  const { instagramUserId, accessToken, videoUrl, caption, coverUrl } = params;
+
+  // Step 1: Create media container
+  const containerBody: Record<string, string> = {
+    media_type: 'REELS',
+    video_url: videoUrl,
+    caption,
+    access_token: accessToken,
+  };
+
+  if (coverUrl) {
+    containerBody.cover_url = coverUrl;
+  }
+
+  const containerRes = await fetch(`${GRAPH_API_BASE}/${instagramUserId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(containerBody),
+  });
+
+  if (!containerRes.ok) {
+    const err = await containerRes.json();
+    throw new Error(`Failed to create media container: ${err.error?.message || JSON.stringify(err)}`);
+  }
+
+  const containerData = await containerRes.json();
+  const containerId = containerData.id;
+
+  // Step 2: Poll for container to be ready
+  const maxPollAttempts = 60; // 5 minutes at 5s intervals
+  const pollInterval = 5000;
+
+  for (let i = 0; i < maxPollAttempts; i++) {
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+    const statusRes = await fetch(
+      `${GRAPH_API_BASE}/${containerId}?fields=status_code,status&access_token=${accessToken}`
+    );
+
+    if (!statusRes.ok) continue;
+
+    const statusData = await statusRes.json();
+
+    if (statusData.status_code === 'FINISHED') {
+      break;
+    }
+
+    if (statusData.status_code === 'ERROR') {
+      throw new Error(`Media container failed: ${statusData.status || 'Unknown error'}`);
+    }
+
+    if (i === maxPollAttempts - 1) {
+      throw new Error('Media container timed out waiting for FINISHED status');
+    }
+  }
+
+  // Step 3: Publish the container
+  const publishRes = await fetch(`${GRAPH_API_BASE}/${instagramUserId}/media_publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      creation_id: containerId,
+      access_token: accessToken,
+    }),
+  });
+
+  if (!publishRes.ok) {
+    const err = await publishRes.json();
+    throw new Error(`Failed to publish: ${err.error?.message || JSON.stringify(err)}`);
+  }
+
+  const publishData = await publishRes.json();
+  const mediaId = publishData.id;
+
+  // Get permalink
+  let permalink = '';
+  try {
+    const mediaRes = await fetch(
+      `${GRAPH_API_BASE}/${mediaId}?fields=permalink&access_token=${accessToken}`
+    );
+    if (mediaRes.ok) {
+      const mediaData = await mediaRes.json();
+      permalink = mediaData.permalink || '';
+    }
+  } catch {
+    // Permalink is nice to have, not critical
+  }
+
+  return { containerId, mediaId, permalink };
+}
+
+// ─── Token Management ───────────────────────────────────────────────
+
+/**
+ * Get a valid access token for an Instagram account, refreshing if needed.
+ */
+export async function getValidToken(accountId: string): Promise<string> {
+  const account = await prisma.instagramAccount.findUnique({
+    where: { id: accountId },
+  });
+
+  if (!account) {
+    throw new Error('Instagram account not found');
+  }
+
+  if (!account.isActive) {
+    throw new Error('Instagram account is inactive');
+  }
+
+  // If token expires within 7 days, refresh it
+  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  if (account.tokenExpiresAt < sevenDaysFromNow) {
+    try {
+      const refreshed = await refreshLongLivedToken(account.accessToken);
+      await prisma.instagramAccount.update({
+        where: { id: accountId },
+        data: {
+          accessToken: refreshed.accessToken,
+          tokenExpiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
+        },
+      });
+      return refreshed.accessToken;
+    } catch (error) {
+      logger.error('Failed to refresh Instagram token', { accountId, error });
+      // If refresh fails but token hasn't expired yet, use the existing one
+      if (account.tokenExpiresAt > new Date()) {
+        return account.accessToken;
+      }
+      // Mark account as inactive
+      await prisma.instagramAccount.update({
+        where: { id: accountId },
+        data: { isActive: false, lastError: 'Token expired and refresh failed' },
+      });
+      throw new Error('Instagram token expired and could not be refreshed');
+    }
+  }
+
+  return account.accessToken;
+}
