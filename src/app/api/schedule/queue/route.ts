@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (autoGenerateCaption || !providedCaption) {
       try {
         const generated = await generateCaption({
-          transcript: video.originalName, // Fallback; ideally we'd store transcript
+          transcript: video.transcript || video.originalName,
           userId: user.id,
           videoTitle: video.originalName,
         });

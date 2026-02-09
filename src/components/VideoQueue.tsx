@@ -12,6 +12,8 @@ export interface QueuedVideo {
   outputFilename?: string;
   /** Database Video record ID (returned from /api/process) */
   videoId?: string;
+  /** Transcript text from Whisper (returned from /api/process) */
+  transcript?: string;
   /** Timestamp when video was completed (for detecting stale entries) */
   completedAt?: number;
   /** Current processing progress (only set while status === 'processing') */
