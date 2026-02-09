@@ -9,7 +9,13 @@ import OpenAI from 'openai';
 import { prisma } from './db';
 import { logger } from './logger';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not set');
+  }
+  return new OpenAI({ apiKey });
+}
 
 export interface GeneratedCaption {
   hook: string;
@@ -95,7 +101,7 @@ Return ONLY valid JSON (no markdown, no code fences):
 }`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.8,
