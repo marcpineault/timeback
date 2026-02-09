@@ -184,17 +184,19 @@ export async function reorderQueue(
     .sort((a, b) => a.getTime() - b.getTime());
 
   // Reassign times in the new order
-  const updates = orderedPostIds.map((postId, index) => {
+  const updates = orderedPostIds.flatMap((postId, index) => {
     if (index < existingTimes.length) {
-      return prisma.scheduledPost.update({
+      return [prisma.scheduledPost.update({
         where: { id: postId, userId },
         data: { scheduledFor: existingTimes[index] },
-      });
+      })];
     }
-    return null;
-  }).filter(Boolean);
+    return [];
+  });
 
-  await prisma.$transaction(updates as Parameters<typeof prisma.$transaction>[0]);
+  if (updates.length > 0) {
+    await prisma.$transaction(updates);
+  }
 }
 
 /**
