@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Helper to update video status
-    const updateVideoStatus = async (status: 'PROCESSING' | 'COMPLETED' | 'FAILED', data?: { processedUrl?: string; errorMessage?: string }) => {
+    const updateVideoStatus = async (status: 'PROCESSING' | 'COMPLETED' | 'FAILED', data?: { processedUrl?: string; errorMessage?: string; transcript?: string }) => {
       if (videoRecordId) {
         await prisma.video.update({
           where: { id: videoRecordId },
@@ -640,6 +640,11 @@ export async function POST(request: NextRequest) {
       processedUrl = `/api/download/${outputFilename}`;
     }
 
+    // Build transcript text from segments (available regardless of auth)
+    const fullTranscript = transcriptionSegments.length > 0
+      ? transcriptionSegments.map(s => s.text).join(' ').trim()
+      : undefined;
+
     // Track usage and update video record if user is authenticated
     if (dbUserId) {
       // Only increment video count for new videos, not reprocesses
@@ -650,8 +655,8 @@ export async function POST(request: NextRequest) {
         logger.info('Skipped video count increment (reprocess)');
       }
 
-      // Update video record to COMPLETED with the processed URL (S3 key or local path)
-      await updateVideoStatus('COMPLETED', { processedUrl });
+      // Update video record to COMPLETED with the processed URL and transcript
+      await updateVideoStatus('COMPLETED', { processedUrl, transcript: fullTranscript });
     }
 
     // Clean up the original uploaded file
@@ -688,6 +693,7 @@ export async function POST(request: NextRequest) {
       downloadUrl: `/api/download/${outputFilename}`,
       processedUrl, // Include S3 key or local path for client
       videoId: videoRecordId, // Include videoId for reprocessing
+      transcript: fullTranscript || undefined, // Include transcript for caption generation
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

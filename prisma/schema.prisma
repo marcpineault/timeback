@@ -94,6 +94,7 @@ model Video {
   status          VideoStatus @default(PENDING)
   duration        Int?        // in seconds
   silenceRemoved  Int?        // seconds removed
+  transcript      String?     // Full transcript text from Whisper
   errorMessage    String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt

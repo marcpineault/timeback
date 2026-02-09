@@ -27,7 +27,7 @@ export async function POST(
     // Verify post belongs to user
     const post = await prisma.scheduledPost.findFirst({
       where: { id: postId, userId: user.id },
-      include: { video: true },
+      include: { video: { select: { originalName: true, transcript: true } } },
     });
 
     if (!post) {
@@ -42,7 +42,7 @@ export async function POST(
     }
 
     const generated = await regenerateCaption({
-      transcript: post.video.originalName, // Fallback; ideally stored transcript
+      transcript: post.video.transcript || post.video.originalName,
       userId: user.id,
       videoTitle: post.video.originalName,
       styleOverride,

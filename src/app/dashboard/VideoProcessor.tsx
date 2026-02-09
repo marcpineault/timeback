@@ -8,6 +8,7 @@ import VideoPreview from '@/components/VideoPreview'
 import MediaEditor from '@/components/MediaEditor'
 import GoogleDriveUpload from '@/components/GoogleDriveUpload'
 import GoogleDriveImport from '@/components/GoogleDriveImport'
+import ScheduleModal from '@/components/schedule/ScheduleModal'
 import Link from 'next/link'
 
 interface EnabledFeatures {
@@ -55,9 +56,8 @@ export default function VideoProcessor({
   } | null>(null)
   // State for pending auto-process - stores config when auto-process should trigger after queue update
   const [pendingAutoProcess, setPendingAutoProcess] = useState<ProcessingConfig | null>(null)
-  // Instagram scheduling state
-  const [isScheduling, setIsScheduling] = useState(false)
-  const [scheduleResult, setScheduleResult] = useState<{ scheduled: number; failed: number } | null>(null)
+  // Instagram scheduling modal
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
 
   useEffect(() => {
     const ua = navigator.userAgent
@@ -533,6 +533,7 @@ export default function VideoProcessor({
         downloadUrl: data.downloadUrl,
         outputFilename: data.outputFilename,
         videoId: data.videoId, // Database record ID for scheduling
+        transcript: data.transcript, // Whisper transcript for caption generation
         completedAt: Date.now(), // Track completion time for stale detection
       }
     } catch (err) {
@@ -924,64 +925,6 @@ export default function VideoProcessor({
     setIsSavingAll(false)
   }
 
-  // Schedule all completed videos to Instagram
-  const handleScheduleAll = async () => {
-    const schedulableVideos = videoQueue.filter(v => v.status === 'complete' && v.videoId)
-    if (schedulableVideos.length === 0) return
-
-    setIsScheduling(true)
-    setScheduleResult(null)
-
-    // Get the user's first connected Instagram account
-    let accountId: string | null = null
-    try {
-      const accountsRes = await fetch('/api/instagram/accounts')
-      if (accountsRes.ok) {
-        const data = await accountsRes.json()
-        const activeAccount = data.accounts?.find((a: { isActive: boolean }) => a.isActive)
-        accountId = activeAccount?.id || null
-      }
-    } catch {
-      // handled below
-    }
-
-    if (!accountId) {
-      alert('No Instagram account connected. Go to Schedule > Settings to connect one.')
-      setIsScheduling(false)
-      return
-    }
-
-    let scheduled = 0
-    let failed = 0
-
-    for (const video of schedulableVideos) {
-      try {
-        const res = await fetch('/api/schedule/queue', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoId: video.videoId,
-            instagramAccountId: accountId,
-            autoGenerateCaption: true,
-          }),
-        })
-
-        if (res.ok) {
-          scheduled++
-        } else {
-          const err = await res.json()
-          console.error('Failed to schedule video:', err.error)
-          failed++
-        }
-      } catch {
-        failed++
-      }
-    }
-
-    setScheduleResult({ scheduled, failed })
-    setIsScheduling(false)
-  }
-
   const pendingVideos = videoQueue.filter(v => v.status === 'pending')
   const completedVideos = videoQueue.filter(v => v.status === 'complete')
   const hasVideosToProcess = pendingVideos.length > 0
@@ -1284,7 +1227,7 @@ export default function VideoProcessor({
           />
 
           {/* Instagram Scheduling - only for beta users */}
-          {enabledFeatures.instagramScheduling && (
+          {enabledFeatures.instagramScheduling && completedVideos.filter(v => v.videoId).length > 0 && (
             <div className="mt-4 p-4 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-xl">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
@@ -1295,26 +1238,13 @@ export default function VideoProcessor({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleScheduleAll}
-                    disabled={isScheduling || completedVideos.filter(v => v.videoId).length === 0}
-                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                   >
-                    {isScheduling ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Scheduling...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Schedule All
-                      </>
-                    )}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Schedule to Instagram
                   </button>
                   <Link
                     href="/dashboard/schedule"
@@ -1324,22 +1254,6 @@ export default function VideoProcessor({
                   </Link>
                 </div>
               </div>
-              {scheduleResult && (
-                <div className="mt-3 text-sm">
-                  {scheduleResult.failed === 0 ? (
-                    <p className="text-green-400">
-                      {scheduleResult.scheduled} video(s) scheduled! AI captions will be generated automatically.{' '}
-                      <Link href="/dashboard/schedule" className="underline">View queue</Link>
-                    </p>
-                  ) : (
-                    <p className="text-amber-400">
-                      {scheduleResult.scheduled} scheduled, {scheduleResult.failed} failed.
-                      Make sure you have an Instagram account connected and schedule slots set up.{' '}
-                      <Link href="/dashboard/schedule" className="underline">Check settings</Link>
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1362,6 +1276,23 @@ export default function VideoProcessor({
           filename={editorVideo.outputFilename}
           onClose={handleCloseEditor}
           onComplete={handleEditorComplete}
+        />
+      )}
+
+      {/* Instagram Schedule Modal */}
+      {showScheduleModal && (
+        <ScheduleModal
+          videos={completedVideos
+            .filter((v) => v.videoId)
+            .map((v) => ({
+              videoId: v.videoId!,
+              originalName: v.file.originalName,
+              transcript: v.transcript,
+            }))}
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={(count) => {
+            console.log(`[VideoProcessor] ${count} video(s) scheduled to Instagram`)
+          }}
         />
       )}
     </div>
