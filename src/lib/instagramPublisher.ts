@@ -10,6 +10,68 @@ import { logger } from './logger';
 import { publishReel, getValidToken } from './instagram';
 
 const MAX_RETRIES = 3;
+const STALE_UPLOADING_MINUTES = 10;
+
+/**
+ * Recover posts stuck in UPLOADING status (e.g., from a container restart mid-publish).
+ * Resets them to SCHEDULED for retry, or marks as FAILED if retries exhausted.
+ */
+async function recoverStaleUploadingPosts(): Promise<number> {
+  const staleThreshold = new Date(Date.now() - STALE_UPLOADING_MINUTES * 60 * 1000);
+
+  const stalePosts = await prisma.scheduledPost.findMany({
+    where: {
+      status: 'UPLOADING',
+      lastAttemptAt: { lte: staleThreshold },
+    },
+    include: { video: true },
+  });
+
+  let recovered = 0;
+
+  for (const post of stalePosts) {
+    const newRetryCount = post.retryCount + 1;
+
+    if (newRetryCount >= MAX_RETRIES) {
+      await prisma.scheduledPost.update({
+        where: { id: post.id },
+        data: {
+          status: 'FAILED',
+          retryCount: newRetryCount,
+          lastError: 'Post was stuck in UPLOADING state (container likely restarted mid-publish)',
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: post.userId,
+          type: 'post_failed',
+          title: 'Post failed to publish',
+          message: `Your video "${post.video.originalName}" failed after ${MAX_RETRIES} attempts. The server restarted during publishing.`,
+          data: { postId: post.id, videoId: post.videoId },
+        },
+      });
+    } else {
+      await prisma.scheduledPost.update({
+        where: { id: post.id },
+        data: {
+          status: 'SCHEDULED',
+          retryCount: newRetryCount,
+          lastError: 'Recovered from stale UPLOADING state (container restarted mid-publish)',
+        },
+      });
+    }
+
+    recovered++;
+    logger.info('Recovered stale UPLOADING post', {
+      postId: post.id,
+      newRetryCount,
+      newStatus: newRetryCount >= MAX_RETRIES ? 'FAILED' : 'SCHEDULED',
+    });
+  }
+
+  return recovered;
+}
 
 /**
  * Process all posts that are due for publishing.
@@ -18,8 +80,15 @@ const MAX_RETRIES = 3;
 export async function publishDuePosts(): Promise<{
   published: number;
   failed: number;
+  recovered: number;
   errors: string[];
 }> {
+  // First, recover any posts stuck in UPLOADING from a previous crash
+  const recovered = await recoverStaleUploadingPosts();
+  if (recovered > 0) {
+    logger.info(`Recovered ${recovered} stale UPLOADING posts`);
+  }
+
   const now = new Date();
   const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
 
@@ -46,11 +115,19 @@ export async function publishDuePosts(): Promise<{
 
   for (const post of duePosts) {
     try {
-      // Mark as uploading
-      await prisma.scheduledPost.update({
-        where: { id: post.id },
-        data: { status: 'UPLOADING', lastAttemptAt: now },
-      });
+      // Atomically claim the post by transitioning SCHEDULED -> UPLOADING.
+      // This prevents duplicate publishes if multiple cron requests run concurrently.
+      const claimed = await prisma.$executeRaw`
+        UPDATE "ScheduledPost"
+        SET "status" = 'UPLOADING', "lastAttemptAt" = ${now}
+        WHERE "id" = ${post.id} AND "status" = 'SCHEDULED'
+      `;
+
+      if (claimed === 0) {
+        // Another cron instance already claimed this post
+        logger.info('Post already claimed by another process', { postId: post.id });
+        continue;
+      }
 
       // Verify video has a processed URL
       if (!post.video.processedUrl) {
@@ -138,7 +215,7 @@ export async function publishDuePosts(): Promise<{
     }
   }
 
-  return { published, failed, errors };
+  return { published, failed, recovered, errors };
 }
 
 /**
