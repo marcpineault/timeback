@@ -23,8 +23,8 @@ export default function CalendarView({ onDayClick }: CalendarViewProps) {
   }, [currentMonth])
 
   async function fetchCalendarPosts() {
-    const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
-    const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59)
+    const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 0)
+    const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1, 23, 59, 59)
 
     try {
       const res = await fetch(

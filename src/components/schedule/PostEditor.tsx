@@ -16,7 +16,7 @@ export default function PostEditor({ post, onSave, onRegenerate, onClose }: Post
   const [regenerating, setRegenerating] = useState(false)
 
   const initDate = new Date(post.scheduledFor)
-  const initDateStr = initDate.toISOString().split('T')[0]
+  const initDateStr = `${initDate.getFullYear()}-${String(initDate.getMonth() + 1).padStart(2, '0')}-${String(initDate.getDate()).padStart(2, '0')}`
   const initTimeStr = initDate.toTimeString().slice(0, 5)
 
   const [scheduledDate, setScheduledDate] = useState(initDateStr)
