@@ -55,11 +55,13 @@ export function getInstagramAuthUrl(state: string): string {
 }
 
 /**
- * Exchange an OAuth authorization code for a short-lived token,
- * then exchange that for a long-lived token (~60 days).
+ * Exchange an OAuth authorization code for both short-lived and long-lived tokens.
+ * Returns both so we can use the short-lived token for discovery (more reliable
+ * with /me/accounts) and store the long-lived token for future use.
  */
-export async function exchangeCodeForLongLivedToken(code: string): Promise<{
-  accessToken: string;
+export async function exchangeCodeForTokens(code: string): Promise<{
+  shortLivedToken: string;
+  longLivedToken: string;
   expiresIn: number;
 }> {
   const { appId, appSecret, redirectUri } = getInstagramConfig();
@@ -82,6 +84,7 @@ export async function exchangeCodeForLongLivedToken(code: string): Promise<{
   }
 
   const shortLivedData = await shortLivedRes.json();
+  const shortLivedToken = shortLivedData.access_token;
 
   // Step 2: Exchange short-lived token for long-lived token
   const longLivedRes = await fetch(
@@ -90,7 +93,7 @@ export async function exchangeCodeForLongLivedToken(code: string): Promise<{
         grant_type: 'fb_exchange_token',
         client_id: appId,
         client_secret: appSecret,
-        fb_exchange_token: shortLivedData.access_token,
+        fb_exchange_token: shortLivedToken,
       })
   );
 
@@ -103,7 +106,8 @@ export async function exchangeCodeForLongLivedToken(code: string): Promise<{
   const longLivedData = await longLivedRes.json();
 
   return {
-    accessToken: longLivedData.access_token,
+    shortLivedToken,
+    longLivedToken: longLivedData.access_token,
     expiresIn: longLivedData.expires_in || 5184000, // Default 60 days
   };
 }
@@ -163,6 +167,7 @@ export interface DiscoveryResult {
   pagesFound: number;
   pageNames: string[];
   tokenScopes: string[];
+  granularPageIds: string[];
 }
 
 /**
@@ -177,6 +182,7 @@ export async function discoverInstagramAccounts(
   const { appId, appSecret } = getInstagramConfig();
   const appAccessToken = `${appId}|${appSecret}`;
   let tokenScopes: string[] = [];
+  let granularPageIds: string[] = [];
   try {
     const debugRes = await fetch(
       `${GRAPH_API_BASE}/debug_token?input_token=${encodeURIComponent(userAccessToken)}&access_token=${encodeURIComponent(appAccessToken)}`
@@ -184,14 +190,25 @@ export async function discoverInstagramAccounts(
     if (debugRes.ok) {
       const debugData = await debugRes.json();
       tokenScopes = debugData.data?.scopes || [];
+      const granularScopes = debugData.data?.granular_scopes || [];
       logger.info('Token debug info', {
         scopes: tokenScopes,
         appId: debugData.data?.app_id,
         type: debugData.data?.type,
         isValid: debugData.data?.is_valid,
         expiresAt: debugData.data?.expires_at,
-        granularScopes: debugData.data?.granular_scopes,
+        granularScopes,
       });
+
+      // Extract page IDs from granular_scopes as fallback for /me/accounts
+      for (const gs of granularScopes) {
+        if (gs.scope === 'pages_show_list' && Array.isArray(gs.target_ids)) {
+          granularPageIds = gs.target_ids;
+        }
+      }
+      if (granularPageIds.length > 0) {
+        logger.info('Extracted page IDs from granular_scopes', { granularPageIds });
+      }
     } else {
       const err = await debugRes.json().catch(() => ({}));
       logger.warn('debug_token failed', { error: err });
@@ -295,7 +312,94 @@ export async function discoverInstagramAccounts(
     logger.info('Page has no linked Instagram Business account', { pageId: page.id, pageName: page.name });
   }
 
-  return { accounts, pagesFound: pages.length, pageNames: pages.map(p => p.name), tokenScopes };
+  return { accounts, pagesFound: pages.length, pageNames: pages.map(p => p.name), tokenScopes, granularPageIds };
+}
+
+/**
+ * Fallback discovery: query pages directly by ID (from granular_scopes).
+ * Bypasses /me/accounts which can return empty with long-lived tokens.
+ */
+export async function discoverFromPageIds(
+  userAccessToken: string,
+  pageIds: string[]
+): Promise<DiscoveryResult> {
+  const accounts: InstagramBusinessAccount[] = [];
+  const pageNames: string[] = [];
+
+  for (const pageId of pageIds) {
+    // Query page directly for its name, access token, and linked IG account
+    const pageRes = await fetch(
+      `${GRAPH_API_BASE}/${pageId}?fields=id,name,access_token,instagram_business_account{id,username,profile_picture_url}&access_token=${userAccessToken}`
+    );
+
+    if (!pageRes.ok) {
+      const err = await pageRes.json().catch(() => ({}));
+      logger.warn('Direct page query failed', { pageId, error: err });
+
+      // Try without instagram_business_account nested field (in case it causes filtering)
+      const pageRes2 = await fetch(
+        `${GRAPH_API_BASE}/${pageId}?fields=id,name,access_token&access_token=${userAccessToken}`
+      );
+      if (pageRes2.ok) {
+        const pageData2 = await pageRes2.json();
+        pageNames.push(pageData2.name || pageId);
+        logger.info('Direct page query (simple)', { pageId, response: JSON.stringify(pageData2) });
+
+        // Now query IG separately
+        const igRes = await fetch(
+          `${GRAPH_API_BASE}/${pageId}?fields=instagram_business_account&access_token=${pageData2.access_token || userAccessToken}`
+        );
+        if (igRes.ok) {
+          const igData = await igRes.json();
+          logger.info('Direct page IG query', { pageId, response: JSON.stringify(igData) });
+          const igAccountId = igData.instagram_business_account?.id;
+          if (igAccountId) {
+            const profileRes = await fetch(
+              `${GRAPH_API_BASE}/${igAccountId}?fields=id,username,profile_picture_url&access_token=${pageData2.access_token || userAccessToken}`
+            );
+            if (profileRes.ok) {
+              const profile = await profileRes.json();
+              accounts.push({
+                instagramUserId: profile.id,
+                instagramUsername: profile.username,
+                instagramProfilePic: profile.profile_picture_url || null,
+                facebookPageId: pageId,
+                facebookPageName: pageData2.name || pageId,
+                pageAccessToken: pageData2.access_token || userAccessToken,
+              });
+            }
+          }
+        }
+      }
+      continue;
+    }
+
+    const pageData = await pageRes.json();
+    pageNames.push(pageData.name || pageId);
+    logger.info('Direct page query result', { pageId, response: JSON.stringify(pageData) });
+
+    const igAccount = pageData.instagram_business_account;
+    if (igAccount?.id) {
+      accounts.push({
+        instagramUserId: igAccount.id,
+        instagramUsername: igAccount.username || 'unknown',
+        instagramProfilePic: igAccount.profile_picture_url || null,
+        facebookPageId: pageId,
+        facebookPageName: pageData.name || pageId,
+        pageAccessToken: pageData.access_token || userAccessToken,
+      });
+    }
+  }
+
+  logger.info('discoverFromPageIds result', { pagesQueried: pageIds.length, accountsFound: accounts.length });
+
+  return {
+    accounts,
+    pagesFound: pageIds.length,
+    pageNames,
+    tokenScopes: [],
+    granularPageIds: pageIds,
+  };
 }
 
 // ─── Content Publishing ─────────────────────────────────────────────
