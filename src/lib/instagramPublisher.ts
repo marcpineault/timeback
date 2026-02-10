@@ -8,9 +8,47 @@
 import { prisma } from './db';
 import { logger } from './logger';
 import { publishReel, getValidToken } from './instagram';
+import { isS3Configured, getProcessedVideoUrl } from './s3';
 
 const MAX_RETRIES = 3;
 const STALE_UPLOADING_MINUTES = 10;
+
+/**
+ * Resolve a stored processedUrl to a publicly accessible URL that Instagram can download.
+ *
+ * processedUrl is stored as either:
+ * - An S3 key (e.g. "processed/12345-abc-video.mp4") when S3/R2 is configured
+ * - A relative path (e.g. "/api/download/video.mp4") when using local storage
+ * - Already a full URL (starts with "http")
+ */
+async function resolveVideoUrl(processedUrl: string): Promise<string> {
+  // Already a full URL
+  if (processedUrl.startsWith('http://') || processedUrl.startsWith('https://')) {
+    return processedUrl;
+  }
+
+  // S3 key — generate a presigned URL
+  if (processedUrl.startsWith('processed/') && isS3Configured()) {
+    const presignedUrl = await getProcessedVideoUrl(processedUrl);
+    logger.info('Resolved S3 key to presigned URL for Instagram publishing', {
+      s3Key: processedUrl,
+    });
+    return presignedUrl;
+  }
+
+  // Local relative path — prepend app URL
+  if (processedUrl.startsWith('/')) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!appUrl) {
+      throw new Error(
+        'Cannot publish video: NEXT_PUBLIC_APP_URL is not configured and video is stored locally'
+      );
+    }
+    return `${appUrl}${processedUrl}`;
+  }
+
+  throw new Error(`Cannot resolve video URL for Instagram publishing: ${processedUrl}`);
+}
 
 /**
  * Recover posts stuck in UPLOADING status (e.g., from a container restart mid-publish).
@@ -134,6 +172,9 @@ export async function publishDuePosts(): Promise<{
         throw new Error('Video has no processed URL');
       }
 
+      // Resolve stored processedUrl to a publicly accessible URL for Instagram
+      const videoUrl = await resolveVideoUrl(post.video.processedUrl);
+
       // Get a valid token (refreshes if needed)
       const accessToken = await getValidToken(post.instagramAccountId);
 
@@ -141,7 +182,7 @@ export async function publishDuePosts(): Promise<{
       const result = await publishReel({
         instagramUserId: post.instagramAccount.instagramUserId,
         accessToken,
-        videoUrl: post.video.processedUrl,
+        videoUrl,
         caption: post.caption,
         coverUrl: post.coverImageUrl || undefined,
       });
