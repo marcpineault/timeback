@@ -46,8 +46,11 @@ export async function GET(request: NextRequest) {
     const { accounts: igAccounts, pagesFound, pageNames, tokenScopes } = await discoverInstagramAccounts(accessToken);
 
     if (igAccounts.length === 0) {
-      if (!tokenScopes.includes('pages_show_list')) {
+      if (!tokenScopes.includes('pages_show_list') || !tokenScopes.includes('pages_read_engagement')) {
         return redirectToSchedule('/dashboard/schedule?error=missing_page_permissions');
+      }
+      if (!tokenScopes.includes('instagram_basic')) {
+        return redirectToSchedule('/dashboard/schedule?error=missing_instagram_permissions');
       }
       if (pagesFound === 0) {
         return redirectToSchedule('/dashboard/schedule?error=no_facebook_pages');
