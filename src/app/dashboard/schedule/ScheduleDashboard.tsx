@@ -84,7 +84,9 @@ export default function ScheduleDashboard() {
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
           <p className="text-red-400 text-sm">
             {error === 'missing_page_permissions'
-              ? 'Facebook Page permissions were not granted. Please disconnect the app from your Facebook settings (Settings → Business Integrations), then try connecting again and approve all requested permissions.'
+              ? 'Facebook Page permissions were not granted. Please remove the app from your Facebook settings (Settings → Business Integrations), then try connecting again and approve all requested permissions.'
+              : error === 'missing_instagram_permissions'
+              ? 'Instagram permissions were not granted. Make sure your Facebook App has the "Instagram" product added in the Facebook Developer Console (App Dashboard → Add Product → Instagram). Then remove the app from your Facebook settings and reconnect.'
               : error === 'no_facebook_pages'
               ? 'No Facebook Pages found for your account. You need a Facebook Page to connect an Instagram Business account. Create one at facebook.com/pages/create, then link your Instagram account to it.'
               : error === 'no_instagram_business_account'
