@@ -20,6 +20,7 @@ type Tab = 'queue' | 'calendar' | 'published' | 'settings'
 export default function ScheduleDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('queue')
   const [editingPost, setEditingPost] = useState<ScheduledPostData | null>(null)
+  const [publishingId, setPublishingId] = useState<string | null>(null)
   const searchParams = useSearchParams()
 
   const { accounts, loading: accountsLoading, refetch: refetchAccounts } = useInstagramAccounts()
@@ -60,6 +61,25 @@ export default function ScheduleDashboard() {
       refetchQueue()
     } catch (err) {
       console.error('Failed to save post:', err)
+    }
+  }
+
+  async function handlePublishNow(postId: string) {
+    if (!confirm('Publish this post to Instagram right now?')) return
+
+    setPublishingId(postId)
+    try {
+      const res = await fetch(`/api/schedule/queue/${postId}/publish`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Failed to publish post')
+      }
+      refetchQueue()
+    } catch (err) {
+      console.error('Failed to publish post:', err)
+      alert('Failed to publish post. Please try again.')
+    } finally {
+      setPublishingId(null)
     }
   }
 
@@ -150,6 +170,8 @@ export default function ScheduleDashboard() {
                   stats={stats}
                   onEditPost={setEditingPost}
                   onRemovePost={handleRemovePost}
+                  onPublishNow={handlePublishNow}
+                  publishingId={publishingId}
                 />
               )}
 

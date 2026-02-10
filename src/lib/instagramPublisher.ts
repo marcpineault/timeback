@@ -260,6 +260,116 @@ export async function publishDuePosts(): Promise<{
 }
 
 /**
+ * Publish a single post immediately (on-demand "Publish Now").
+ * Unlike publishDuePosts, this targets a specific post regardless of its scheduled time.
+ */
+export async function publishPost(postId: string, userId: string): Promise<{
+  success: boolean;
+  error?: string;
+  mediaId?: string;
+  permalink?: string;
+}> {
+  const post = await prisma.scheduledPost.findFirst({
+    where: { id: postId, userId },
+    include: {
+      video: true,
+      instagramAccount: true,
+    },
+  });
+
+  if (!post) {
+    return { success: false, error: 'Post not found' };
+  }
+
+  if (post.status === 'PUBLISHED') {
+    return { success: false, error: 'Post is already published' };
+  }
+
+  if (post.status === 'UPLOADING') {
+    return { success: false, error: 'Post is currently being uploaded' };
+  }
+
+  if (post.status === 'CANCELLED') {
+    return { success: false, error: 'Post has been cancelled' };
+  }
+
+  if (!post.video.processedUrl) {
+    return { success: false, error: 'Video has no processed URL' };
+  }
+
+  // Atomically claim the post
+  const now = new Date();
+  const claimed = await prisma.$executeRaw`
+    UPDATE "ScheduledPost"
+    SET "status" = 'UPLOADING', "lastAttemptAt" = ${now}
+    WHERE "id" = ${post.id} AND "status" IN ('QUEUED', 'SCHEDULED', 'FAILED')
+  `;
+
+  if (claimed === 0) {
+    return { success: false, error: 'Post could not be claimed for publishing (it may already be in progress)' };
+  }
+
+  try {
+    const videoUrl = await resolveVideoUrl(post.video.processedUrl);
+    const accessToken = await getValidToken(post.instagramAccountId);
+
+    const result = await publishReel({
+      instagramUserId: post.instagramAccount.instagramUserId,
+      accessToken,
+      videoUrl,
+      caption: post.caption,
+      coverUrl: post.coverImageUrl || undefined,
+    });
+
+    await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+        igContainerId: result.containerId,
+        igMediaId: result.mediaId,
+        igPermalink: result.permalink,
+      },
+    });
+
+    await prisma.instagramAccount.update({
+      where: { id: post.instagramAccountId },
+      data: { lastPublishedAt: new Date(), lastError: null },
+    });
+
+    logger.info('Post published immediately via Publish Now', {
+      postId: post.id,
+      mediaId: result.mediaId,
+    });
+
+    return { success: true, mediaId: result.mediaId, permalink: result.permalink };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const newRetryCount = post.retryCount + 1;
+
+    // On failure, mark as FAILED (user explicitly triggered this, no silent retry)
+    await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: {
+        status: 'FAILED',
+        retryCount: newRetryCount,
+        lastError: errorMessage,
+        lastAttemptAt: now,
+      },
+    });
+
+    await prisma.instagramAccount.update({
+      where: { id: post.instagramAccountId },
+      data: { lastError: errorMessage },
+    });
+
+    logger.error('Publish Now failed', { postId: post.id, error: errorMessage });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
  * Refresh tokens that are expiring within 7 days.
  * Called by a daily cron job.
  */
