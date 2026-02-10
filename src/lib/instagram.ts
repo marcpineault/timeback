@@ -38,6 +38,7 @@ export function getInstagramAuthUrl(state: string): string {
   const scopes = [
     'instagram_basic',
     'instagram_content_publish',
+    'pages_show_list',
   ].join(',');
 
   const params = new URLSearchParams({
@@ -162,17 +163,29 @@ export async function discoverInstagramAccounts(
   userAccessToken: string
 ): Promise<InstagramBusinessAccount[]> {
   // Get user's Facebook Pages
-  const pagesRes = await fetch(
-    `${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`
-  );
+  const pagesUrl = `${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`;
+  logger.info('Discovering Instagram accounts - fetching Facebook Pages');
+
+  const pagesRes = await fetch(pagesUrl);
 
   if (!pagesRes.ok) {
     const err = await pagesRes.json();
+    logger.error('Failed to fetch Facebook Pages', err);
     throw new Error(err.error?.message || 'Failed to fetch Facebook Pages');
   }
 
   const pagesData = await pagesRes.json();
   const pages: FacebookPage[] = pagesData.data || [];
+
+  logger.info(`Found ${pages.length} Facebook Page(s)`, {
+    pages: pages.map((p) => ({ id: p.id, name: p.name })),
+  });
+
+  if (pages.length === 0) {
+    logger.warn(
+      'No Facebook Pages found. The user must have a Facebook Page linked to their Instagram Business/Creator account.'
+    );
+  }
 
   const accounts: InstagramBusinessAccount[] = [];
 
@@ -182,11 +195,20 @@ export async function discoverInstagramAccounts(
       `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
     );
 
-    if (!igRes.ok) continue;
+    if (!igRes.ok) {
+      const igErr = await igRes.json().catch(() => ({}));
+      logger.warn(`Failed to check IG account for page ${page.name}`, igErr);
+      continue;
+    }
 
     const igData = await igRes.json();
+    logger.info(`Page "${page.name}" instagram_business_account:`, igData);
+
     const igAccountId = igData.instagram_business_account?.id;
-    if (!igAccountId) continue;
+    if (!igAccountId) {
+      logger.info(`Page "${page.name}" has no linked Instagram Business account`);
+      continue;
+    }
 
     // Get Instagram account details
     const profileRes = await fetch(
