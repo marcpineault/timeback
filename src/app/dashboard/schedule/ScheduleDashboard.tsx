@@ -82,8 +82,12 @@ export default function ScheduleDashboard() {
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
           <p className="text-red-400 text-sm">
-            {error === 'no_instagram_business_account'
-              ? 'No Instagram Business or Creator account found. Make sure your Instagram account is connected to a Facebook Page.'
+            {error === 'missing_page_permissions'
+              ? 'Facebook Page permissions were not granted. Please disconnect the app from your Facebook settings (Settings → Business Integrations), then try connecting again and approve all requested permissions.'
+              : error === 'no_facebook_pages'
+              ? 'No Facebook Pages found for your account. You need a Facebook Page to connect an Instagram Business account. Create one at facebook.com/pages/create, then link your Instagram account to it.'
+              : error === 'no_instagram_business_account'
+              ? 'Your Facebook Page(s) were found but none have a linked Instagram Business account. In the Instagram app, go to Settings → Account → Switch to Professional Account, then link it to your Facebook Page.'
               : `Connection error: ${error.replace(/_/g, ' ')}`}
           </p>
         </div>

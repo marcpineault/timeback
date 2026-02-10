@@ -43,9 +43,15 @@ export async function GET(request: NextRequest) {
     const { accessToken, expiresIn } = await exchangeCodeForLongLivedToken(code);
 
     // Discover Instagram Business accounts
-    const igAccounts = await discoverInstagramAccounts(accessToken);
+    const { accounts: igAccounts, pagesFound, tokenScopes } = await discoverInstagramAccounts(accessToken);
 
     if (igAccounts.length === 0) {
+      if (!tokenScopes.includes('pages_show_list')) {
+        return redirectToSchedule('/dashboard/schedule?error=missing_page_permissions');
+      }
+      if (pagesFound === 0) {
+        return redirectToSchedule('/dashboard/schedule?error=no_facebook_pages');
+      }
       return redirectToSchedule('/dashboard/schedule?error=no_instagram_business_account');
     }
 
