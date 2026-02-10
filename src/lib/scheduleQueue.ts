@@ -7,6 +7,7 @@
 
 import { prisma } from './db';
 import { logger } from './logger';
+import { localTimeToUTC } from './timezone';
 
 /**
  * Find the next open schedule slot for a user, starting from the given date.
@@ -64,10 +65,7 @@ export async function findNextOpenSlot(
     const daySlots = slots.filter((s) => s.dayOfWeek === dayOfWeek);
 
     for (const slot of daySlots) {
-      const [hours, minutes] = slot.timeOfDay.split(':').map(Number);
-
-      const slotTime = new Date(checkDate);
-      slotTime.setHours(hours, minutes, 0, 0);
+      const slotTime = localTimeToUTC(checkDate, slot.timeOfDay, slot.timezone);
 
       // Skip if in the past
       if (slotTime <= startFrom) continue;
