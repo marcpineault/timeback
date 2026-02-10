@@ -47,6 +47,7 @@ export function getInstagramAuthUrl(state: string): string {
     redirect_uri: redirectUri,
     scope: scopes,
     response_type: 'code',
+    auth_type: 'rerequest',
     state,
   });
 
@@ -172,10 +173,13 @@ export async function discoverInstagramAccounts(
   userAccessToken: string
 ): Promise<DiscoveryResult> {
   // Debug: check which permissions the token actually has
+  // Must use app access token (appId|appSecret) to get accurate debug info
+  const { appId, appSecret } = getInstagramConfig();
+  const appAccessToken = `${appId}|${appSecret}`;
   let tokenScopes: string[] = [];
   try {
     const debugRes = await fetch(
-      `${GRAPH_API_BASE}/debug_token?input_token=${userAccessToken}&access_token=${userAccessToken}`
+      `${GRAPH_API_BASE}/debug_token?input_token=${encodeURIComponent(userAccessToken)}&access_token=${encodeURIComponent(appAccessToken)}`
     );
     if (debugRes.ok) {
       const debugData = await debugRes.json();
@@ -185,7 +189,12 @@ export async function discoverInstagramAccounts(
         appId: debugData.data?.app_id,
         type: debugData.data?.type,
         isValid: debugData.data?.is_valid,
+        expiresAt: debugData.data?.expires_at,
+        granularScopes: debugData.data?.granular_scopes,
       });
+    } else {
+      const err = await debugRes.json().catch(() => ({}));
+      logger.warn('debug_token failed', { error: err });
     }
   } catch (e) {
     logger.warn('Failed to debug token', { error: e });
