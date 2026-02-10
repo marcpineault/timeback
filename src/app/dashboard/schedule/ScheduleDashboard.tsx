@@ -29,6 +29,7 @@ export default function ScheduleDashboard() {
   // Handle connection callback messages
   const connected = searchParams.get('connected')
   const error = searchParams.get('error')
+  const pagesParam = searchParams.get('pages')
 
   useEffect(() => {
     if (connected === 'true') {
@@ -87,7 +88,7 @@ export default function ScheduleDashboard() {
               : error === 'no_facebook_pages'
               ? 'No Facebook Pages found for your account. You need a Facebook Page to connect an Instagram Business account. Create one at facebook.com/pages/create, then link your Instagram account to it.'
               : error === 'no_instagram_business_account'
-              ? 'Your Facebook Page(s) were found but none have a linked Instagram Business account. In the Instagram app, go to Settings → Account → Switch to Professional Account, then link it to your Facebook Page.'
+              ? `We found your Facebook Page${pagesParam ? ` "${pagesParam}"` : '(s)'} but it doesn't have a linked Instagram Business account. Go to your Facebook Page → Settings → Linked Accounts → Instagram and connect your Instagram account there.`
               : `Connection error: ${error.replace(/_/g, ' ')}`}
           </p>
         </div>

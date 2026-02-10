@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const { accessToken, expiresIn } = await exchangeCodeForLongLivedToken(code);
 
     // Discover Instagram Business accounts
-    const { accounts: igAccounts, pagesFound, tokenScopes } = await discoverInstagramAccounts(accessToken);
+    const { accounts: igAccounts, pagesFound, pageNames, tokenScopes } = await discoverInstagramAccounts(accessToken);
 
     if (igAccounts.length === 0) {
       if (!tokenScopes.includes('pages_show_list')) {
@@ -52,7 +52,8 @@ export async function GET(request: NextRequest) {
       if (pagesFound === 0) {
         return redirectToSchedule('/dashboard/schedule?error=no_facebook_pages');
       }
-      return redirectToSchedule('/dashboard/schedule?error=no_instagram_business_account');
+      const pagesParam = encodeURIComponent(pageNames.join(', '));
+      return redirectToSchedule(`/dashboard/schedule?error=no_instagram_business_account&pages=${pagesParam}`);
     }
 
     // Store each discovered account (upsert to handle reconnections)
