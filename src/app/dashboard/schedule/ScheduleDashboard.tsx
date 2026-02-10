@@ -88,7 +88,7 @@ export default function ScheduleDashboard() {
               : error === 'missing_instagram_permissions'
               ? 'Instagram permissions were not granted. Make sure your Facebook App has the "Instagram" product added in the Facebook Developer Console (App Dashboard → Add Product → Instagram). Then remove the app from your Facebook settings and reconnect.'
               : error === 'no_facebook_pages'
-              ? 'No Facebook Pages found for your account. You need a Facebook Page to connect an Instagram Business account. Create one at facebook.com/pages/create, then link your Instagram account to it.'
+              ? 'No Facebook Pages found. During the Facebook login, make sure to select your Facebook Page when prompted. If this keeps happening, go to Facebook Settings → Business Integrations, remove TimeBack, and try again.'
               : error === 'no_instagram_business_account'
               ? `We found your Facebook Page${pagesParam ? ` "${pagesParam}"` : '(s)'} but it doesn't have a linked Instagram Business account. Go to your Facebook Page → Settings → Linked Accounts → Instagram and connect your Instagram account there.`
               : `Connection error: ${error.replace(/_/g, ' ')}`}

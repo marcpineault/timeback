@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { exchangeCodeForLongLivedToken, discoverInstagramAccounts } from '@/lib/instagram';
+import { exchangeCodeForTokens, discoverInstagramAccounts, discoverFromPageIds } from '@/lib/instagram';
 
 function redirectToSchedule(path: string): NextResponse {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://timebackvideo.com';
@@ -39,11 +39,31 @@ export async function GET(request: NextRequest) {
       return redirectToSchedule('/dashboard/schedule?error=user_not_found');
     }
 
-    // Exchange code for long-lived token
-    const { accessToken, expiresIn } = await exchangeCodeForLongLivedToken(code);
+    // Exchange code for both short-lived and long-lived tokens
+    const { shortLivedToken, longLivedToken, expiresIn } = await exchangeCodeForTokens(code);
 
-    // Discover Instagram Business accounts
-    const { accounts: igAccounts, pagesFound, pageNames, tokenScopes } = await discoverInstagramAccounts(accessToken);
+    // Step 1: Try discovering with short-lived token first (more reliable with /me/accounts)
+    let discovery = await discoverInstagramAccounts(shortLivedToken);
+
+    // Step 2: If short-lived token returned 0 pages, try with long-lived token
+    if (discovery.accounts.length === 0 && discovery.pagesFound === 0) {
+      console.log('Short-lived token returned 0 pages, trying long-lived token...');
+      const longLivedDiscovery = await discoverInstagramAccounts(longLivedToken);
+      if (longLivedDiscovery.accounts.length > 0 || longLivedDiscovery.pagesFound > 0) {
+        discovery = longLivedDiscovery;
+      }
+    }
+
+    // Step 3: If still no accounts and we have page IDs from granular_scopes, query directly
+    if (discovery.accounts.length === 0 && discovery.granularPageIds.length > 0) {
+      console.log('Falling back to granular_scopes page IDs:', discovery.granularPageIds);
+      const directDiscovery = await discoverFromPageIds(longLivedToken, discovery.granularPageIds);
+      if (directDiscovery.accounts.length > 0) {
+        discovery = directDiscovery;
+      }
+    }
+
+    const { accounts: igAccounts, pagesFound, pageNames, tokenScopes } = discovery;
 
     if (igAccounts.length === 0) {
       if (!tokenScopes.includes('pages_show_list') || !tokenScopes.includes('pages_read_engagement')) {
@@ -59,7 +79,7 @@ export async function GET(request: NextRequest) {
       return redirectToSchedule(`/dashboard/schedule?error=no_instagram_business_account&pages=${pagesParam}`);
     }
 
-    // Store each discovered account (upsert to handle reconnections)
+    // Store each discovered account with the LONG-LIVED token for future publishing
     for (const ig of igAccounts) {
       await prisma.instagramAccount.upsert({
         where: { instagramUserId: ig.instagramUserId },
