@@ -159,6 +159,7 @@ interface InstagramBusinessAccount {
 export interface DiscoveryResult {
   accounts: InstagramBusinessAccount[];
   pagesFound: number;
+  pageNames: string[];
   tokenScopes: string[];
 }
 
@@ -212,20 +213,50 @@ export async function discoverInstagramAccounts(
 
   for (const page of pages) {
     // Check if this page has a linked Instagram Business account
+    // Try both field names — Facebook has been migrating from instagram_business_account
+    // to connected_instagram_account in newer API versions
     const igRes = await fetch(
-      `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
+      `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account,connected_instagram_account&access_token=${page.access_token}`
     );
 
     if (!igRes.ok) {
       const err = await igRes.json().catch(() => ({}));
       logger.warn('Failed to query Instagram business account for page', { pageId: page.id, pageName: page.name, error: err });
+
+      // Retry with user token instead of page token
+      const igRetryRes = await fetch(
+        `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account,connected_instagram_account&access_token=${userAccessToken}`
+      );
+      if (!igRetryRes.ok) continue;
+
+      const igRetryData = await igRetryRes.json();
+      logger.info('Retry with user token result', { pageId: page.id, response: igRetryData });
+      const retryAccountId = igRetryData.instagram_business_account?.id || igRetryData.connected_instagram_account?.id;
+      if (retryAccountId) {
+        const profileRes = await fetch(
+          `${GRAPH_API_BASE}/${retryAccountId}?fields=id,username,profile_picture_url&access_token=${userAccessToken}`
+        );
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          accounts.push({
+            instagramUserId: profile.id,
+            instagramUsername: profile.username,
+            instagramProfilePic: profile.profile_picture_url || null,
+            facebookPageId: page.id,
+            facebookPageName: page.name,
+            pageAccessToken: page.access_token,
+          });
+        }
+      }
       continue;
     }
 
     const igData = await igRes.json();
-    const igAccountId = igData.instagram_business_account?.id;
+    logger.info('Page IG query response', { pageId: page.id, pageName: page.name, response: JSON.stringify(igData) });
+
+    const igAccountId = igData.instagram_business_account?.id || igData.connected_instagram_account?.id;
     if (!igAccountId) {
-      logger.info('Page has no linked Instagram Business account', { pageId: page.id, pageName: page.name });
+      logger.info('Page has no linked Instagram Business account', { pageId: page.id, pageName: page.name, rawResponse: igData });
       continue;
     }
 
@@ -248,7 +279,7 @@ export async function discoverInstagramAccounts(
     });
   }
 
-  return { accounts, pagesFound: pages.length, tokenScopes };
+  return { accounts, pagesFound: pages.length, pageNames: pages.map(p => p.name), tokenScopes };
 }
 
 // ─── Content Publishing ─────────────────────────────────────────────
