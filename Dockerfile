@@ -51,9 +51,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install prisma CLI globally for database migrations (must match project version)
-RUN npm install -g prisma@6.19.2
-
 # Create directories for uploads and processed files (including /data for Railway volume mount)
 RUN mkdir -p /app/uploads /app/processed /data/uploads /data/processed
 
@@ -64,6 +61,7 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
 COPY --from=builder /app/node_modules/@img ./node_modules/@img
 COPY --from=builder /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
