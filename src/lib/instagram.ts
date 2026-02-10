@@ -156,13 +156,39 @@ interface InstagramBusinessAccount {
   pageAccessToken: string;
 }
 
+export interface DiscoveryResult {
+  accounts: InstagramBusinessAccount[];
+  pagesFound: number;
+  tokenScopes: string[];
+}
+
 /**
  * After OAuth, discover the user's Facebook Pages and their linked
  * Instagram Business/Creator accounts.
  */
 export async function discoverInstagramAccounts(
   userAccessToken: string
-): Promise<InstagramBusinessAccount[]> {
+): Promise<DiscoveryResult> {
+  // Debug: check which permissions the token actually has
+  let tokenScopes: string[] = [];
+  try {
+    const debugRes = await fetch(
+      `${GRAPH_API_BASE}/debug_token?input_token=${userAccessToken}&access_token=${userAccessToken}`
+    );
+    if (debugRes.ok) {
+      const debugData = await debugRes.json();
+      tokenScopes = debugData.data?.scopes || [];
+      logger.info('Token debug info', {
+        scopes: tokenScopes,
+        appId: debugData.data?.app_id,
+        type: debugData.data?.type,
+        isValid: debugData.data?.is_valid,
+      });
+    }
+  } catch (e) {
+    logger.warn('Failed to debug token', { error: e });
+  }
+
   // Get user's Facebook Pages
   const pagesRes = await fetch(
     `${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`
@@ -222,7 +248,7 @@ export async function discoverInstagramAccounts(
     });
   }
 
-  return accounts;
+  return { accounts, pagesFound: pages.length, tokenScopes };
 }
 
 // ─── Content Publishing ─────────────────────────────────────────────
