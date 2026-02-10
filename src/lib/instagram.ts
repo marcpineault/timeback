@@ -145,6 +145,7 @@ interface FacebookPage {
   id: string;
   name: string;
   access_token: string;
+  instagram_business_account?: { id: string };
 }
 
 interface InstagramBusinessAccount {
@@ -190,20 +191,26 @@ export async function discoverInstagramAccounts(
     logger.warn('Failed to debug token', { error: e });
   }
 
-  // Get user's Facebook Pages
+  // Strategy 1: Get pages WITH instagram_business_account in a single call
+  // This uses the user token which may have different permission behavior
   const pagesRes = await fetch(
-    `${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token&access_token=${userAccessToken}`
+    `${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username,profile_picture_url}&access_token=${userAccessToken}`
   );
 
   if (!pagesRes.ok) {
     const err = await pagesRes.json();
+    logger.error('Failed to fetch Facebook Pages', { error: err });
     throw new Error(err.error?.message || 'Failed to fetch Facebook Pages');
   }
 
   const pagesData = await pagesRes.json();
   const pages: FacebookPage[] = pagesData.data || [];
 
-  logger.info('Facebook Pages discovered', { count: pages.length, pageNames: pages.map(p => p.name) });
+  logger.info('Facebook Pages discovered', {
+    count: pages.length,
+    pageNames: pages.map(p => p.name),
+    rawResponse: JSON.stringify(pagesData),
+  });
 
   if (pages.length === 0) {
     logger.warn('No Facebook Pages found — ensure pages_show_list permission is granted');
@@ -212,67 +219,66 @@ export async function discoverInstagramAccounts(
   const accounts: InstagramBusinessAccount[] = [];
 
   for (const page of pages) {
-    // Check if this page has a linked Instagram Business account
-    // Try both field names — Facebook has been migrating from instagram_business_account
-    // to connected_instagram_account in newer API versions
-    const igRes = await fetch(
-      `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account,connected_instagram_account&access_token=${page.access_token}`
-    );
+    let igAccountId = page.instagram_business_account?.id;
+    let igUsername = (page.instagram_business_account as Record<string, string>)?.username;
+    let igProfilePic = (page.instagram_business_account as Record<string, string>)?.profile_picture_url || null;
 
-    if (!igRes.ok) {
-      const err = await igRes.json().catch(() => ({}));
-      logger.warn('Failed to query Instagram business account for page', { pageId: page.id, pageName: page.name, error: err });
-
-      // Retry with user token instead of page token
-      const igRetryRes = await fetch(
-        `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account,connected_instagram_account&access_token=${userAccessToken}`
-      );
-      if (!igRetryRes.ok) continue;
-
-      const igRetryData = await igRetryRes.json();
-      logger.info('Retry with user token result', { pageId: page.id, response: igRetryData });
-      const retryAccountId = igRetryData.instagram_business_account?.id || igRetryData.connected_instagram_account?.id;
-      if (retryAccountId) {
-        const profileRes = await fetch(
-          `${GRAPH_API_BASE}/${retryAccountId}?fields=id,username,profile_picture_url&access_token=${userAccessToken}`
-        );
-        if (profileRes.ok) {
-          const profile = await profileRes.json();
-          accounts.push({
-            instagramUserId: profile.id,
-            instagramUsername: profile.username,
-            instagramProfilePic: profile.profile_picture_url || null,
-            facebookPageId: page.id,
-            facebookPageName: page.name,
-            pageAccessToken: page.access_token,
-          });
-        }
-      }
-      continue;
-    }
-
-    const igData = await igRes.json();
-    logger.info('Page IG query response', { pageId: page.id, pageName: page.name, response: JSON.stringify(igData) });
-
-    const igAccountId = igData.instagram_business_account?.id || igData.connected_instagram_account?.id;
+    // Strategy 2: If not returned inline, query the page directly
     if (!igAccountId) {
-      logger.info('Page has no linked Instagram Business account', { pageId: page.id, pageName: page.name, rawResponse: igData });
+      logger.info('No IG account in inline response, querying page directly', { pageId: page.id, pageName: page.name });
+
+      const igRes = await fetch(
+        `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
+      );
+
+      if (igRes.ok) {
+        const igData = await igRes.json();
+        logger.info('Page IG query response (page token)', { pageId: page.id, pageName: page.name, response: JSON.stringify(igData) });
+        igAccountId = igData.instagram_business_account?.id;
+      } else {
+        const err = await igRes.json().catch(() => ({}));
+        logger.warn('Page token query failed', { pageId: page.id, pageName: page.name, error: err });
+      }
+    }
+
+    // Strategy 3: Try user token if page token didn't work
+    if (!igAccountId) {
+      const igRes2 = await fetch(
+        `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account&access_token=${userAccessToken}`
+      );
+
+      if (igRes2.ok) {
+        const igData2 = await igRes2.json();
+        logger.info('Page IG query response (user token)', { pageId: page.id, pageName: page.name, response: JSON.stringify(igData2) });
+        igAccountId = igData2.instagram_business_account?.id;
+      } else {
+        const err = await igRes2.json().catch(() => ({}));
+        logger.warn('User token query also failed', { pageId: page.id, pageName: page.name, error: err });
+      }
+    }
+
+    if (!igAccountId) {
+      logger.info('Page has no linked Instagram Business account after all strategies', { pageId: page.id, pageName: page.name });
       continue;
     }
 
-    // Get Instagram account details
-    const profileRes = await fetch(
-      `${GRAPH_API_BASE}/${igAccountId}?fields=id,username,profile_picture_url&access_token=${page.access_token}`
-    );
+    // Fetch profile details if we didn't get them inline
+    if (!igUsername) {
+      const profileRes = await fetch(
+        `${GRAPH_API_BASE}/${igAccountId}?fields=id,username,profile_picture_url&access_token=${page.access_token}`
+      );
 
-    if (!profileRes.ok) continue;
-
-    const profile = await profileRes.json();
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        igUsername = profile.username;
+        igProfilePic = profile.profile_picture_url || null;
+      }
+    }
 
     accounts.push({
-      instagramUserId: profile.id,
-      instagramUsername: profile.username,
-      instagramProfilePic: profile.profile_picture_url || null,
+      instagramUserId: igAccountId,
+      instagramUsername: igUsername || 'unknown',
+      instagramProfilePic: igProfilePic,
       facebookPageId: page.id,
       facebookPageName: page.name,
       pageAccessToken: page.access_token,
