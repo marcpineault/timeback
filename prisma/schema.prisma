@@ -134,8 +134,9 @@ model InstagramAccount {
   facebookPageId        String
   facebookPageName      String?
 
-  accessToken           String
-  tokenExpiresAt        DateTime
+  accessToken           String   // Page access token (used for publishing)
+  userAccessToken       String?  // Long-lived user token (used to refresh page tokens)
+  tokenExpiresAt        DateTime // Expiry of the user access token (60 days)
 
   isActive              Boolean  @default(true)
   lastPublishedAt       DateTime?

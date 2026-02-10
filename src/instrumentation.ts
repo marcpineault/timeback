@@ -41,9 +41,21 @@ export async function register() {
       // requests (uploads, processing), causing user-visible failures.
     });
 
+    // Start internal cron scheduler for Instagram publishing
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_SCHEDULER === 'true') {
+      const { startScheduler } = await import('./lib/scheduler');
+      startScheduler();
+    }
+
     // Handle SIGTERM gracefully (for container orchestration)
-    process.on('SIGTERM', () => {
+    process.on('SIGTERM', async () => {
       logger.info('SIGTERM received, shutting down gracefully');
+      try {
+        const { stopScheduler } = await import('./lib/scheduler');
+        stopScheduler();
+      } catch {
+        // Scheduler may not have been started
+      }
       // Allow time for cleanup
       setTimeout(() => {
         process.exit(0);

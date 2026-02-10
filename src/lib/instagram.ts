@@ -9,7 +9,7 @@ import { prisma } from './db';
 import { logger } from './logger';
 
 const GRAPH_API_VERSION = 'v21.0';
-const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+export const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 // ─── Configuration ──────────────────────────────────────────────────
 
@@ -402,6 +402,157 @@ export async function discoverFromPageIds(
   };
 }
 
+// ─── Page Token Helpers ──────────────────────────────────────────────
+
+/**
+ * Fetch a fresh page access token for a specific Facebook Page using a user access token.
+ * When called with a long-lived user token, the returned page token is never-expiring.
+ */
+export async function fetchPageToken(userAccessToken: string, pageId: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${GRAPH_API_BASE}/${pageId}?fields=access_token&access_token=${userAccessToken}`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      return data.access_token || null;
+    }
+    const err = await res.json().catch(() => ({}));
+    logger.warn('Failed to fetch page token', { pageId, error: err });
+    return null;
+  } catch (e) {
+    logger.warn('Error fetching page token', { pageId, error: e });
+    return null;
+  }
+}
+
+/**
+ * Fetch page tokens for multiple pages using a long-lived user token.
+ * Returns a map of facebookPageId -> never-expiring page access token.
+ */
+export async function fetchLongLivedPageTokens(
+  longLivedUserToken: string
+): Promise<Map<string, string>> {
+  const tokenMap = new Map<string, string>();
+  try {
+    const pagesRes = await fetch(
+      `${GRAPH_API_BASE}/me/accounts?fields=id,access_token&access_token=${longLivedUserToken}`
+    );
+    if (pagesRes.ok) {
+      const pagesData = await pagesRes.json();
+      for (const page of pagesData.data || []) {
+        if (page.id && page.access_token) {
+          tokenMap.set(page.id, page.access_token);
+        }
+      }
+      logger.info('Fetched long-lived page tokens', { pageCount: tokenMap.size });
+    } else {
+      const err = await pagesRes.json().catch(() => ({}));
+      logger.warn('Failed to fetch pages with long-lived token', { error: err });
+    }
+  } catch (e) {
+    logger.warn('Error fetching long-lived page tokens', { error: e });
+  }
+  return tokenMap;
+}
+
+// ─── Facebook API Error Classification ──────────────────────────────
+
+interface FacebookApiError {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: number;
+    error_subcode?: number;
+    fbtrace_id?: string;
+  };
+}
+
+export interface FacebookErrorClassification {
+  category: 'token_expired' | 'token_invalid' | 'permission_denied' | 'rate_limited' | 'media_error' | 'unknown';
+  userMessage: string;
+  shouldRetry: boolean;
+  shouldDeactivateAccount: boolean;
+}
+
+export function classifyFacebookError(err: FacebookApiError): FacebookErrorClassification {
+  const code = err.error?.code;
+  const subcode = err.error?.error_subcode;
+  const message = err.error?.message || '';
+
+  // Token expired (code 190, subcode 463 = expired, 460 = password changed)
+  if (code === 190) {
+    if (subcode === 463 || subcode === 460) {
+      return {
+        category: 'token_expired',
+        userMessage: 'Your Instagram connection has expired. Please reconnect your account.',
+        shouldRetry: false,
+        shouldDeactivateAccount: true,
+      };
+    }
+    if (subcode === 458) {
+      return {
+        category: 'permission_denied',
+        userMessage: 'Instagram permissions were revoked. Please reconnect with all required permissions.',
+        shouldRetry: false,
+        shouldDeactivateAccount: true,
+      };
+    }
+    return {
+      category: 'token_invalid',
+      userMessage: 'Your Instagram authentication is invalid. Please reconnect your account.',
+      shouldRetry: false,
+      shouldDeactivateAccount: true,
+    };
+  }
+
+  // Permission denied (code 10 = permission not granted, code 200 = permission error)
+  if (code === 10 || code === 200) {
+    return {
+      category: 'permission_denied',
+      userMessage: 'Instagram permissions are missing. Please reconnect with all required permissions.',
+      shouldRetry: false,
+      shouldDeactivateAccount: true,
+    };
+  }
+
+  // Rate limited (code 4 = app-level, code 32 = user-level, code 613 = calls limit)
+  if (code === 4 || code === 32 || code === 613) {
+    return {
+      category: 'rate_limited',
+      userMessage: 'Instagram rate limit reached. Your post will be retried automatically.',
+      shouldRetry: true,
+      shouldDeactivateAccount: false,
+    };
+  }
+
+  // Media-specific errors
+  if (code === 36003 || message.toLowerCase().includes('media') || message.toLowerCase().includes('video')) {
+    return {
+      category: 'media_error',
+      userMessage: `Instagram rejected the video: ${message}`,
+      shouldRetry: false,
+      shouldDeactivateAccount: false,
+    };
+  }
+
+  return {
+    category: 'unknown',
+    userMessage: `Instagram API error: ${message || 'Unknown error'}`,
+    shouldRetry: true,
+    shouldDeactivateAccount: false,
+  };
+}
+
+export class PublishError extends Error {
+  classification: FacebookErrorClassification;
+  constructor(message: string, classification: FacebookErrorClassification) {
+    super(message);
+    this.name = 'PublishError';
+    this.classification = classification;
+  }
+}
+
 // ─── Content Publishing ─────────────────────────────────────────────
 
 interface PublishReelParams {
@@ -449,7 +600,16 @@ export async function publishReel(params: PublishReelParams): Promise<PublishRes
 
   if (!containerRes.ok) {
     const err = await containerRes.json();
-    throw new Error(`Failed to create media container: ${err.error?.message || JSON.stringify(err)}`);
+    const classification = classifyFacebookError(err);
+    logger.error('Failed to create media container', {
+      error: err,
+      classification: classification.category,
+      fbtrace_id: err.error?.fbtrace_id,
+    });
+    throw new PublishError(
+      `Failed to create media container: ${classification.userMessage}`,
+      classification
+    );
   }
 
   const containerData = await containerRes.json();
@@ -495,7 +655,16 @@ export async function publishReel(params: PublishReelParams): Promise<PublishRes
 
   if (!publishRes.ok) {
     const err = await publishRes.json();
-    throw new Error(`Failed to publish: ${err.error?.message || JSON.stringify(err)}`);
+    const classification = classifyFacebookError(err);
+    logger.error('Failed to publish media', {
+      error: err,
+      classification: classification.category,
+      fbtrace_id: err.error?.fbtrace_id,
+    });
+    throw new PublishError(
+      `Failed to publish: ${classification.userMessage}`,
+      classification
+    );
   }
 
   const publishData = await publishRes.json();
@@ -522,6 +691,9 @@ export async function publishReel(params: PublishReelParams): Promise<PublishRes
 
 /**
  * Get a valid access token for an Instagram account, refreshing if needed.
+ *
+ * Uses the long-lived userAccessToken (stored separately) for the fb_exchange_token
+ * refresh call, then re-derives a fresh page token from the refreshed user token.
  */
 export async function getValidToken(accountId: string): Promise<string> {
   const account = await prisma.instagramAccount.findUnique({
@@ -539,16 +711,36 @@ export async function getValidToken(accountId: string): Promise<string> {
   // If token expires within 7 days, refresh it
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   if (account.tokenExpiresAt < sevenDaysFromNow) {
+    // Need userAccessToken to refresh — legacy records without it must reconnect
+    if (!account.userAccessToken) {
+      logger.warn('No userAccessToken stored, cannot refresh. User must reconnect.', { accountId });
+      if (account.tokenExpiresAt > new Date()) {
+        return account.accessToken;
+      }
+      await prisma.instagramAccount.update({
+        where: { id: accountId },
+        data: { isActive: false, lastError: 'Please reconnect your Instagram account to continue publishing.' },
+      });
+      throw new Error('Instagram account needs reconnection (no user token stored)');
+    }
+
     try {
-      const refreshed = await refreshLongLivedToken(account.accessToken);
+      // Refresh the long-lived USER token (not the page token)
+      const refreshed = await refreshLongLivedToken(account.userAccessToken);
+
+      // Re-derive the page token from the refreshed user token
+      const newPageToken = await fetchPageToken(refreshed.accessToken, account.facebookPageId);
+
       await prisma.instagramAccount.update({
         where: { id: accountId },
         data: {
-          accessToken: refreshed.accessToken,
+          userAccessToken: refreshed.accessToken,
+          accessToken: newPageToken || account.accessToken,
           tokenExpiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
+          lastError: null,
         },
       });
-      return refreshed.accessToken;
+      return newPageToken || account.accessToken;
     } catch (error) {
       logger.error('Failed to refresh Instagram token', { accountId, error });
       // If refresh fails but token hasn't expired yet, use the existing one
@@ -558,7 +750,7 @@ export async function getValidToken(accountId: string): Promise<string> {
       // Mark account as inactive
       await prisma.instagramAccount.update({
         where: { id: accountId },
-        data: { isActive: false, lastError: 'Token expired and refresh failed' },
+        data: { isActive: false, lastError: 'Token expired and refresh failed. Please reconnect your account.' },
       });
       throw new Error('Instagram token expired and could not be refreshed');
     }

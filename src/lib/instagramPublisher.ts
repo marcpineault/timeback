@@ -7,7 +7,7 @@
 
 import { prisma } from './db';
 import { logger } from './logger';
-import { publishReel, getValidToken } from './instagram';
+import { publishReel, getValidToken, PublishError } from './instagram';
 import { isS3Configured, getProcessedVideoUrl } from './s3';
 
 const MAX_RETRIES = 3;
@@ -128,15 +128,14 @@ export async function publishDuePosts(): Promise<{
   }
 
   const now = new Date();
-  const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
 
-  // Find posts that are due: scheduled time has passed, but not more than 10 min ago
+  // Find ALL overdue posts — no artificial time window cutoff.
+  // Posts are published even if the scheduled time was missed (e.g., server restart).
   const duePosts = await prisma.scheduledPost.findMany({
     where: {
       status: 'SCHEDULED',
       scheduledFor: {
         lte: now,
-        gte: tenMinutesAgo,
       },
     },
     include: {
@@ -146,6 +145,20 @@ export async function publishDuePosts(): Promise<{
     orderBy: { scheduledFor: 'asc' },
     take: 10, // Process max 10 at a time to stay within rate limits
   });
+
+  // Log if catching up on significantly delayed posts
+  if (duePosts.length > 0) {
+    const oldestDue = duePosts[0];
+    const delayMinutes = Math.round((now.getTime() - oldestDue.scheduledFor.getTime()) / 60000);
+    if (delayMinutes > 10) {
+      logger.warn('Catching up on delayed posts', {
+        oldestPostId: oldestDue.id,
+        scheduledFor: oldestDue.scheduledFor.toISOString(),
+        delayMinutes,
+        postsToProcess: duePosts.length,
+      });
+    }
+  }
 
   let published = 0;
   let failed = 0;
@@ -205,6 +218,20 @@ export async function publishDuePosts(): Promise<{
         data: { lastPublishedAt: new Date(), lastError: null },
       });
 
+      // Notify if post was published significantly late
+      const delayMs = now.getTime() - post.scheduledFor.getTime();
+      if (delayMs > 30 * 60 * 1000) {
+        await prisma.notification.create({
+          data: {
+            userId: post.userId,
+            type: 'post_delayed',
+            title: 'Post published late',
+            message: `Your video "${post.video.originalName}" was scheduled for ${post.scheduledFor.toISOString()} but published ${Math.round(delayMs / 60000)} minutes late.`,
+            data: { postId: post.id, delayMinutes: Math.round(delayMs / 60000) },
+          },
+        });
+      }
+
       published++;
       logger.info('Post published successfully', {
         postId: post.id,
@@ -214,8 +241,28 @@ export async function publishDuePosts(): Promise<{
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const newRetryCount = post.retryCount + 1;
 
-      if (newRetryCount >= MAX_RETRIES) {
-        // Max retries reached — mark as failed
+      // Check if this is a classified Facebook error
+      let shouldRetry = true;
+      if (error instanceof PublishError) {
+        shouldRetry = error.classification.shouldRetry;
+
+        if (error.classification.shouldDeactivateAccount) {
+          await prisma.instagramAccount.update({
+            where: { id: post.instagramAccountId },
+            data: {
+              isActive: false,
+              lastError: error.classification.userMessage,
+            },
+          });
+          logger.warn('Deactivated Instagram account due to auth error', {
+            accountId: post.instagramAccountId,
+            category: error.classification.category,
+          });
+        }
+      }
+
+      if (!shouldRetry || newRetryCount >= MAX_RETRIES) {
+        // Non-retryable error or max retries reached — mark as failed
         await prisma.scheduledPost.update({
           where: { id: post.id },
           data: {
@@ -232,7 +279,7 @@ export async function publishDuePosts(): Promise<{
             userId: post.userId,
             type: 'post_failed',
             title: 'Post failed to publish',
-            message: `Your video "${post.video.originalName}" failed to publish after ${MAX_RETRIES} attempts: ${errorMessage}`,
+            message: `Your video "${post.video.originalName}" failed to publish: ${errorMessage}`,
             data: { postId: post.id, videoId: post.videoId },
           },
         });
@@ -252,7 +299,13 @@ export async function publishDuePosts(): Promise<{
       }
 
       errors.push(`Post ${post.id}: ${errorMessage}`);
-      logger.error('Failed to publish post', { postId: post.id, error: errorMessage });
+      logger.error('Failed to publish post', {
+        postId: post.id,
+        error: errorMessage,
+        category: error instanceof PublishError ? error.classification.category : 'unknown',
+        shouldRetry,
+        retryCount: newRetryCount,
+      });
     }
   }
 
@@ -390,8 +443,31 @@ export async function refreshExpiringTokens(): Promise<{
   let failedCount = 0;
 
   for (const account of expiringAccounts) {
+    // Legacy accounts without userAccessToken cannot be refreshed — prompt reconnection
+    if (!account.userAccessToken) {
+      logger.warn('Account missing userAccessToken, prompting reconnection', {
+        accountId: account.id,
+        instagramUsername: account.instagramUsername,
+      });
+      await prisma.instagramAccount.update({
+        where: { id: account.id },
+        data: { isActive: false, lastError: 'Please reconnect your Instagram account (system update).' },
+      });
+      await prisma.notification.create({
+        data: {
+          userId: account.userId,
+          type: 'reconnection_needed',
+          title: 'Instagram reconnection required',
+          message: `Your Instagram account @${account.instagramUsername} needs to be reconnected due to a system update. Please visit your schedule settings to reconnect.`,
+          data: { accountId: account.id },
+        },
+      });
+      failedCount++;
+      continue;
+    }
+
     try {
-      // getValidToken handles the refresh logic
+      // getValidToken handles the refresh logic (now uses userAccessToken internally)
       await getValidToken(account.id);
       refreshed++;
     } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { exchangeCodeForTokens, discoverInstagramAccounts, discoverFromPageIds } from '@/lib/instagram';
+import { exchangeCodeForTokens, discoverInstagramAccounts, discoverFromPageIds, fetchLongLivedPageTokens } from '@/lib/instagram';
+import { logger } from '@/lib/logger';
 
 function redirectToSchedule(path: string): NextResponse {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://timebackvideo.com';
@@ -79,8 +80,29 @@ export async function GET(request: NextRequest) {
       return redirectToSchedule(`/dashboard/schedule?error=no_instagram_business_account&pages=${pagesParam}`);
     }
 
-    // Store each discovered account with the LONG-LIVED token for future publishing
+    // Re-fetch page tokens using the long-lived user token to get never-expiring page tokens.
+    // Discovery may have used the short-lived token (more reliable for /me/accounts),
+    // which returns short-lived page tokens (~1 hour). Page tokens obtained via a
+    // long-lived user token are never-expiring for pages where the user has a permanent role.
+    const longLivedPageTokens = await fetchLongLivedPageTokens(longLivedToken);
+
+    // Store each discovered account with proper tokens
     for (const ig of igAccounts) {
+      // Prefer the never-expiring page token from the long-lived user token request
+      const pageToken = longLivedPageTokens.get(ig.facebookPageId) || ig.pageAccessToken;
+
+      if (longLivedPageTokens.has(ig.facebookPageId)) {
+        logger.info('Using long-lived page token for account', {
+          instagramUsername: ig.instagramUsername,
+          facebookPageId: ig.facebookPageId,
+        });
+      } else {
+        logger.warn('Could not get long-lived page token, using discovery token (may be short-lived)', {
+          instagramUsername: ig.instagramUsername,
+          facebookPageId: ig.facebookPageId,
+        });
+      }
+
       await prisma.instagramAccount.upsert({
         where: { instagramUserId: ig.instagramUserId },
         create: {
@@ -90,12 +112,14 @@ export async function GET(request: NextRequest) {
           instagramProfilePic: ig.instagramProfilePic,
           facebookPageId: ig.facebookPageId,
           facebookPageName: ig.facebookPageName,
-          accessToken: ig.pageAccessToken,
+          accessToken: pageToken,
+          userAccessToken: longLivedToken,
           tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
           isActive: true,
         },
         update: {
-          accessToken: ig.pageAccessToken,
+          accessToken: pageToken,
+          userAccessToken: longLivedToken,
           tokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
           instagramUsername: ig.instagramUsername,
           instagramProfilePic: ig.instagramProfilePic,
