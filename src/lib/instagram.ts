@@ -38,6 +38,8 @@ export function getInstagramAuthUrl(state: string): string {
   const scopes = [
     'instagram_basic',
     'instagram_content_publish',
+    'pages_show_list',
+    'pages_read_engagement',
   ].join(',');
 
   const params = new URLSearchParams({
@@ -174,6 +176,12 @@ export async function discoverInstagramAccounts(
   const pagesData = await pagesRes.json();
   const pages: FacebookPage[] = pagesData.data || [];
 
+  logger.info('Facebook Pages discovered', { count: pages.length, pageNames: pages.map(p => p.name) });
+
+  if (pages.length === 0) {
+    logger.warn('No Facebook Pages found — ensure pages_show_list permission is granted');
+  }
+
   const accounts: InstagramBusinessAccount[] = [];
 
   for (const page of pages) {
@@ -182,11 +190,18 @@ export async function discoverInstagramAccounts(
       `${GRAPH_API_BASE}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
     );
 
-    if (!igRes.ok) continue;
+    if (!igRes.ok) {
+      const err = await igRes.json().catch(() => ({}));
+      logger.warn('Failed to query Instagram business account for page', { pageId: page.id, pageName: page.name, error: err });
+      continue;
+    }
 
     const igData = await igRes.json();
     const igAccountId = igData.instagram_business_account?.id;
-    if (!igAccountId) continue;
+    if (!igAccountId) {
+      logger.info('Page has no linked Instagram Business account', { pageId: page.id, pageName: page.name });
+      continue;
+    }
 
     // Get Instagram account details
     const profileRes = await fetch(
