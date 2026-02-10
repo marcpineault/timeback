@@ -6,6 +6,8 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/pricing',
+  '/privacy',
+  '/terms',
   '/api/webhooks(.*)',
   '/api/upload', // Upload route handles its own auth after parsing body
   '/api/health', // Health check endpoint for monitoring

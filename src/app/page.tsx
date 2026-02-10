@@ -402,6 +402,7 @@ export default async function LandingPage() {
               </a>
               <a href="mailto:support@timebackvideo.com" className="hover:text-gray-300 transition-colors">Support</a>
               <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms</Link>
             </div>
           </div>
           <div className="mt-6 pt-6 border-t border-gray-800 text-center text-gray-500 text-sm">
