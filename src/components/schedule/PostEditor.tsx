@@ -3,25 +3,40 @@
 import { useState } from 'react'
 import { ScheduledPostData } from '@/hooks/useSchedule'
 
-interface CaptionEditorProps {
+interface PostEditorProps {
   post: ScheduledPostData
-  onSave: (postId: string, caption: string) => void
+  onSave: (postId: string, data: { caption: string; scheduledFor?: string }) => void
   onRegenerate: (postId: string) => void
   onClose: () => void
 }
 
-export default function CaptionEditor({ post, onSave, onRegenerate, onClose }: CaptionEditorProps) {
+export default function PostEditor({ post, onSave, onRegenerate, onClose }: PostEditorProps) {
   const [caption, setCaption] = useState(post.caption)
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
 
+  const initDate = new Date(post.scheduledFor)
+  const initDateStr = initDate.toISOString().split('T')[0]
+  const initTimeStr = initDate.toTimeString().slice(0, 5)
+
+  const [scheduledDate, setScheduledDate] = useState(initDateStr)
+  const [scheduledTime, setScheduledTime] = useState(initTimeStr)
+
   const charCount = caption.length
   const isOverLimit = charCount > 2200
+
+  const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`)
+  const isInPast = scheduledDateTime < new Date()
+  const hasTimeChanged = scheduledDate !== initDateStr || scheduledTime !== initTimeStr
 
   async function handleSave() {
     setSaving(true)
     try {
-      await onSave(post.id, caption)
+      const data: { caption: string; scheduledFor?: string } = { caption }
+      if (hasTimeChanged) {
+        data.scheduledFor = scheduledDateTime.toISOString()
+      }
+      await onSave(post.id, data)
       onClose()
     } finally {
       setSaving(false)
@@ -48,14 +63,12 @@ export default function CaptionEditor({ post, onSave, onRegenerate, onClose }: C
     }
   }
 
-  const scheduledDate = new Date(post.scheduledFor)
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-[#1A1A24] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-800">
-          <h3 className="text-lg font-semibold text-white">Edit Caption</h3>
+          <h3 className="text-lg font-semibold text-white">Edit Post</h3>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-white transition-colors text-xl"
@@ -73,14 +86,24 @@ export default function CaptionEditor({ post, onSave, onRegenerate, onClose }: C
                 <p className="text-white text-sm font-medium truncate">{post.video.originalName}</p>
                 <p className="text-gray-500 text-xs mt-1">@{post.instagramAccount.instagramUsername}</p>
               </div>
-              <div className="text-sm">
+              <div className="text-sm space-y-2">
                 <p className="text-gray-500">Scheduled:</p>
-                <p className="text-white">
-                  {scheduledDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                </p>
-                <p className="text-violet-400">
-                  {scheduledDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                </p>
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full bg-[#2A2A3A] text-white rounded-lg px-3 py-1.5 text-sm border border-gray-700 focus:border-violet-500 outline-none"
+                />
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="w-full bg-[#2A2A3A] text-white rounded-lg px-3 py-1.5 text-sm border border-gray-700 focus:border-violet-500 outline-none"
+                />
+                {isInPast && (
+                  <p className="text-red-400 text-xs">Cannot schedule in the past</p>
+                )}
               </div>
             </div>
 
@@ -118,7 +141,7 @@ export default function CaptionEditor({ post, onSave, onRegenerate, onClose }: C
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || isOverLimit}
+            disabled={saving || isOverLimit || isInPast}
             className="px-5 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Changes'}

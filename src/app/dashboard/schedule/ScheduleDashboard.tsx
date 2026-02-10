@@ -6,7 +6,7 @@ import InstagramConnect from '@/components/schedule/InstagramConnect'
 import ScheduleBuilder from '@/components/schedule/ScheduleBuilder'
 import QueueView from '@/components/schedule/QueueView'
 import CalendarView from '@/components/schedule/CalendarView'
-import CaptionEditor from '@/components/schedule/CaptionEditor'
+import PostEditor from '@/components/schedule/PostEditor'
 import PublishedHistory from '@/components/schedule/PublishedHistory'
 import {
   useInstagramAccounts,
@@ -50,16 +50,16 @@ export default function ScheduleDashboard() {
     }
   }
 
-  async function handleSaveCaption(postId: string, caption: string) {
+  async function handleSavePost(postId: string, data: { caption: string; scheduledFor?: string }) {
     try {
       await fetch(`/api/schedule/queue/${postId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caption }),
+        body: JSON.stringify(data),
       })
       refetchQueue()
     } catch (err) {
-      console.error('Failed to save caption:', err)
+      console.error('Failed to save post:', err)
     }
   }
 
@@ -156,8 +156,8 @@ export default function ScheduleDashboard() {
               {activeTab === 'calendar' && (
                 <div className="bg-[#1A1A24] rounded-xl p-6">
                   <CalendarView
-                    onDayClick={(date) => {
-                      console.log('Clicked day:', date)
+                    onDayClick={() => {
+                      setActiveTab('queue')
                     }}
                   />
                 </div>
@@ -184,9 +184,9 @@ export default function ScheduleDashboard() {
 
       {/* Caption Editor Modal */}
       {editingPost && (
-        <CaptionEditor
+        <PostEditor
           post={editingPost}
-          onSave={handleSaveCaption}
+          onSave={handleSavePost}
           onRegenerate={() => refetchQueue()}
           onClose={() => setEditingPost(null)}
         />
