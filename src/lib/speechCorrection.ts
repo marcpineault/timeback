@@ -140,16 +140,26 @@ function normalizeWord(word: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Audio-level filler detection
+// Silence map: adaptive threshold + speech-band filter
+//
+// Replaces the old audio filler detection. Instead of trying to identify
+// which audio segments "sound like fillers", we build a full map of all
+// silence intervals. This map is then used to snap detected mistake
+// boundaries to natural silence edges for clean cuts.
 // ---------------------------------------------------------------------------
 
-async function detectFillerSoundsFromAudio(
+interface SilenceInterval {
+  start: number;
+  end: number;
+}
+
+async function buildSilenceMap(
   videoPath: string,
   outputDir: string,
-): Promise<Array<{ start: number; end: number; duration: number }>> {
-  console.log('[Speech Correction] Analyzing audio for filler sounds...');
+): Promise<SilenceInterval[]> {
+  console.log('[Speech Correction] Building silence map with adaptive threshold...');
 
-  const audioPath = path.join(outputDir, `temp_audio_analysis_${Date.now()}.wav`);
+  const audioPath = path.join(outputDir, `temp_silence_map_${Date.now()}.wav`);
 
   try {
     // Extract audio as WAV for analysis
@@ -165,147 +175,132 @@ async function detectFillerSoundsFromAudio(
         .run();
     });
 
-    // Use spawn with array args to prevent command injection
-    const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
-      const ffmpegArgs = ['-i', audioPath, '-af', 'silencedetect=noise=-40dB:d=0.08', '-f', 'null', '-'];
-      const proc = spawn('ffmpeg', ffmpegArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
-      let stdoutData = '';
-      let stderrData = '';
-      proc.stdout?.on('data', (data: Buffer) => { stdoutData += data.toString(); });
-      proc.stderr?.on('data', (data: Buffer) => { stderrData += data.toString(); });
-      proc.on('close', () => resolve({ stdout: stdoutData + stderrData }));
+    // Step 1: Analyze audio levels with speech-band filter to compute
+    // adaptive threshold. Uses the same approach as silence removal.
+    const statsOutput = await new Promise<string>((resolve, reject) => {
+      const proc = spawn('ffmpeg', [
+        '-i', audioPath,
+        '-af', 'highpass=f=200,lowpass=f=3500,astats=metadata=1:reset=1',
+        '-f', 'null', '-',
+      ], { stdio: ['pipe', 'pipe', 'pipe'] });
+      let stderr = '';
+      proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+      proc.on('close', () => resolve(stderr));
       proc.on('error', reject);
     });
 
-    // Parse silence detection output
-    const silenceStarts: number[] = [];
-    const silenceEnds: number[] = [];
+    // Parse RMS and peak levels from astats output
+    let rmsLevel = -30;
+    let peakLevel = -10;
+    const rmsMatch = statsOutput.match(/RMS level dB:\s*([-\d.]+)/);
+    const peakMatch = statsOutput.match(/Peak level dB:\s*([-\d.]+)/);
+    if (rmsMatch) rmsLevel = parseFloat(rmsMatch[1]);
+    if (peakMatch) peakLevel = parseFloat(peakMatch[1]);
 
-    for (const line of stdout.split('\n')) {
-      const startMatch = line.match(/silence_start: ([\d.]+)/);
-      const endMatch = line.match(/silence_end: ([\d.]+)/);
-      if (startMatch) silenceStarts.push(parseFloat(startMatch[1]));
-      if (endMatch) silenceEnds.push(parseFloat(endMatch[1]));
+    const dynamicRange = peakLevel - rmsLevel;
+
+    // Adaptive threshold calculation:
+    // - Noisy audio (DR < 10dB): threshold closer to speech level
+    // - Clean audio (DR >= 10dB): threshold well below speech
+    let silenceThreshold: number;
+    if (dynamicRange < 10) {
+      silenceThreshold = rmsLevel + (dynamicRange * 0.3);
+    } else {
+      silenceThreshold = rmsLevel - 3;
     }
+    silenceThreshold = Math.max(-50, Math.min(-15, silenceThreshold));
 
-    console.log(`[Speech Correction] Found ${silenceStarts.length} silence starts, ${silenceEnds.length} silence ends`);
-
-    // Find short speech segments between silences — these could be filler sounds
-    const potentialFillers: Array<{ start: number; end: number; duration: number }> = [];
-
-    if (silenceStarts.length > 0 && silenceStarts[0] > 0.12) {
-      const duration = silenceStarts[0];
-      if (duration >= 0.1 && duration <= 0.9) {
-        potentialFillers.push({ start: 0, end: silenceStarts[0], duration });
-      }
-    }
-
-    for (let i = 0; i < silenceEnds.length; i++) {
-      const speechStart = silenceEnds[i];
-      const nextSilenceIdx = silenceStarts.findIndex(s => s > speechStart);
-      const speechEnd = nextSilenceIdx >= 0 ? silenceStarts[nextSilenceIdx] : null;
-
-      if (speechEnd !== null && speechEnd > speechStart) {
-        const duration = speechEnd - speechStart;
-        if (duration >= 0.1 && duration <= 0.8) {
-          potentialFillers.push({ start: speechStart, end: speechEnd, duration });
-        }
-      }
-    }
-
-    // Detect closely spaced short segments (stutters)
-    const stutterCandidates: Array<{ start: number; end: number; duration: number }> = [];
-    for (let i = 0; i < potentialFillers.length - 1; i++) {
-      const current = potentialFillers[i];
-      const next = potentialFillers[i + 1];
-      if (next.start - current.end < 0.15 && current.duration < 0.3 && next.duration < 0.3) {
-        stutterCandidates.push(current);
-      }
-    }
-
-    const allFillers = [...potentialFillers, ...stutterCandidates];
-    const uniqueFillers = allFillers.filter((filler, index, self) =>
-      index === self.findIndex(f => Math.abs(f.start - filler.start) < 0.05),
+    console.log(
+      `[Speech Correction] Audio: peak=${peakLevel.toFixed(1)}dB, RMS=${rmsLevel.toFixed(1)}dB, ` +
+      `DR=${dynamicRange.toFixed(1)}dB → silence threshold=${silenceThreshold.toFixed(1)}dB`,
     );
 
-    console.log(`[Speech Correction] Found ${uniqueFillers.length} potential filler sounds from audio analysis`);
+    // Step 2: Run silence detection with speech-band filter.
+    // Minimum duration 0.05s (50ms) — catches the micro-silences that
+    // naturally bracket filler words.
+    const silenceOutput = await new Promise<string>((resolve, reject) => {
+      const proc = spawn('ffmpeg', [
+        '-i', audioPath,
+        '-af', `highpass=f=200,lowpass=f=3500,silencedetect=noise=${silenceThreshold}dB:d=0.05`,
+        '-f', 'null', '-',
+      ], { stdio: ['pipe', 'pipe', 'pipe'] });
+      let stderr = '';
+      proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+      proc.on('close', () => resolve(stderr));
+      proc.on('error', reject);
+    });
 
-    // Clean up
+    // Parse silence intervals
+    const silences: SilenceInterval[] = [];
+    let currentStart: number | null = null;
+    for (const line of silenceOutput.split('\n')) {
+      const startMatch = line.match(/silence_start: ([\d.]+)/);
+      const endMatch = line.match(/silence_end: ([\d.]+)/);
+      if (startMatch) currentStart = parseFloat(startMatch[1]);
+      if (endMatch && currentStart !== null) {
+        silences.push({ start: currentStart, end: parseFloat(endMatch[1]) });
+        currentStart = null;
+      }
+    }
+
+    console.log(`[Speech Correction] Silence map: ${silences.length} intervals found`);
+
     if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-    return uniqueFillers;
+    return silences;
   } catch (error) {
-    console.error('[Speech Correction] Audio analysis failed:', error);
+    console.error('[Speech Correction] Silence map build failed:', error);
     if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
     return [];
   }
 }
 
 // ---------------------------------------------------------------------------
-// Correlate audio fillers with transcript
+// Snap mistake boundaries to nearest silence edges
+//
+// For each detected mistake, expand its start/end into the surrounding
+// silence intervals. This ensures cuts happen at natural silence points
+// rather than relying on imprecise Whisper word timestamps + padding.
 // ---------------------------------------------------------------------------
 
-function correlateAudioFillersWithTranscript(
-  audioFillers: Array<{ start: number; end: number; duration: number }>,
-  words: TranscriptionWord[],
-  fillerConfig: FillerWordConfig,
-): SpeechMistake[] {
-  const mistakes: SpeechMistake[] = [];
+function snapToSilenceBoundaries(
+  mistakes: SpeechMistake[],
+  silenceMap: SilenceInterval[],
+): void {
+  if (silenceMap.length === 0) return;
 
-  for (const filler of audioFillers) {
-    const overlappingWords = words.filter(
-      w =>
-        (w.start >= filler.start - 0.1 && w.start <= filler.end + 0.1) ||
-        (w.end >= filler.start - 0.1 && w.end <= filler.end + 0.1) ||
-        (w.start <= filler.start && w.end >= filler.end),
-    );
+  // Keep 30ms of silence at each edit point for natural word spacing
+  const KEEP_SILENCE = 0.03;
 
-    if (overlappingWords.length > 0) {
-      const fillerWord = overlappingWords.find(w => getFillerTier(w.word, fillerConfig) > 0);
+  for (const mistake of mistakes) {
+    // Find silence interval closest to and overlapping/adjacent to mistake start
+    let preSilence: SilenceInterval | null = null;
+    let postSilence: SilenceInterval | null = null;
 
-      if (fillerWord) {
-        const tier = getFillerTier(fillerWord.word, fillerConfig);
-        // Use the widest boundary between audio detection and Whisper.
-        // Audio silence-detection finds exact sound boundaries; Whisper
-        // word timestamps can be off by 100-200ms. Taking the wider span
-        // ensures we capture the full filler sound.
-        mistakes.push({
-          type: 'filler_word',
-          startTime: Math.min(fillerWord.start, filler.start),
-          endTime: Math.max(fillerWord.end, filler.end),
-          text: fillerWord.word,
-          reason: 'Audio-confirmed filler word',
-          // Audio-confirmed Tier 1 gets highest confidence
-          confidence: tier === 1 ? 0.95 : tier === 2 ? 0.80 : 0.65,
-        });
-      } else {
-        const text = overlappingWords.map(w => w.word).join(' ');
-        if (overlappingWords.length <= 2 && filler.duration < 0.8) {
-          mistakes.push({
-            type: 'filler_word',
-            startTime: filler.start,
-            endTime: filler.end,
-            text: text || '[hesitation]',
-            reason: 'Audio-detected hesitation sound',
-            confidence: 0.40,
-          });
+    for (const silence of silenceMap) {
+      // Pre-silence: silence that ends near/after mistake start and starts before it
+      if (silence.end >= mistake.startTime - 0.1 && silence.start < mistake.startTime + 0.1) {
+        if (!preSilence || Math.abs(silence.end - mistake.startTime) < Math.abs(preSilence.end - mistake.startTime)) {
+          preSilence = silence;
         }
       }
-    } else {
-      // No overlapping words — gap in transcription
-      if (filler.duration >= 0.15 && filler.duration <= 0.6) {
-        mistakes.push({
-          type: 'filler_word',
-          startTime: filler.start,
-          endTime: filler.end,
-          text: '[filler sound]',
-          reason: 'Audio-detected filler (not in transcript)',
-          confidence: 0.35,
-        });
+      // Post-silence: silence that starts near/before mistake end and ends after it
+      if (silence.start <= mistake.endTime + 0.1 && silence.end > mistake.endTime - 0.1) {
+        if (!postSilence || Math.abs(silence.start - mistake.endTime) < Math.abs(postSilence.start - mistake.endTime)) {
+          postSilence = silence;
+        }
       }
     }
-  }
 
-  return mistakes;
+    // Snap start: expand backward into pre-silence, keeping a tiny gap
+    if (preSilence) {
+      mistake.startTime = preSilence.start + KEEP_SILENCE;
+    }
+
+    // Snap end: expand forward into post-silence, keeping a tiny gap
+    if (postSilence) {
+      mistake.endTime = postSilence.end - KEEP_SILENCE;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -413,9 +408,9 @@ function preDetectMistakes(
           shouldFlag = true;
           confidence = 0.85;
         } else if (tier === 1) {
-          // Tier 1: always flag
+          // Tier 1: always flag — these are never real words
           shouldFlag = true;
-          confidence = 0.85;
+          confidence = 0.90;
         } else if (tier === 2) {
           // Tier 2: flag with light context check
           // "like" needs special handling
@@ -425,18 +420,17 @@ function preDetectMistakes(
             if (verbContexts.includes(prevWord) || comparisonContexts.includes(prevWord)) continue;
             if (['this', 'that', 'a', 'the'].includes(nextWord)) continue;
           }
-          // Flag if preceded or followed by a pause > 0.3s, or word is short (< 0.3s)
-          shouldFlag = gapBefore > 0.3 || gapAfter > 0.3 || wordDuration < 0.3;
-          confidence = 0.65;
+          // Flag if preceded or followed by a pause > 0.15s, or word is short (< 0.4s)
+          shouldFlag = gapBefore > 0.15 || gapAfter > 0.15 || wordDuration < 0.4;
+          confidence = 0.70;
         } else if (tier === 3) {
-          // Tier 3: only flag with strong evidence
-          // Need a significant gap (> 0.5s) on at least one side
+          // Tier 3: flag with moderate evidence
           if (normalized === 'so' || normalized === 'well') {
-            shouldFlag = i === 0 || gapBefore > 0.5;
+            shouldFlag = i === 0 || gapBefore > 0.25;
           } else {
-            shouldFlag = gapBefore > 0.5 && gapAfter > 0.3;
+            shouldFlag = gapBefore > 0.25 && gapAfter > 0.15;
           }
-          confidence = 0.50;
+          confidence = 0.55;
         }
 
         if (shouldFlag) {
@@ -1020,18 +1014,10 @@ export async function applySpeechCorrections(
 
   console.log(`[Speech Correction] Applying corrections to video (duration: ${duration.toFixed(2)}s)`);
 
-  // Speech correction needs tight, aggressive cuts:
-  //
-  //  cutPadding = 0.15  — Eat 150ms of dead air on each side of the filler.
-  //                        Compensates for Whisper timestamp imprecision (~100-200ms)
-  //                        and trims natural pauses that bracket filler words. Without
-  //                        this, both pauses are preserved and concatenated, creating
-  //                        a noticeable gap at every cut point.
-  //
-  //  timebackPadding = 0  — No keep-segment expansion. The 20ms audio micro-fades
-  //                          in the FFmpeg filter handle smooth transitions. Any
-  //                          timeback padding reclaims cut area and loosens the edit.
-  const segments = calculateSegmentsToKeep(mistakes, duration, confidenceThreshold, 0.15, 0, 0);
+  // Mistake boundaries are already silence-snapped by snapToSilenceBoundaries(),
+  // so we only need minimal padding (5ms) to avoid sub-sample edge artifacts.
+  // No timeback padding — cuts are aligned to natural silence points.
+  const segments = calculateSegmentsToKeep(mistakes, duration, confidenceThreshold, 0.005, 0, 0);
 
   if (segments.length === 0) {
     throw new Error('No segments to keep after corrections — this would result in an empty video');
@@ -1044,7 +1030,7 @@ export async function applySpeechCorrections(
   }
 
   // Build filter complex with audio micro-fades to eliminate clicks at edit points
-  const AUDIO_FADE_MS = 0.02; // 20ms micro-fade — inaudible but eliminates pops
+  const AUDIO_FADE_MS = 0.03; // 30ms micro-fade — inaudible but eliminates pops
   const filterParts: string[] = [];
   const concatInputs: string[] = [];
 
@@ -1146,61 +1132,47 @@ export async function correctSpeechMistakes(
       ? config.confidenceThreshold
       : AGGRESSIVENESS_THRESHOLDS[config.aggressiveness] || 0.60;
 
-  // Step 1 + 2: Run audio analysis and transcript detection in PARALLEL
-  console.log('[Speech Correction] Running audio analysis and transcript detection in parallel...');
+  // Step 1: Build silence map AND run transcript detection in PARALLEL.
+  // The silence map gives us precise audio boundaries for cutting;
+  // transcript detection identifies WHICH words to remove.
+  console.log('[Speech Correction] Building silence map and running detection in parallel...');
 
-  const [audioFillerMistakes, transcriptMistakes] = await Promise.all([
-    // Audio-level filler detection
-    config.removeFillerWords
-      ? detectFillerSoundsFromAudio(inputPath, outputDir).then(audioFillers =>
-          correlateAudioFillersWithTranscript(audioFillers, words, fillerConfig),
-        )
-      : Promise.resolve([] as SpeechMistake[]),
-
-    // Transcript-based detection (programmatic + GPT)
+  const [silenceMap, transcriptMistakes] = await Promise.all([
+    buildSilenceMap(inputPath, outputDir),
     detectSpeechMistakes(words, config, fillerConfig),
   ]);
 
   console.log(
-    `[Speech Correction] Audio: ${audioFillerMistakes.length} detections, Transcript: ${transcriptMistakes.length} detections`,
+    `[Speech Correction] Detection: ${transcriptMistakes.length} mistakes, Silence map: ${silenceMap.length} intervals`,
   );
 
-  // Step 3: Merge with confidence boosting for multi-signal detections
-  const allMistakes = [...transcriptMistakes];
+  // Step 2: Filter by confidence threshold
+  const allMistakes = transcriptMistakes.filter(m => m.confidence >= confidenceThreshold);
 
-  for (const audioMistake of audioFillerMistakes) {
-    const overlappingIdx = allMistakes.findIndex(
-      existing =>
-        Math.abs(audioMistake.startTime - existing.startTime) < 0.2 ||
-        (audioMistake.startTime >= existing.startTime - 0.1 && audioMistake.startTime <= existing.endTime + 0.1),
-    );
-
-    if (overlappingIdx >= 0) {
-      // Audio confirms transcript detection — boost confidence and widen
-      // boundaries to the union. Audio silence-detection gives precise
-      // sound boundaries; Whisper word timestamps can be off by 100-200ms.
-      const existing = allMistakes[overlappingIdx];
-      existing.confidence = Math.min(0.95, existing.confidence + 0.10);
-      existing.startTime = Math.min(existing.startTime, audioMistake.startTime);
-      existing.endTime = Math.max(existing.endTime, audioMistake.endTime);
-      existing.reason += ' (audio-confirmed)';
-    } else {
-      allMistakes.push(audioMistake);
-    }
-  }
-
-  allMistakes.sort((a, b) => a.startTime - b.startTime);
-
-  const aboveThreshold = allMistakes.filter(m => m.confidence >= confidenceThreshold).length;
   console.log(
-    `[Speech Correction] Total: ${allMistakes.length} mistakes, ${aboveThreshold} above threshold (${confidenceThreshold.toFixed(2)})`,
+    `[Speech Correction] ${allMistakes.length}/${transcriptMistakes.length} mistakes above threshold (${confidenceThreshold.toFixed(2)})`,
   );
 
-  if (aboveThreshold === 0) {
+  if (allMistakes.length === 0) {
     console.log('[Speech Correction] No mistakes above confidence threshold, copying file');
     fs.copyFileSync(inputPath, outputPath);
-    return { outputPath, mistakes: allMistakes, segmentsRemoved: 0, timeRemoved: 0 };
+    return { outputPath, mistakes: transcriptMistakes, segmentsRemoved: 0, timeRemoved: 0 };
   }
+
+  // Step 3: Snap mistake boundaries to silence edges.
+  // This replaces the old fixed-padding approach. Instead of cutting at
+  // Whisper word timestamps ± arbitrary ms, we expand each cut into the
+  // surrounding silence intervals for clean, natural-sounding edits.
+  snapToSilenceBoundaries(allMistakes, silenceMap);
+
+  // Log final cut plan
+  allMistakes.sort((a, b) => a.startTime - b.startTime);
+  console.log('[Speech Correction] Cut plan after silence-snapping:');
+  allMistakes.forEach((m, i) => {
+    console.log(
+      `  ${i + 1}. [${m.type}] "${m.text}" (${m.startTime.toFixed(2)}s–${m.endTime.toFixed(2)}s) conf=${m.confidence.toFixed(2)}: ${m.reason}`,
+    );
+  });
 
   // Step 4: Apply corrections
   console.log('[Speech Correction] Applying corrections...');
@@ -1208,7 +1180,7 @@ export async function correctSpeechMistakes(
 
   return {
     outputPath: result.outputPath,
-    mistakes: allMistakes,
+    mistakes: transcriptMistakes,
     segmentsRemoved: result.segmentsRemoved,
     timeRemoved: result.timeRemoved,
   };
