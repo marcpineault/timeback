@@ -102,16 +102,27 @@ export default function ScheduleDashboard() {
       )}
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
-          <p className="text-red-400 text-sm">
+          <p className="text-red-400 text-sm font-medium mb-1">
             {error === 'missing_page_permissions'
-              ? 'Facebook Page permissions were not granted. Please remove the app from your Facebook settings (Settings → Business Integrations), then try connecting again and approve all requested permissions.'
+              ? 'Page permissions not granted'
               : error === 'missing_instagram_permissions'
-              ? 'Instagram permissions were not granted. Make sure your Facebook App has the "Instagram" product added in the Facebook Developer Console (App Dashboard → Add Product → Instagram). Then remove the app from your Facebook settings and reconnect.'
+              ? 'Instagram permissions not granted'
               : error === 'no_facebook_pages'
-              ? 'No Facebook Pages found. During the Facebook login, make sure to select your Facebook Page when prompted. If this keeps happening, go to Facebook Settings → Business Integrations, remove TimeBack, and try again.'
+              ? 'No Facebook Page selected'
               : error === 'no_instagram_business_account'
-              ? `We found your Facebook Page${pagesParam ? ` "${pagesParam}"` : '(s)'} but it doesn't have a linked Instagram Business account. Go to your Facebook Page → Settings → Linked Accounts → Instagram and connect your Instagram account there.`
-              : `Connection error: ${error.replace(/_/g, ' ')}`}
+              ? 'No Instagram Business account found'
+              : 'Connection failed'}
+          </p>
+          <p className="text-red-400/70 text-xs">
+            {error === 'missing_page_permissions'
+              ? 'Please try again and approve all permissions when Facebook asks.'
+              : error === 'missing_instagram_permissions'
+              ? 'Please try again and approve all permissions when Facebook asks.'
+              : error === 'no_facebook_pages'
+              ? 'Make sure to select your Facebook Page during the login flow. Try connecting again.'
+              : error === 'no_instagram_business_account'
+              ? `Your Facebook Page${pagesParam ? ` "${pagesParam}"` : ''} doesn't have a linked Instagram Business or Creator account. Link one in your Facebook Page settings under Linked Accounts, then try again.`
+              : `Something went wrong (${error.replace(/_/g, ' ')}). Please try connecting again.`}
           </p>
         </div>
       )}
@@ -126,20 +137,7 @@ export default function ScheduleDashboard() {
 
       {/* No accounts connected */}
       {!accountsLoading && accounts.length === 0 ? (
-        <div>
-          <InstagramConnect accounts={accounts} onConnected={refetchAccounts} />
-          <div className="mt-6 bg-[#1A1A24] rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-3">How it works</h3>
-            <div className="space-y-3 text-gray-400 text-sm">
-              <p>1. Connect your Instagram Business or Creator account</p>
-              <p>2. Set up your weekly posting schedule (e.g., 3x/day at 9am, 1pm, 6pm)</p>
-              <p>3. Upload and process your videos in the Editor</p>
-              <p>4. Add processed videos to your schedule queue</p>
-              <p>5. AI generates captions for each post</p>
-              <p>6. Videos auto-publish to Instagram at your scheduled times</p>
-            </div>
-          </div>
-        </div>
+        <InstagramConnect accounts={accounts} onConnected={refetchAccounts} />
       ) : (
         <>
           {/* Tabs */}
