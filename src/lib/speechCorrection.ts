@@ -566,11 +566,84 @@ function preDetectMistakes(
 }
 
 // ---------------------------------------------------------------------------
-// GPT-based detection (chunked for accuracy)
+// LCS-based diff: find which original words were removed in cleaned version
+//
+// Instead of asking GPT to identify mistake indices (error-prone), we ask
+// GPT-4o to return the cleaned transcript, then use LCS diff to find which
+// words were removed. This leverages what LLMs are good at (understanding
+// intent) rather than what they're bad at (precise index picking).
 // ---------------------------------------------------------------------------
 
-const GPT_CHUNK_SIZE = 100;
-const GPT_CHUNK_OVERLAP = 20;
+function findRemovedWordIndices(
+  originalWords: TranscriptionWord[],
+  cleanedText: string,
+): Set<number> {
+  const cleanedTokens = cleanedText
+    .split(/\s+/)
+    .map(w => w.toLowerCase().replace(/[^a-zà-ÿ0-9']/g, ''))
+    .filter(Boolean);
+
+  const origTokens = originalWords.map(w =>
+    w.word.toLowerCase().replace(/[^a-zà-ÿ0-9']/g, ''),
+  );
+
+  const n = origTokens.length;
+  const m = cleanedTokens.length;
+
+  if (m === 0) {
+    console.warn('[Speech Correction] GPT returned empty cleaned text, skipping');
+    return new Set();
+  }
+
+  // Build LCS DP table
+  const dp: number[][] = [];
+  for (let i = 0; i <= n; i++) {
+    dp[i] = new Array(m + 1).fill(0);
+  }
+
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      if (origTokens[i - 1] === cleanedTokens[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  // Backtrack to find which original words are in the LCS (kept)
+  const keptIndices = new Set<number>();
+  let i = n;
+  let j = m;
+  while (i > 0 && j > 0) {
+    if (origTokens[i - 1] === cleanedTokens[j - 1]) {
+      keptIndices.add(i - 1);
+      i--;
+      j--;
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+
+  // Words NOT in the LCS were removed
+  const removedIndices = new Set<number>();
+  for (let idx = 0; idx < n; idx++) {
+    if (!keptIndices.has(idx)) {
+      removedIndices.add(idx);
+    }
+  }
+
+  return removedIndices;
+}
+
+// ---------------------------------------------------------------------------
+// GPT-based detection: clean-transcript-diff approach
+// ---------------------------------------------------------------------------
+
+const GPT_CHUNK_SIZE = 800;
+const GPT_CHUNK_OVERLAP = 50;
 
 export async function detectSpeechMistakesWithGPT(
   words: TranscriptionWord[],
@@ -580,7 +653,7 @@ export async function detectSpeechMistakesWithGPT(
 
   const openai = getOpenAIClient();
 
-  // Chunk the transcript for better accuracy on longer videos
+  // Chunk the transcript for very long videos
   const chunks: { words: TranscriptionWord[]; offset: number }[] = [];
 
   if (words.length <= GPT_CHUNK_SIZE + GPT_CHUNK_OVERLAP) {
@@ -593,146 +666,191 @@ export async function detectSpeechMistakesWithGPT(
     }
   }
 
-  console.log(`[Speech Correction] Analyzing ${words.length} words with GPT in ${chunks.length} chunk(s)...`);
+  console.log(`[Speech Correction] Analyzing ${words.length} words with GPT-4o clean-transcript-diff in ${chunks.length} chunk(s)...`);
 
-  const aggressivenessInstructions: Record<string, string> = {
-    conservative: 'Be conservative — only flag clear, obvious mistakes that definitely disrupt the flow.',
-    moderate: 'Be moderately aggressive — flag mistakes that a professional editor would remove.',
-    aggressive: 'Be very aggressive — flag everything that could possibly be a mistake. When in doubt, flag it.',
-  };
+  // Build removal instructions based on config
+  const removalTypes: string[] = [];
+  if (config.removeFillerWords) {
+    removalTypes.push('- Filler sounds: um, uh, uhm, hmm, er, ah, and similar hesitation sounds');
+  }
+  if (config.removeFalseStarts) {
+    removalTypes.push('- False starts: incomplete thoughts that get abandoned and restarted');
+  }
+  if (config.removeSelfCorrections) {
+    removalTypes.push('- Self-corrections: when someone says something wrong then corrects themselves');
+  }
+  if (config.removeRepeatedWords) {
+    removalTypes.push('- Stutters and accidental word repetitions: "the the", "I I I"');
+  }
+  if (config.removeRepeatedPhrases) {
+    removalTypes.push('- Repeated phrases: when someone accidentally says the same phrase twice in a row');
+  }
 
-  const systemPrompt = `You are an expert video editor analyzing a transcript to find speech mistakes to cut. Your job is to be THOROUGH and find ALL mistakes.
+  const aggressivenessNote =
+    config.aggressiveness === 'aggressive'
+      ? 'Be thorough — remove anything that sounds like a speech mistake.'
+      : config.aggressiveness === 'conservative'
+        ? 'Be very conservative — only remove things that are clearly mistakes.'
+        : 'Remove clear mistakes but preserve natural speech rhythm.';
 
-MISTAKES TO FIND:
-${config.removeRepeatedWords ? `
-1. REPEATED_WORD: Any word said twice in a row or very close together
-   - "the the", "I I", "and and", "to to", "a a"
-   - Even small words count!` : ''}
-${config.removeFillerWords ? `
-2. FILLER_WORD: Verbal fillers and hesitations
-   - "um", "uh", "uhm", "er", "ah", "oh", "hmm", "mm"
-   - "like" when used as a filler (NOT as a verb or comparison)
-   - "you know" as a filler phrase
-   - "I mean" when not actually clarifying
-   - "basically", "literally", "actually", "obviously" when overused
-   - "so" or "well" at the start of sentences as a filler
-   - "right" or "okay" used as verbal tics` : ''}
-${config.removeFalseStarts ? `
-3. FALSE_START: Incomplete thoughts that get restarted
-   - "I was going to-- I decided to..."
-   - "We should-- actually let's..."
-   - Any sentence that gets abandoned and restarted` : ''}
-${config.removeSelfCorrections ? `
-4. SELF_CORRECTION: When someone says something wrong then corrects it
-   - "I went to the store-- I mean the mall" → cut "I went to the store-- I mean"
-   - "It costs fifty-- sorry, sixty dollars" → cut "fifty-- sorry,"
-   - Always keep the CORRECT version, cut the wrong part` : ''}
-5. STUTTER: Stuttering or partial words
-   - "b-b-but", "wh-what", "I-I-I"
-${config.removeRepeatedPhrases ? `
-6. REPEATED_PHRASE: ONLY flag phrases that are CLEARLY accidental back-to-back repetitions
-   - Must be IMMEDIATELY consecutive (no words between them)
-   - Be VERY conservative — when in doubt, do NOT flag it` : ''}
+  const systemPrompt = `You clean up spoken transcripts by removing speech mistakes.
 
-${aggressivenessInstructions[config.aggressiveness]}
+Remove ONLY:
+${removalTypes.join('\n')}
 
-CRITICAL RULES:
-1. Be THOROUGH — find every single mistake
-2. For repeated words, mark the FIRST occurrence for removal (keep the clearer second one)
-3. For self-corrections, mark the WRONG part (keep the correction)
-4. Each word has an index — use exact indices
-5. Do NOT flag "like" when used as "I like X" or "looks like X"
-6. Do NOT flag intentional emphasis or rhetorical repetition
-7. Include a confidence score (0.0–1.0) for each mistake
+Rules:
+- Use ONLY words from the original — never add, rephrase, or reorder words
+- Only REMOVE words, never insert new ones
+- Keep all meaningful content intact
+- For self-corrections, keep the CORRECTED version (the second attempt)
+- For false starts, keep the completed thought
+- ${aggressivenessNote}
 
-OUTPUT FORMAT — Return JSON:
-{
-  "mistakes": [
-    {
-      "type": "FILLER_WORD",
-      "startIndex": 5,
-      "endIndex": 5,
-      "text": "um",
-      "reason": "Filler word",
-      "confidence": 0.9
-    }
-  ]
-}`;
+Return ONLY the cleaned transcript text. No explanations, no formatting, no quotes around it.`;
 
-  // Process chunks (in parallel when there are multiple)
+  // Process chunks (in parallel for speed)
   const chunkResults = await Promise.all(
     chunks.map(async (chunk) => {
-      const wordList = chunk.words.map((w, i) => ({
-        index: i + chunk.offset,
-        word: w.word,
-        start: w.start,
-        end: w.end,
-      }));
-
       const transcriptText = chunk.words.map(w => w.word).join(' ');
 
       try {
         const response = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: [
             { role: 'system', content: systemPrompt },
-            {
-              role: 'user',
-              content: `Find ALL speech mistakes in this transcript. Be thorough!\n\nTRANSCRIPT:\n"${transcriptText}"\n\nWORD LIST (with indices and timestamps):\n${JSON.stringify(wordList, null, 2)}\n\nReturn a JSON object with all mistakes found. Check every single word!`,
-            },
+            { role: 'user', content: transcriptText },
           ],
-          response_format: { type: 'json_object' },
           temperature: 0.1,
         });
 
-        const content = response.choices[0].message.content || '{"mistakes": []}';
-        const parsed = JSON.parse(content);
-        return (parsed.mistakes || []) as Array<{
-          type: string;
-          startIndex: number;
-          endIndex: number;
-          text?: string;
-          reason?: string;
-          confidence?: number;
-        }>;
+        const cleanedText = response.choices[0].message.content?.trim() || '';
+
+        if (!cleanedText) {
+          console.warn('[Speech Correction] GPT returned empty response for chunk');
+          return { removedIndices: new Set<number>(), offset: chunk.offset, size: chunk.words.length };
+        }
+
+        const removedIndices = findRemovedWordIndices(chunk.words, cleanedText);
+        console.log(
+          `[Speech Correction] Chunk (offset ${chunk.offset}): ${removedIndices.size}/${chunk.words.length} words removed`,
+        );
+
+        return { removedIndices, offset: chunk.offset, size: chunk.words.length };
       } catch (error) {
         console.error('[Speech Correction] GPT chunk error:', error);
-        return [];
+        return { removedIndices: new Set<number>(), offset: chunk.offset, size: chunk.words.length };
       }
     }),
   );
 
-  // Flatten and convert to SpeechMistake format
-  const allRaw = chunkResults.flat();
-  const mistakes: SpeechMistake[] = allRaw
-    .filter(
-      m =>
-        m.startIndex !== undefined &&
-        m.endIndex !== undefined &&
-        m.startIndex >= 0 &&
-        m.endIndex < words.length &&
-        m.startIndex <= m.endIndex,
-    )
-    .map(m => ({
-      type: m.type.toLowerCase().replace(/_/g, '_') as MistakeType,
-      startTime: words[m.startIndex].start,
-      endTime: words[m.endIndex].end,
-      text: m.text || words.slice(m.startIndex, m.endIndex + 1).map(w => w.word).join(' '),
-      reason: m.reason || 'Detected by AI',
-      confidence: m.confidence ?? 0.70,
-    }));
-
-  // Deduplicate across chunk overlaps
-  const deduped: SpeechMistake[] = [];
-  for (const m of mistakes) {
-    const isDuplicate = deduped.some(
-      existing => Math.abs(existing.startTime - m.startTime) < 0.1 && Math.abs(existing.endTime - m.endTime) < 0.1,
-    );
-    if (!isDuplicate) deduped.push(m);
+  // Collect all removed word indices (adjusting for chunk offsets)
+  const globalRemovedIndices = new Set<number>();
+  for (const result of chunkResults) {
+    for (const localIdx of result.removedIndices) {
+      globalRemovedIndices.add(localIdx + result.offset);
+    }
   }
 
-  console.log(`[Speech Correction] GPT detected ${deduped.length} mistakes across ${chunks.length} chunk(s)`);
-  return deduped;
+  // For overlap regions, require consensus (both chunks must agree to remove)
+  if (chunks.length > 1) {
+    for (let c = 0; c < chunks.length - 1; c++) {
+      const currentEnd = chunks[c].offset + chunks[c].words.length;
+      const nextStart = chunks[c + 1].offset;
+      for (let idx = nextStart; idx < currentEnd; idx++) {
+        const inCurrent = chunkResults[c].removedIndices.has(idx - chunks[c].offset);
+        const inNext = chunkResults[c + 1].removedIndices.has(idx - chunks[c + 1].offset);
+        if (inCurrent !== inNext) {
+          // Disagreement in overlap — be conservative, keep the word
+          globalRemovedIndices.delete(idx);
+        }
+      }
+    }
+  }
+
+  // Group consecutive removed words into SpeechMistake objects
+  const fillerConfig = getFillerConfig(config.language === 'auto' ? 'en' : config.language);
+  const sortedRemoved = Array.from(globalRemovedIndices).sort((a, b) => a - b);
+
+  const groups: Array<{ start: number; end: number }> = [];
+  let currentGroup: { start: number; end: number } | null = null;
+
+  for (const idx of sortedRemoved) {
+    if (!currentGroup) {
+      currentGroup = { start: idx, end: idx };
+    } else if (idx <= currentGroup.end + 1) {
+      // Consecutive or adjacent — extend group
+      currentGroup.end = idx;
+    } else {
+      groups.push(currentGroup);
+      currentGroup = { start: idx, end: idx };
+    }
+  }
+  if (currentGroup) groups.push(currentGroup);
+
+  // Convert groups to SpeechMistake objects with classification
+  const mistakes: SpeechMistake[] = [];
+
+  for (const group of groups) {
+    if (group.start >= words.length || group.end >= words.length) continue;
+
+    const groupWords = words.slice(group.start, group.end + 1);
+    const text = groupWords.map(w => w.word).join(' ');
+
+    // Classify the mistake type
+    let type: MistakeType = 'false_start';
+    let reason = 'Speech mistake removed by AI';
+    let confidence = 0.80;
+
+    const allFillers = groupWords.every(w => getFillerTier(w.word, fillerConfig) >= 1);
+
+    if (allFillers) {
+      type = 'filler_word';
+      reason = groupWords.length === 1 ? 'Filler sound' : 'Filler words';
+      confidence = 0.90;
+    } else if (groupWords.length === 1) {
+      const tier = getFillerTier(groupWords[0].word, fillerConfig);
+      if (tier >= 1) {
+        type = 'filler_word';
+        reason = 'Filler word';
+        confidence = 0.85;
+      } else {
+        // Check if it's a repeated word by looking at neighbors
+        const nextIdx = group.end + 1;
+        const prevIdx = group.start - 1;
+        const norm = normalizeWord(groupWords[0].word);
+        if (nextIdx < words.length && normalizeWord(words[nextIdx].word) === norm) {
+          type = 'repeated_word';
+          reason = 'Repeated word';
+          confidence = 0.85;
+        } else if (prevIdx >= 0 && normalizeWord(words[prevIdx].word) === norm) {
+          type = 'repeated_word';
+          reason = 'Repeated word';
+          confidence = 0.85;
+        } else {
+          type = 'self_correction';
+          reason = 'Speech mistake';
+          confidence = 0.75;
+        }
+      }
+    } else {
+      // Multi-word removal — false start or self-correction
+      type = 'false_start';
+      reason = 'False start or self-correction';
+      confidence = 0.80;
+    }
+
+    mistakes.push({
+      type,
+      startTime: words[group.start].start,
+      endTime: words[group.end].end,
+      text,
+      reason,
+      confidence,
+    });
+  }
+
+  console.log(`[Speech Correction] GPT clean-transcript-diff detected ${mistakes.length} mistakes`);
+  return mistakes;
 }
 
 // ---------------------------------------------------------------------------
