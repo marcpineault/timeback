@@ -137,6 +137,49 @@ const ASPECT_RATIO_OPTIONS: { value: AspectRatioPreset; label: string; platforms
 // localStorage key for persisting processing config
 const STORAGE_KEY = 'timeback_processing_config';
 
+// Speech correction presets with simple labels
+const SPEECH_PRESETS = {
+  minimal: {
+    label: 'Clean',
+    description: 'Removes um, uh, and stutters',
+    config: {
+      removeFillerWords: true,
+      removeRepeatedWords: true,
+      removeRepeatedPhrases: false,
+      removeFalseStarts: false,
+      removeSelfCorrections: false,
+      aggressiveness: 'conservative' as const,
+      confidenceThreshold: 0.80,
+    },
+  },
+  professional: {
+    label: 'Professional',
+    description: 'Removes all fillers, repeats, and false starts',
+    config: {
+      removeFillerWords: true,
+      removeRepeatedWords: true,
+      removeRepeatedPhrases: true,
+      removeFalseStarts: true,
+      removeSelfCorrections: false,
+      aggressiveness: 'moderate' as const,
+      confidenceThreshold: 0.60,
+    },
+  },
+  broadcast: {
+    label: 'Maximum',
+    description: 'Removes everything including self-corrections',
+    config: {
+      removeFillerWords: true,
+      removeRepeatedWords: true,
+      removeRepeatedPhrases: true,
+      removeFalseStarts: true,
+      removeSelfCorrections: true,
+      aggressiveness: 'aggressive' as const,
+      confidenceThreshold: 0.40,
+    },
+  },
+};
+
 // Default config - used for initial state and merging with saved config
 const DEFAULT_CONFIG: ProcessingConfig = {
   generateCaptions: true,
@@ -157,20 +200,20 @@ const DEFAULT_CONFIG: ProcessingConfig = {
   },
   normalizeAudio: true,
   aspectRatio: 'original',
-  speechCorrection: false,
+  speechCorrection: true,
   speechCorrectionConfig: {
     removeFillerWords: true,
     removeRepeatedWords: true,
     removeRepeatedPhrases: true,
     removeFalseStarts: true,
-    removeSelfCorrections: true,
+    removeSelfCorrections: false,
     aggressiveness: 'moderate',
     confidenceThreshold: 0.6,
     language: 'auto',
     customFillerWords: [],
     customFillerPhrases: [],
   },
-  speechCorrectionPreset: null,
+  speechCorrectionPreset: 'professional',
 };
 
 export default function ProcessingOptions({
@@ -408,273 +451,164 @@ export default function ProcessingOptions({
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base sm:text-lg font-medium text-white">Speech Correction</h3>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={config.speechCorrection}
               onChange={(e) => setConfig({ ...config, speechCorrection: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
+              className="sr-only peer"
             />
-            <span className="text-gray-400">Enable</span>
+            <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-violet-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-indigo-500 peer-checked:to-violet-500"></div>
           </label>
         </div>
         <p className="text-xs text-gray-500">
-          AI-powered removal of filler words, repeated phrases, and speech mistakes
+          Automatically removes filler words (um, uh), stutters, and speech mistakes from your video{config.generateCaptions ? ' and captions' : ''}
         </p>
 
         {config.speechCorrection && (
-          <div className="space-y-4 p-4 bg-gray-700/50 rounded-lg">
-            {/* Correction Presets */}
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Quick Preset</label>
-              <div className="flex gap-2">
-                {[
-                  { key: 'minimal', label: 'Minimal', desc: 'Only um, uh' },
-                  { key: 'professional', label: 'Professional', desc: 'All fillers + repeats' },
-                  { key: 'broadcast', label: 'Broadcast', desc: 'Maximum cleanup' },
-                  { key: null, label: 'Custom', desc: 'Your settings' },
-                ].map(({ key, label }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                      if (key) {
-                        const presets: Record<string, Partial<ProcessingConfig['speechCorrectionConfig']> & { aggressiveness: 'conservative' | 'moderate' | 'aggressive'; confidenceThreshold: number }> = {
-                          minimal: { removeFillerWords: true, removeRepeatedWords: true, removeRepeatedPhrases: false, removeFalseStarts: false, removeSelfCorrections: false, aggressiveness: 'conservative', confidenceThreshold: 0.80 },
-                          professional: { removeFillerWords: true, removeRepeatedWords: true, removeRepeatedPhrases: true, removeFalseStarts: true, removeSelfCorrections: false, aggressiveness: 'moderate', confidenceThreshold: 0.60 },
-                          broadcast: { removeFillerWords: true, removeRepeatedWords: true, removeRepeatedPhrases: true, removeFalseStarts: true, removeSelfCorrections: true, aggressiveness: 'aggressive', confidenceThreshold: 0.40 },
-                        };
-                        setConfig({
-                          ...config,
-                          speechCorrectionPreset: key,
-                          speechCorrectionConfig: { ...config.speechCorrectionConfig, ...presets[key] },
-                        });
-                      } else {
-                        setConfig({ ...config, speechCorrectionPreset: null });
+          <div className="space-y-3">
+            {/* Simple preset cards */}
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.entries(SPEECH_PRESETS) as [string, typeof SPEECH_PRESETS[keyof typeof SPEECH_PRESETS]][]).map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setConfig({
+                      ...config,
+                      speechCorrectionPreset: key,
+                      speechCorrectionConfig: {
+                        ...config.speechCorrectionConfig,
+                        ...preset.config,
+                      },
+                    });
+                  }}
+                  className={`p-3 rounded-lg border-2 transition-all text-center ${
+                    config.speechCorrectionPreset === key
+                      ? 'border-violet-500 bg-violet-500/10'
+                      : 'border-gray-700 hover:border-gray-500 bg-gray-700/30'
+                  }`}
+                >
+                  <span className={`text-sm font-medium block ${
+                    config.speechCorrectionPreset === key ? 'text-white' : 'text-gray-300'
+                  }`}>
+                    {preset.label}
+                  </span>
+                  <p className={`text-xs mt-1 ${
+                    config.speechCorrectionPreset === key ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    {preset.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            {/* Caption sync note */}
+            {config.generateCaptions && (
+              <div className="flex items-start gap-2 p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                <svg className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-xs text-indigo-300">
+                  Captions will automatically update to match — removed words won&apos;t appear in your captions
+                </p>
+              </div>
+            )}
+
+            {/* Advanced settings toggle */}
+            <details className="group">
+              <summary className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-400 transition-colors py-1">
+                <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                Advanced settings
+              </summary>
+              <div className="mt-3 space-y-3 p-3 bg-gray-700/30 rounded-lg border border-gray-700">
+                {/* Language Selection */}
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Language</label>
+                  <select
+                    value={config.speechCorrectionConfig.language}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      speechCorrectionConfig: { ...config.speechCorrectionConfig, language: e.target.value }
+                    })}
+                    className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500"
+                  >
+                    <option value="auto">Auto-detect (English)</option>
+                    <option value="en">English</option>
+                    <option value="fr">French</option>
+                    <option value="es">Spanish</option>
+                    <option value="de">German</option>
+                    <option value="pt">Portuguese</option>
+                  </select>
+                </div>
+
+                {/* Custom Filler Words */}
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Custom words to remove</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. literally, honestly, right (comma-separated)"
+                    value={config.speechCorrectionConfig.customFillerWords.join(', ')}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      speechCorrectionConfig: {
+                        ...config.speechCorrectionConfig,
+                        customFillerWords: e.target.value.split(',').map(w => w.trim()).filter(Boolean),
                       }
-                    }}
-                    className={`flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm transition-colors ${
-                      config.speechCorrectionPreset === key
-                        ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'
-                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                    })}
+                    className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500 placeholder-gray-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Words specific to your speaking style</p>
+                </div>
+
+                {/* Custom Filler Phrases */}
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Custom phrases to remove</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. at the end of the day, if that makes sense"
+                    value={config.speechCorrectionConfig.customFillerPhrases.join(', ')}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      speechCorrectionConfig: {
+                        ...config.speechCorrectionConfig,
+                        customFillerPhrases: e.target.value.split(',').map(p => p.trim()).filter(Boolean),
+                      }
+                    })}
+                    className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500 placeholder-gray-500"
+                  />
+                </div>
+
+                {/* Confidence Threshold */}
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">
+                    Sensitivity: {Math.round(config.speechCorrectionConfig.confidenceThreshold * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="20"
+                    max="95"
+                    step="5"
+                    value={Math.round(config.speechCorrectionConfig.confidenceThreshold * 100)}
+                    onChange={(e) => setConfig({
+                      ...config,
+                      speechCorrectionPreset: null,
+                      speechCorrectionConfig: {
+                        ...config.speechCorrectionConfig,
+                        confidenceThreshold: parseInt(e.target.value) / 100,
+                      }
+                    })}
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-600 accent-violet-500"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>More corrections</span>
+                    <span>Fewer, safer</span>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Correction type toggles */}
-            <div className="space-y-2">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.speechCorrectionConfig.removeFillerWords}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionPreset: null,
-                  speechCorrectionConfig: { ...config.speechCorrectionConfig, removeFillerWords: e.target.checked }
-                })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
-              />
-              <div>
-                <span className="text-gray-300 text-sm">Remove filler words</span>
-                <p className="text-xs text-gray-500">um, uh, like, you know, basically</p>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.speechCorrectionConfig.removeRepeatedWords}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionPreset: null,
-                  speechCorrectionConfig: { ...config.speechCorrectionConfig, removeRepeatedWords: e.target.checked }
-                })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
-              />
-              <div>
-                <span className="text-gray-300 text-sm">Remove repeated words</span>
-                <p className="text-xs text-gray-500">&quot;the the&quot;, &quot;I I&quot;, stutters</p>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.speechCorrectionConfig.removeRepeatedPhrases}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionPreset: null,
-                  speechCorrectionConfig: { ...config.speechCorrectionConfig, removeRepeatedPhrases: e.target.checked }
-                })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
-              />
-              <div>
-                <span className="text-gray-300 text-sm">Remove repeated phrases</span>
-                <p className="text-xs text-gray-500">&quot;so basically, so basically&quot;, duplicate sentences</p>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.speechCorrectionConfig.removeFalseStarts}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionPreset: null,
-                  speechCorrectionConfig: { ...config.speechCorrectionConfig, removeFalseStarts: e.target.checked }
-                })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
-              />
-              <div>
-                <span className="text-gray-300 text-sm">Remove false starts</span>
-                <p className="text-xs text-gray-500">Incomplete thoughts that get restarted</p>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.speechCorrectionConfig.removeSelfCorrections}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionPreset: null,
-                  speechCorrectionConfig: { ...config.speechCorrectionConfig, removeSelfCorrections: e.target.checked }
-                })}
-                className="w-4 h-4 rounded bg-gray-600 border-gray-500 text-violet-500 focus:ring-violet-500"
-              />
-              <div>
-                <span className="text-gray-300 text-sm">Remove self-corrections</span>
-                <p className="text-xs text-gray-500">&quot;I went to the store-- I mean the mall&quot;</p>
-              </div>
-            </label>
-            </div>
-
-            {/* Aggressiveness */}
-            <div className="pt-3 border-t border-gray-600">
-              <label className="block text-sm text-gray-400 mb-2">Aggressiveness</label>
-              <div className="flex gap-2">
-                {(['conservative', 'moderate', 'aggressive'] as const).map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => {
-                      const thresholds = { conservative: 0.80, moderate: 0.60, aggressive: 0.40 };
-                      setConfig({
-                        ...config,
-                        speechCorrectionPreset: null,
-                        speechCorrectionConfig: {
-                          ...config.speechCorrectionConfig,
-                          aggressiveness: level,
-                          confidenceThreshold: thresholds[level],
-                        }
-                      });
-                    }}
-                    className={`flex-1 py-2 px-3 rounded-lg capitalize text-sm transition-colors ${
-                      config.speechCorrectionConfig.aggressiveness === level
-                        ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'
-                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                {config.speechCorrectionConfig.aggressiveness === 'conservative' && 'Only removes obvious mistakes (high confidence required)'}
-                {config.speechCorrectionConfig.aggressiveness === 'moderate' && 'Balanced removal of speech issues'}
-                {config.speechCorrectionConfig.aggressiveness === 'aggressive' && 'Maximum cleanup — removes anything that might be a mistake'}
-              </p>
-            </div>
-
-            {/* Confidence Threshold */}
-            <div className="pt-3 border-t border-gray-600">
-              <label className="block text-sm text-gray-400 mb-2">
-                Confidence Threshold: {Math.round(config.speechCorrectionConfig.confidenceThreshold * 100)}%
-              </label>
-              <input
-                type="range"
-                min="20"
-                max="95"
-                step="5"
-                value={Math.round(config.speechCorrectionConfig.confidenceThreshold * 100)}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionPreset: null,
-                  speechCorrectionConfig: {
-                    ...config.speechCorrectionConfig,
-                    confidenceThreshold: parseInt(e.target.value) / 100,
-                  }
-                })}
-                className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-600 accent-violet-500"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>More corrections</span>
-                <span>Fewer, safer corrections</span>
-              </div>
-            </div>
-
-            {/* Language Selection */}
-            <div className="pt-3 border-t border-gray-600">
-              <label className="block text-sm text-gray-400 mb-2">Language</label>
-              <select
-                value={config.speechCorrectionConfig.language}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionConfig: { ...config.speechCorrectionConfig, language: e.target.value }
-                })}
-                className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500"
-              >
-                <option value="auto">Auto-detect (English)</option>
-                <option value="en">English</option>
-                <option value="fr">French</option>
-                <option value="es">Spanish</option>
-                <option value="de">German</option>
-                <option value="pt">Portuguese</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Filler words are language-specific — select your video&apos;s language for best results</p>
-            </div>
-
-            {/* Custom Filler Words */}
-            <div className="pt-3 border-t border-gray-600">
-              <label className="block text-sm text-gray-400 mb-2">Custom Filler Words</label>
-              <input
-                type="text"
-                placeholder="e.g. literally, honestly, right (comma-separated)"
-                value={config.speechCorrectionConfig.customFillerWords.join(', ')}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionConfig: {
-                    ...config.speechCorrectionConfig,
-                    customFillerWords: e.target.value.split(',').map(w => w.trim()).filter(Boolean),
-                  }
-                })}
-                className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500 placeholder-gray-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">Add words specific to your speaking style that you want removed</p>
-            </div>
-
-            {/* Custom Filler Phrases */}
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Custom Filler Phrases</label>
-              <input
-                type="text"
-                placeholder="e.g. at the end of the day, if that makes sense (comma-separated)"
-                value={config.speechCorrectionConfig.customFillerPhrases.join(', ')}
-                onChange={(e) => setConfig({
-                  ...config,
-                  speechCorrectionConfig: {
-                    ...config.speechCorrectionConfig,
-                    customFillerPhrases: e.target.value.split(',').map(p => p.trim()).filter(Boolean),
-                  }
-                })}
-                className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500 placeholder-gray-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">Multi-word phrases that should be detected and removed</p>
-            </div>
+            </details>
           </div>
         )}
       </div>
