@@ -1016,13 +1016,18 @@ export async function applySpeechCorrections(
 
   console.log(`[Speech Correction] Applying corrections to video (duration: ${duration.toFixed(2)}s)`);
 
-  // Use zero timeback padding for speech correction. The default padding (250ms
-  // before + 200ms after each keep-segment) was designed for silence removal
-  // where gaps are long. For speech correction, filler words are typically
-  // 0.1–0.5s — the padding would expand keep-segments enough to overlap and
-  // merge, completely swallowing the cuts and removing nothing. The 20ms audio
-  // micro-fades in the FFmpeg filter already handle smooth transitions.
-  const segments = calculateSegmentsToKeep(mistakes, duration, confidenceThreshold, 0.03, 0, 0);
+  // Speech correction needs tighter cuts than silence removal:
+  //
+  //  cutPadding = 0.12  — Eat 120ms of dead air around each filler word. Speakers
+  //                        typically pause ~100-200ms before/after a filler; without
+  //                        this, both pauses are preserved and concatenated, creating
+  //                        a noticeable gap ("loose" feeling) at every cut point.
+  //
+  //  timebackPadding = 0.02 — Tiny 20ms safety buffer (matches the audio micro-fade
+  //                            duration) to avoid clipping the edges of real speech.
+  //                            The original 250ms/200ms values were for silence removal
+  //                            and would swallow cuts shorter than ~0.45s.
+  const segments = calculateSegmentsToKeep(mistakes, duration, confidenceThreshold, 0.12, 0.02, 0.02);
 
   if (segments.length === 0) {
     throw new Error('No segments to keep after corrections — this would result in an empty video');
