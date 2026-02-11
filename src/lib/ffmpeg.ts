@@ -881,8 +881,8 @@ export async function burnCaptions(
   const styleMap: Record<string, string> = {
     // Instagram style - white text on semi-transparent dark background box
     // Clean, modern, refined look with better readability on busy backgrounds
-    // MarginV=85 ≈ 30% from bottom (moved up), MarginL=28, MarginR=53 for horizontal padding
-    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=85,MarginL=28,MarginR=53',
+    // MarginV=70 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
+    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
   };
 
   logger.debug(`[Captions] Burning captions from: ${srtPath}`);
@@ -1552,7 +1552,7 @@ export async function applyCombinedFilters(
       filters.push(`ass='${escapedPath}'`);
     } else {
       // Instagram style caption
-      const subtitleStyle = 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=85,MarginL=28,MarginR=53';
+      const subtitleStyle = 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53';
       filters.push(`subtitles='${escapedPath}':force_style='${subtitleStyle}'`);
     }
 
