@@ -264,10 +264,14 @@ function correlateAudioFillersWithTranscript(
 
       if (fillerWord) {
         const tier = getFillerTier(fillerWord.word, fillerConfig);
+        // Use the widest boundary between audio detection and Whisper.
+        // Audio silence-detection finds exact sound boundaries; Whisper
+        // word timestamps can be off by 100-200ms. Taking the wider span
+        // ensures we capture the full filler sound.
         mistakes.push({
           type: 'filler_word',
-          startTime: fillerWord.start,
-          endTime: fillerWord.end,
+          startTime: Math.min(fillerWord.start, filler.start),
+          endTime: Math.max(fillerWord.end, filler.end),
           text: fillerWord.word,
           reason: 'Audio-confirmed filler word',
           // Audio-confirmed Tier 1 gets highest confidence
@@ -1016,18 +1020,18 @@ export async function applySpeechCorrections(
 
   console.log(`[Speech Correction] Applying corrections to video (duration: ${duration.toFixed(2)}s)`);
 
-  // Speech correction needs tighter cuts than silence removal:
+  // Speech correction needs tight, aggressive cuts:
   //
-  //  cutPadding = 0.12  — Eat 120ms of dead air around each filler word. Speakers
-  //                        typically pause ~100-200ms before/after a filler; without
+  //  cutPadding = 0.15  — Eat 150ms of dead air on each side of the filler.
+  //                        Compensates for Whisper timestamp imprecision (~100-200ms)
+  //                        and trims natural pauses that bracket filler words. Without
   //                        this, both pauses are preserved and concatenated, creating
-  //                        a noticeable gap ("loose" feeling) at every cut point.
+  //                        a noticeable gap at every cut point.
   //
-  //  timebackPadding = 0.02 — Tiny 20ms safety buffer (matches the audio micro-fade
-  //                            duration) to avoid clipping the edges of real speech.
-  //                            The original 250ms/200ms values were for silence removal
-  //                            and would swallow cuts shorter than ~0.45s.
-  const segments = calculateSegmentsToKeep(mistakes, duration, confidenceThreshold, 0.12, 0.02, 0.02);
+  //  timebackPadding = 0  — No keep-segment expansion. The 20ms audio micro-fades
+  //                          in the FFmpeg filter handle smooth transitions. Any
+  //                          timeback padding reclaims cut area and loosens the edit.
+  const segments = calculateSegmentsToKeep(mistakes, duration, confidenceThreshold, 0.15, 0, 0);
 
   if (segments.length === 0) {
     throw new Error('No segments to keep after corrections — this would result in an empty video');
@@ -1172,9 +1176,13 @@ export async function correctSpeechMistakes(
     );
 
     if (overlappingIdx >= 0) {
-      // Audio confirms transcript detection — boost confidence
+      // Audio confirms transcript detection — boost confidence and widen
+      // boundaries to the union. Audio silence-detection gives precise
+      // sound boundaries; Whisper word timestamps can be off by 100-200ms.
       const existing = allMistakes[overlappingIdx];
       existing.confidence = Math.min(0.95, existing.confidence + 0.10);
+      existing.startTime = Math.min(existing.startTime, audioMistake.startTime);
+      existing.endTime = Math.max(existing.endTime, audioMistake.endTime);
       existing.reason += ' (audio-confirmed)';
     } else {
       allMistakes.push(audioMistake);
