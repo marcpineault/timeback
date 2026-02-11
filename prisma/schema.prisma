@@ -68,7 +68,7 @@ model UserProcessingPreferences {
   // Video Settings
   aspectRatio          String  @default("original")
 
-  // Speech Correction (Beta)
+  // Speech Correction
   speechCorrection           Boolean @default(false)
   removeFillerWords          Boolean @default(true)
   removeRepeatedWords        Boolean @default(true)
@@ -76,6 +76,11 @@ model UserProcessingPreferences {
   removeFalseStarts          Boolean @default(true)
   removeSelfCorrections      Boolean @default(true)
   speechAggressiveness       String  @default("moderate")
+  speechConfidenceThreshold  Float   @default(0.6)
+  speechLanguage             String  @default("auto")
+  customFillerWords          String[]
+  customFillerPhrases        String[]
+  speechCorrectionPreset     String?  // 'minimal' | 'professional' | 'broadcast' | null (custom)
 
   // B-Roll (future)
   generateBRoll        Boolean @default(false)

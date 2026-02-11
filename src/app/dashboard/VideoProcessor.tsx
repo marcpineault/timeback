@@ -366,7 +366,12 @@ export default function VideoProcessor({
           removeFalseStarts: true,
           removeSelfCorrections: true,
           aggressiveness: 'moderate',
+          confidenceThreshold: 0.6,
+          language: 'auto',
+          customFillerWords: [],
+          customFillerPhrases: [],
         },
+        speechCorrectionPreset: null,
       }
 
       const prefs = cachedPreferencesRef.current
@@ -388,6 +393,7 @@ export default function VideoProcessor({
           aspectRatio: (prefs.aspectRatio as ProcessingConfig['aspectRatio']) ?? defaultConfig.aspectRatio,
           speechCorrection: (prefs.speechCorrection as boolean) ?? defaultConfig.speechCorrection,
           speechCorrectionConfig: (prefs.speechCorrectionConfig as ProcessingConfig['speechCorrectionConfig']) ?? defaultConfig.speechCorrectionConfig,
+          speechCorrectionPreset: (prefs as Record<string, unknown>).speechCorrectionPreset as string | null ?? defaultConfig.speechCorrectionPreset,
         }
         console.log('[VideoProcessor] Auto-process: using cached preferences')
         setPendingAutoProcess(savedConfig)

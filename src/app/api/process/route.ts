@@ -445,6 +445,10 @@ export async function POST(request: NextRequest) {
           removeFalseStarts: speechCorrectionConfig.removeFalseStarts ?? true,
           removeSelfCorrections: speechCorrectionConfig.removeSelfCorrections ?? true,
           aggressiveness: speechCorrectionConfig.aggressiveness || 'moderate',
+          confidenceThreshold: speechCorrectionConfig.confidenceThreshold ?? 0.6,
+          language: speechCorrectionConfig.language || 'auto',
+          customFillerWords: speechCorrectionConfig.customFillerWords ?? [],
+          customFillerPhrases: speechCorrectionConfig.customFillerPhrases ?? [],
         } : DEFAULT_SPEECH_CORRECTION_CONFIG;
 
         stepOutput = path.join(processedDir, `${baseName}_corrected.mp4`);
