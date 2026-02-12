@@ -6,11 +6,17 @@
  * Learns from user ratings and edit patterns over time.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { prisma } from './db';
 import { logger } from './logger';
 
-const anthropic = new Anthropic();
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not set');
+  }
+  return new OpenAI({ apiKey });
+}
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -242,25 +248,24 @@ Return ONLY valid JSON array (no markdown, no code fences):
   logger.debug(`[ScriptGenerator] Generating ${count} ideas for user ${userId}`);
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const completion = await getOpenAIClient().chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 4096,
       temperature: 0.9,
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
-
-    const jsonStr = content.text.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+    const raw = completion.choices[0]?.message?.content?.trim() || '';
+    const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
     const ideas: GeneratedIdea[] = JSON.parse(jsonStr);
 
     logger.debug(`[ScriptGenerator] Generated ${ideas.length} ideas`);
     return ideas;
   } catch (error) {
-    logger.error('[ScriptGenerator] Failed to generate ideas', { error, userId });
+    logger.error('[ScriptGenerator] Failed to generate ideas', {
+      error: error instanceof Error ? { message: error.message } : error,
+      userId,
+    });
     throw new Error('Failed to generate video ideas');
   }
 }
@@ -352,19 +357,15 @@ Return ONLY valid JSON (no markdown, no code fences):
   logger.debug(`[ScriptGenerator] Generating script for idea: "${idea.title}" (user ${userId})`);
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const completion = await getOpenAIClient().chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 4096,
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
-
-    const jsonStr = content.text.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+    const raw = completion.choices[0]?.message?.content?.trim() || '';
+    const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
     const script: GeneratedScript = JSON.parse(jsonStr);
 
     // Recalculate word count from actual output
@@ -374,7 +375,10 @@ Return ONLY valid JSON (no markdown, no code fences):
     logger.debug(`[ScriptGenerator] Generated script: ${script.wordCount} words, ~${script.estimatedDuration}s`);
     return script;
   } catch (error) {
-    logger.error('[ScriptGenerator] Failed to generate script', { error, userId });
+    logger.error('[ScriptGenerator] Failed to generate script', {
+      error: error instanceof Error ? { message: error.message } : error,
+      userId,
+    });
     throw new Error('Failed to generate script');
   }
 }
