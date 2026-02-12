@@ -6,11 +6,17 @@
  * Claude's deep knowledge of viral content, not scraped from specific URLs.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { buildCreatorPrompt, type CreatorContext } from './scriptGenerator';
 import { logger } from './logger';
 
-const anthropic = new Anthropic();
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not set');
+  }
+  return new OpenAI({ apiKey });
+}
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -132,19 +138,15 @@ IMPORTANT: Make each entry DISTINCT — different patterns, different psychologi
   logger.debug(`[SwipeFileGenerator] Generating ${count} entries for user ${userId} (category: ${categoryFilter || 'ALL'})`);
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const completion = await getOpenAIClient().chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 8192,
       temperature: 0.9,
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
-
-    const jsonStr = content.text.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+    const raw = completion.choices[0]?.message?.content?.trim() || '';
+    const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
     const entries: GeneratedSwipeEntry[] = JSON.parse(jsonStr);
 
     // Ensure category is set correctly when filtered
@@ -157,7 +159,10 @@ IMPORTANT: Make each entry DISTINCT — different patterns, different psychologi
     logger.debug(`[SwipeFileGenerator] Generated ${entries.length} entries`);
     return entries;
   } catch (error) {
-    logger.error('[SwipeFileGenerator] Failed to generate swipe entries', { error, userId });
+    logger.error('[SwipeFileGenerator] Failed to generate swipe entries', {
+      error: error instanceof Error ? { message: error.message } : error,
+      userId,
+    });
     throw new Error('Failed to generate swipe file entries');
   }
 }
