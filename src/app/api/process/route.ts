@@ -54,11 +54,14 @@ export async function POST(request: NextRequest) {
       bRollConfig,
       normalizeAudio: shouldNormalizeAudio,
       aspectRatio,
-      speechCorrection,
+      speechCorrection: _speechCorrection,
       speechCorrectionConfig,
       userId: bodyUserId,
       videoId: existingVideoId,  // Optional: for reprocessing existing videos
     } = body;
+
+    // Speech correction is disabled - it was causing issues with silence removal
+    const speechCorrection = false;
 
     if (!fileId || !filename) {
       return NextResponse.json(
