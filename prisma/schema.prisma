@@ -40,6 +40,7 @@ model User {
   creatorProfile      CreatorProfile?
   ideas               Idea[]
   scripts             Script[]
+  swipeEntries        SwipeEntry[]
 }
 
 model UserProcessingPreferences {
@@ -378,4 +379,41 @@ enum ScriptStatus {
   READY
   FILMED
   ARCHIVED
+}
+
+// ─── Swipe File ─────────────────────────────────────────────────────
+
+model SwipeEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  hook        String
+  meat        String
+  cta         String
+  fullExample String
+
+  analysis    String
+  source      String
+  category    SwipeCategory
+  format      String   @default("direct-to-camera")
+
+  niche       String
+  tags        String[]
+
+  isSaved     Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, category])
+  @@index([userId, isSaved])
+}
+
+enum SwipeCategory {
+  HOOK
+  MEAT
+  CTA
+  FULL
 }

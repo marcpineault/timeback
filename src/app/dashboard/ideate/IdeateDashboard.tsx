@@ -6,9 +6,10 @@ import IdeaGenerator from '@/components/ideate/IdeaGenerator'
 import ScriptList from '@/components/ideate/ScriptList'
 import ScriptView from '@/components/ideate/ScriptView'
 import Teleprompter from '@/components/ideate/Teleprompter'
+import SwipeFile from '@/components/ideate/SwipeFile'
 import { useCreatorProfile, useScripts, useScript, type ScriptData } from '@/hooks/useIdeate'
 
-type Tab = 'ideas' | 'scripts' | 'teleprompter' | 'profile'
+type Tab = 'ideas' | 'scripts' | 'swipefile' | 'teleprompter' | 'profile'
 
 export default function IdeateDashboard() {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useCreatorProfile()
@@ -42,6 +43,7 @@ export default function IdeateDashboard() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'ideas', label: 'Ideas' },
     { id: 'scripts', label: 'Scripts' },
+    { id: 'swipefile', label: 'Swipe File' },
     { id: 'teleprompter', label: 'Teleprompter' },
     { id: 'profile', label: 'Profile' },
   ]
@@ -124,6 +126,29 @@ export default function IdeateDashboard() {
                 onOpenTeleprompter={handleOpenTeleprompter}
                 onRefresh={refetchScripts}
               />
+            )
+          )}
+
+          {activeTab === 'swipefile' && (
+            profile?.isComplete ? (
+              <SwipeFile
+                onUseAsIdea={() => {
+                  setActiveTab('ideas')
+                }}
+              />
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-400 mb-2">Complete your creator profile first</p>
+                <p className="text-gray-500 text-sm mb-4">
+                  We need your niche and audience info to find relevant content patterns.
+                </p>
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Set Up Profile
+                </button>
+              </div>
             )
           )}
 
