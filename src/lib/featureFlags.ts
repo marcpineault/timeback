@@ -53,7 +53,8 @@ export function getEnabledFeatures(email: string | null | undefined): {
   instagramScheduling: boolean;
 } {
   return {
-    speechCorrection: isFeatureEnabled('speechCorrection', email),
+    // Disabled: speech correction is causing issues with silence removal
+    speechCorrection: false,
     instagramScheduling: isFeatureEnabled('instagramScheduling', email),
   };
 }

@@ -256,101 +256,55 @@ function calculateAdaptiveThreshold(
   const thresholds: number[] = [];
   const weights: number[] = [];
 
-  // Detect noise levels based on dynamic range
-  // Very noisy (<8dB): background noise is very close to speech level
-  // Noisy (<12dB): noticeable background noise
-  // Moderate (<15dB): some background noise
-  const isVeryNoisyAudio = dynamicRange !== undefined && dynamicRange < 8;
-  const isNoisyAudio = dynamicRange !== undefined && dynamicRange < 12;
+  // Detect if audio is noisy based on dynamic range
+  // Low dynamic range (<10dB) means noise floor is close to speech level
+  const isNoisyAudio = dynamicRange !== undefined && dynamicRange < 10;
   const isModerateNoise = dynamicRange !== undefined && dynamicRange < 15;
 
-  if (isVeryNoisyAudio) {
-    // VERY NOISY AUDIO STRATEGY:
-    // The noise floor (mean) is very close to speech peaks (max).
-    // Setting threshold below the noise floor means silencedetect never
-    // finds silence because background noise keeps the level above threshold.
-    //
-    // Instead, place the threshold BETWEEN the noise floor and speech peaks.
-    // During speech pauses, the level drops to the noise floor (below threshold).
-    // During speech, the level rises above the threshold.
-    //
-    // Example: max=-10dB, mean=-14dB, DR=4dB
-    //   midpoint = -14 + (4 * 0.5) = -12dB
-    //   Speech at -10dB is above -12dB (kept), noise at -14dB is below (silence detected)
-    const midpointThreshold = medianMean + (dynamicRange! * 0.5);
-    thresholds.push(midpointThreshold);
-    weights.push(2.0);  // Dominant weight for very noisy audio
+  // Method 1: Traditional max - offset (primary method for noisy audio)
+  // For noisy audio: use smaller offset (8dB) since speech-noise gap is small
+  // For clean audio: use 10dB offset
+  const peakOffset = isNoisyAudio ? 8 : (isModerateNoise ? 9 : 10);
+  const traditionalThreshold = medianMax - peakOffset;
+  thresholds.push(traditionalThreshold);
+  // Higher weight for noisy audio since mean/RMS are less reliable
+  weights.push(isNoisyAudio ? 1.5 : 1.0);
 
-    // Also add a peak-relative method with very small offset
-    const tightPeakThreshold = medianMax - (dynamicRange! * 0.6);
-    thresholds.push(tightPeakThreshold);
-    weights.push(1.0);
+  // Method 2: Mean-based threshold (less reliable for noisy audio)
+  // AGGRESSIVE: Reduced from 5 to 2dB - tighter around mean level
+  const meanBasedThreshold = medianMean - 2;
+  thresholds.push(meanBasedThreshold);
+  // Lower weight for noisy audio since mean is elevated by noise
+  weights.push(isNoisyAudio ? 0.2 : 0.5);
 
-    logger.debug(`[Adaptive Threshold] Very noisy audio (DR=${dynamicRange!.toFixed(1)}dB): midpoint=${midpointThreshold.toFixed(1)}dB, tightPeak=${tightPeakThreshold.toFixed(1)}dB`);
-
-  } else if (isNoisyAudio) {
-    // NOISY AUDIO STRATEGY:
-    // Place threshold between noise floor and speech, but closer to the noise floor
-    // since there's more separation available than in the very noisy case.
-    const interpolatedThreshold = medianMean + (dynamicRange! * 0.35);
-    thresholds.push(interpolatedThreshold);
-    weights.push(1.5);
-
-    // Traditional peak-based with smaller offset
-    const peakThreshold = medianMax - (dynamicRange! * 0.7);
-    thresholds.push(peakThreshold);
-    weights.push(1.0);
-
-    logger.debug(`[Adaptive Threshold] Noisy audio (DR=${dynamicRange!.toFixed(1)}dB): interpolated=${interpolatedThreshold.toFixed(1)}dB, peak=${peakThreshold.toFixed(1)}dB`);
-
-  } else {
-    // CLEAN / MODERATE NOISE STRATEGY (original approach):
-    // Method 1: Traditional max - offset
-    const peakOffset = isModerateNoise ? 9 : 10;
-    const traditionalThreshold = medianMax - peakOffset;
-    thresholds.push(traditionalThreshold);
-    weights.push(1.0);
-
-    // Method 2: Mean-based threshold
-    const meanBasedThreshold = medianMean - 2;
-    thresholds.push(meanBasedThreshold);
-    weights.push(0.5);
-  }
-
-  // Method using astats RMS data when available
+  // Method 3: If we have astats data, use RMS-based calculation
   if (rmsLevel !== undefined && dynamicRange !== undefined) {
-    if (isVeryNoisyAudio) {
-      // For very noisy audio, use RMS as a proxy for noise floor
-      // Place threshold slightly above RMS
-      const rmsAboveThreshold = rmsLevel + (dynamicRange! * 0.3);
-      thresholds.push(rmsAboveThreshold);
-      weights.push(1.2);
-    } else if (isNoisyAudio) {
-      const rmsThreshold = rmsLevel - 1;
-      thresholds.push(rmsThreshold);
-      weights.push(0.5);
-    } else {
-      // Clean audio: RMS-based with standard offset
-      const rmsOffset = 4;
-      const rmsBasedThreshold = rmsLevel - rmsOffset;
-      thresholds.push(rmsBasedThreshold);
-      weights.push(0.8);
+    // RMS represents the "energy" of the audio, silence should be below RMS
+    // For noisy audio: RMS is elevated, use smaller offset
+    const rmsOffset = isNoisyAudio ? 2 : 4;
+    const rmsBasedThreshold = rmsLevel - rmsOffset;
+    thresholds.push(rmsBasedThreshold);
+    // Lower weight for noisy audio
+    weights.push(isNoisyAudio ? 0.3 : 0.8);
 
-      // High dynamic range = can be more aggressive
-      if (dynamicRange > 15) {
-        const aggressiveThreshold = medianMax - 12;
-        thresholds.push(aggressiveThreshold);
-        weights.push(0.5);
-      }
+    // If dynamic range is large, we can be more aggressive
+    if (dynamicRange > 15) {
+      // High dynamic range = clear distinction between speech and silence
+      // AGGRESSIVE: Use 12dB offset for aggressive silence cutting
+      const aggressiveThreshold = medianMax - 12;
+      thresholds.push(aggressiveThreshold);
+      weights.push(0.5);
     }
 
-    // NOISE-AWARE: For noisy audio, add peak-relative threshold
+    // NOISE-AWARE: For noisy audio, add a peak-relative threshold
+    // This helps when there's constant background noise
     if (isNoisyAudio && peakLevel !== undefined) {
-      const noiseAwareOffset = isVeryNoisyAudio ? 3 : 6;
-      const noiseAwareThreshold = peakLevel - noiseAwareOffset;
+      // Use peak level as reference, with small offset
+      // This ensures we only keep the loudest parts (actual speech)
+      const noiseAwareThreshold = peakLevel - 6;
       thresholds.push(noiseAwareThreshold);
-      weights.push(isVeryNoisyAudio ? 1.5 : 0.8);
-      logger.debug(`[Adaptive Threshold] Noise-aware threshold: ${noiseAwareThreshold.toFixed(1)}dB (peak - ${noiseAwareOffset}dB)`);
+      weights.push(0.8);  // High weight for noisy scenarios
+      logger.debug(`[Adaptive Threshold] Noisy audio detected (DR=${dynamicRange?.toFixed(1)}dB), adding noise-aware threshold: ${noiseAwareThreshold.toFixed(1)}dB`);
     }
   }
 
@@ -364,16 +318,14 @@ function calculateAdaptiveThreshold(
 
   let threshold = weightedSum / totalWeight;
 
-  // Clamp to bounds
-  // For very noisy audio, allow threshold up to -6dB (must be above noise floor)
-  // For noisy audio, up to -8dB
-  // For clean audio, up to -12dB
-  const upperLimit = isVeryNoisyAudio ? -6 : (isNoisyAudio ? -8 : -12);
+  // AGGRESSIVE: Clamp to bounds (-50 to -12 dB) - raised upper limit from -15 to -12
+  // For noisy audio, allow even higher threshold (up to -10dB)
+  const upperLimit = isNoisyAudio ? -10 : -12;
   threshold = Math.min(upperLimit, Math.max(-50, threshold));
 
   // Enhanced logging for debugging
   const gapFromMax = medianMax - threshold;
-  const noiseStatus = isVeryNoisyAudio ? ' [VERY NOISY]' : (isNoisyAudio ? ' [NOISY]' : (isModerateNoise ? ' [MODERATE NOISE]' : ''));
+  const noiseStatus = isNoisyAudio ? ' [NOISY AUDIO]' : (isModerateNoise ? ' [MODERATE NOISE]' : '');
   logger.info(`[Adaptive Threshold] Input: medianMax=${medianMax.toFixed(1)}dB, medianMean=${medianMean.toFixed(1)}dB${rmsLevel !== undefined ? `, rms=${rmsLevel.toFixed(1)}dB` : ''}${dynamicRange !== undefined ? `, dynamicRange=${dynamicRange.toFixed(1)}dB` : ''}${noiseStatus}`);
   logger.info(`[Adaptive Threshold] Methods: ${thresholds.map((t, i) => `${t.toFixed(1)}dB(w=${weights[i]})`).join(', ')}`);
   logger.info(`[Adaptive Threshold] Result: ${threshold.toFixed(1)}dB (${gapFromMax.toFixed(1)}dB below peak) [AGGRESSIVE MODE]${noiseStatus}`);
