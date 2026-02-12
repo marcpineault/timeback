@@ -33,6 +33,7 @@ export function isFeatureEnabled(
   // Define which features require beta access
   const betaFeatures: Set<BetaFeature> = new Set([
     'speechCorrection',
+    'instagramScheduling',
   ]);
 
   // If the feature is in beta, check if user is a beta tester
@@ -54,6 +55,6 @@ export function getEnabledFeatures(email: string | null | undefined): {
   return {
     // Disabled: speech correction is causing issues with silence removal
     speechCorrection: false,
-    instagramScheduling: true,
+    instagramScheduling: isBetaTester(email),
   };
 }
