@@ -81,6 +81,14 @@ export default async function DashboardPage() {
                 Schedule
               </Link>
             )}
+            {getEnabledFeatures(user.email).ideate && (
+              <Link
+                href="/dashboard/ideate"
+                className="text-gray-400 hover:text-white transition-colors text-sm"
+              >
+                Ideate
+              </Link>
+            )}
             <a
               href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
               target="_blank"
