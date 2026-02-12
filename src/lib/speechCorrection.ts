@@ -255,6 +255,195 @@ async function buildSilenceMap(
 }
 
 // ---------------------------------------------------------------------------
+// Audio energy validation: compare per-word RMS energy against context
+//
+// Filler words tend to have lower energy than surrounding speech. By
+// measuring the RMS energy of each detected mistake region and comparing
+// it to the local speech energy, we can boost confidence for likely fillers
+// and reduce confidence for false positives that have normal speech energy.
+// ---------------------------------------------------------------------------
+
+interface EnergyRegion {
+  start: number;
+  end: number;
+  rmsDb: number;
+}
+
+/**
+ * Analyze RMS energy for specific time regions of the audio.
+ * Returns the RMS dB level for each requested region.
+ *
+ * Uses a single FFmpeg pass with the `astats` filter on small segments
+ * to avoid spawning many processes.
+ */
+async function analyzeRegionEnergy(
+  videoPath: string,
+  regions: Array<{ start: number; end: number }>,
+  outputDir: string,
+): Promise<EnergyRegion[]> {
+  if (regions.length === 0) return [];
+
+  const audioPath = path.join(outputDir, `temp_energy_${Date.now()}.wav`);
+  const results: EnergyRegion[] = [];
+
+  try {
+    // Extract audio as WAV for analysis (reuse speech band filter)
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(videoPath)
+        .noVideo()
+        .audioCodec('pcm_s16le')
+        .audioFrequency(16000)
+        .audioChannels(1)
+        .output(audioPath)
+        .on('end', () => resolve())
+        .on('error', reject)
+        .run();
+    });
+
+    // Analyze each region individually (batch up to 8 concurrent)
+    const batchSize = 8;
+    for (let b = 0; b < regions.length; b += batchSize) {
+      const batch = regions.slice(b, b + batchSize);
+
+      const batchResults = await Promise.all(
+        batch.map(async (region) => {
+          const duration = region.end - region.start;
+          if (duration < 0.02) return { ...region, rmsDb: -60 };
+
+          return new Promise<EnergyRegion>((resolve) => {
+            const proc = spawn('ffmpeg', [
+              '-i', audioPath,
+              '-ss', String(region.start),
+              '-t', String(duration),
+              '-af', 'highpass=f=200,lowpass=f=3500,astats=measure_perchannel=RMS_level:measure_overall=RMS_level',
+              '-f', 'null', '-',
+            ], { stdio: ['pipe', 'pipe', 'pipe'] });
+            let stderr = '';
+            proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+            proc.on('close', () => {
+              const rmsMatch = stderr.match(/RMS level dB:\s*([-\d.]+)/);
+              resolve({
+                ...region,
+                rmsDb: rmsMatch ? parseFloat(rmsMatch[1]) : -60,
+              });
+            });
+            proc.on('error', () => resolve({ ...region, rmsDb: -60 }));
+          });
+        }),
+      );
+      results.push(...batchResults);
+    }
+
+    if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+    return results;
+  } catch (error) {
+    console.error('[Speech Correction] Energy analysis failed:', error);
+    if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+    return regions.map(r => ({ ...r, rmsDb: -60 }));
+  }
+}
+
+/**
+ * Validate detected mistakes using audio energy analysis.
+ *
+ * Compares the RMS energy of each mistake region against the median speech
+ * energy. Fillers typically have lower energy than surrounding speech,
+ * so we:
+ *  - BOOST confidence when energy is significantly lower than speech (+0.08)
+ *  - REDUCE confidence when energy matches normal speech levels (−0.10)
+ *  - Leave confidence unchanged for borderline cases
+ *
+ * Only applies to filler_word and stutter types (other types like
+ * repeated_word are validated by text patterns, not energy).
+ */
+async function validateWithAudioEnergy(
+  mistakes: SpeechMistake[],
+  videoPath: string,
+  outputDir: string,
+  words: TranscriptionWord[],
+): Promise<void> {
+  // Only validate filler words and stutters — energy is most discriminative for these
+  const energyRelevant = mistakes.filter(
+    m => m.type === 'filler_word' || m.type === 'stutter',
+  );
+  if (energyRelevant.length === 0) return;
+
+  // Build regions: each mistake + surrounding context
+  const mistakeRegions = energyRelevant.map(m => ({
+    start: m.startTime,
+    end: m.endTime,
+  }));
+
+  // Also sample some non-mistake speech regions for baseline
+  const contextRegions: Array<{ start: number; end: number }> = [];
+  const sortedWords = [...words].sort((a, b) => a.start - b.start);
+  const mistakeTimeSet = new Set(energyRelevant.map(m => `${m.startTime.toFixed(3)}`));
+
+  // Pick up to 10 speech words NOT in mistake regions for baseline
+  let sampled = 0;
+  for (const w of sortedWords) {
+    if (sampled >= 10) break;
+    if (w.end - w.start < 0.1) continue; // Too short to measure
+    if (mistakeTimeSet.has(`${w.start.toFixed(3)}`)) continue;
+
+    // Check this word isn't inside any mistake region
+    const inMistake = energyRelevant.some(
+      m => w.start >= m.startTime - 0.05 && w.end <= m.endTime + 0.05,
+    );
+    if (inMistake) continue;
+
+    contextRegions.push({ start: w.start, end: w.end });
+    sampled++;
+  }
+
+  if (contextRegions.length < 3) {
+    console.log('[Speech Correction] Not enough context words for energy validation, skipping');
+    return;
+  }
+
+  // Analyze energy for all regions
+  const allRegions = [...mistakeRegions, ...contextRegions];
+  const energyResults = await analyzeRegionEnergy(videoPath, allRegions, outputDir);
+
+  if (energyResults.length === 0) return;
+
+  // Calculate baseline speech energy (median of context regions)
+  const contextEnergies = energyResults
+    .slice(mistakeRegions.length)
+    .map(r => r.rmsDb)
+    .filter(e => e > -55) // Filter out silence/very quiet
+    .sort((a, b) => a - b);
+
+  if (contextEnergies.length === 0) return;
+
+  const medianSpeechEnergy = contextEnergies[Math.floor(contextEnergies.length / 2)];
+
+  console.log(
+    `[Speech Correction] Energy validation: speech baseline=${medianSpeechEnergy.toFixed(1)}dB ` +
+    `(${contextEnergies.length} samples), validating ${energyRelevant.length} mistakes`,
+  );
+
+  // Compare each mistake's energy to the baseline
+  for (let i = 0; i < energyRelevant.length; i++) {
+    const mistake = energyRelevant[i];
+    const energy = energyResults[i];
+    const energyDiff = energy.rmsDb - medianSpeechEnergy;
+
+    if (energyDiff < -6) {
+      // Significantly quieter than speech — strong filler signal
+      const boost = 0.08;
+      mistake.confidence = Math.min(0.95, mistake.confidence + boost);
+      mistake.reason += ` [energy: ${energyDiff.toFixed(1)}dB, boosted]`;
+    } else if (energyDiff > -2 && mistake.confidence < 0.80) {
+      // Energy matches normal speech — less likely to be a filler
+      const penalty = 0.10;
+      mistake.confidence = Math.max(0.20, mistake.confidence - penalty);
+      mistake.reason += ` [energy: ${energyDiff.toFixed(1)}dB, reduced]`;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Snap mistake boundaries to nearest silence edges
 //
 // For each detected mistake, expand its start/end into the surrounding
@@ -270,22 +459,40 @@ function snapToSilenceBoundaries(
 
   // Keep 30ms of silence at each edit point for natural word spacing
   const KEEP_SILENCE = 0.03;
+  // Search range: look for silence within ±200ms of mistake boundaries
+  // (wider than before to find better cut points)
+  const SEARCH_RANGE = 0.20;
 
   for (const mistake of mistakes) {
     // Find silence interval closest to and overlapping/adjacent to mistake start
     let preSilence: SilenceInterval | null = null;
     let postSilence: SilenceInterval | null = null;
+    let bestPreDist = Infinity;
+    let bestPostDist = Infinity;
 
     for (const silence of silenceMap) {
-      // Pre-silence: silence that ends near/after mistake start and starts before it
-      if (silence.end >= mistake.startTime - 0.1 && silence.start < mistake.startTime + 0.1) {
-        if (!preSilence || Math.abs(silence.end - mistake.startTime) < Math.abs(preSilence.end - mistake.startTime)) {
+      // Pre-silence: silence that ends near mistake start and starts before it
+      // The silence should end close to where the mistake begins
+      if (
+        silence.end >= mistake.startTime - SEARCH_RANGE &&
+        silence.start < mistake.startTime + 0.05
+      ) {
+        const dist = Math.abs(silence.end - mistake.startTime);
+        if (dist < bestPreDist) {
+          bestPreDist = dist;
           preSilence = silence;
         }
       }
-      // Post-silence: silence that starts near/before mistake end and ends after it
-      if (silence.start <= mistake.endTime + 0.1 && silence.end > mistake.endTime - 0.1) {
-        if (!postSilence || Math.abs(silence.start - mistake.endTime) < Math.abs(postSilence.start - mistake.endTime)) {
+
+      // Post-silence: silence that starts near mistake end and extends after it
+      // The silence should start close to where the mistake ends
+      if (
+        silence.start <= mistake.endTime + SEARCH_RANGE &&
+        silence.end > mistake.endTime - 0.05
+      ) {
+        const dist = Math.abs(silence.start - mistake.endTime);
+        if (dist < bestPostDist) {
+          bestPostDist = dist;
           postSilence = silence;
         }
       }
@@ -293,12 +500,25 @@ function snapToSilenceBoundaries(
 
     // Snap start: expand backward into pre-silence, keeping a tiny gap
     if (preSilence) {
-      mistake.startTime = preSilence.start + KEEP_SILENCE;
+      const newStart = preSilence.start + KEEP_SILENCE;
+      // Only expand if the silence is actually before or overlapping the mistake
+      if (newStart < mistake.startTime + 0.05) {
+        mistake.startTime = newStart;
+      }
     }
 
     // Snap end: expand forward into post-silence, keeping a tiny gap
     if (postSilence) {
-      mistake.endTime = postSilence.end - KEEP_SILENCE;
+      const newEnd = postSilence.end - KEEP_SILENCE;
+      // Only expand if the silence is actually after or overlapping the mistake
+      if (newEnd > mistake.endTime - 0.05) {
+        mistake.endTime = newEnd;
+      }
+    }
+
+    // Safety: ensure start < end
+    if (mistake.startTime >= mistake.endTime) {
+      mistake.endTime = mistake.startTime + 0.05;
     }
   }
 }
@@ -470,24 +690,84 @@ function preDetectMistakes(
       }
     }
 
-    // ── 3. Stutter detection ────────────────────────────────────────
+    // ── 3. Stutter detection (enhanced) ──────────────────────────────
     if (i > 0) {
       const prevNormalized = normalizeWord(words[i - 1].word);
 
+      // 3a. Prefix stutter: "w" → "want", "th" → "the"
       if (
         prevNormalized.length >= 1 &&
         prevNormalized.length < normalized.length &&
         (normalized.startsWith(prevNormalized) ||
           (prevNormalized.length <= 3 && normalized.substring(0, 2) === prevNormalized.substring(0, 2)))
       ) {
-        mistakes.push({
-          type: 'stutter',
-          startTime: words[i - 1].start,
-          endTime: words[i - 1].end,
-          text: words[i - 1].word,
-          reason: `Stutter before "${word.word}"`,
-          confidence: 0.80,
-        });
+        const alreadyMarked = mistakes.some(
+          m => m.startTime === words[i - 1].start && (m.type === 'stutter' || m.type === 'repeated_word'),
+        );
+        if (!alreadyMarked) {
+          mistakes.push({
+            type: 'stutter',
+            startTime: words[i - 1].start,
+            endTime: words[i - 1].end,
+            text: words[i - 1].word,
+            reason: `Stutter before "${word.word}"`,
+            confidence: 0.80,
+          });
+        }
+      }
+
+      // 3b. Multi-step stutter: "I I I want" — detect runs of 3+ identical short words
+      // (pair repetitions are caught in section 2, but 3+ runs deserve higher confidence)
+      if (i >= 2 && config.removeRepeatedWords) {
+        const prevPrevNorm = normalizeWord(words[i - 2].word);
+        if (normalized === prevNormalized && normalized === prevPrevNorm && normalized.length <= 3) {
+          // This is a 3+ stutter run — mark all but the last with high confidence
+          // Check how far back the run extends
+          let runStart = i - 2;
+          while (runStart > 0 && normalizeWord(words[runStart - 1].word) === normalized) {
+            runStart--;
+          }
+          for (let k = runStart; k < i; k++) {
+            const alreadyMarked = mistakes.some(
+              m => m.startTime === words[k].start && (m.type === 'stutter' || m.type === 'repeated_word'),
+            );
+            if (!alreadyMarked) {
+              mistakes.push({
+                type: 'stutter',
+                startTime: words[k].start,
+                endTime: words[k].end,
+                text: words[k].word,
+                reason: `Stutter run (${i - runStart + 1}x "${word.word}")`,
+                confidence: 0.92,
+              });
+            }
+          }
+        }
+      }
+
+      // 3c. Broken stutter with gap: "th" [pause] "the" — short word, gap < 0.4s, next word starts same
+      if (
+        prevNormalized.length <= 3 &&
+        prevNormalized.length >= 1 &&
+        normalized.length > prevNormalized.length &&
+        normalized.startsWith(prevNormalized.substring(0, Math.min(2, prevNormalized.length)))
+      ) {
+        const gap = word.start - words[i - 1].end;
+        if (gap > 0 && gap < 0.4) {
+          const alreadyMarked = mistakes.some(
+            m => m.startTime === words[i - 1].start && (m.type === 'stutter' || m.type === 'repeated_word'),
+          );
+          if (!alreadyMarked) {
+            mistakes.push({
+              type: 'stutter',
+              startTime: words[i - 1].start,
+              endTime: words[i - 1].end,
+              text: words[i - 1].word,
+              reason: `Broken stutter: "${words[i - 1].word}" → "${word.word}" (gap ${(gap * 1000).toFixed(0)}ms)`,
+              confidence: 0.75,
+            });
+          }
+        }
       }
     }
   }
@@ -556,6 +836,165 @@ function preDetectMistakes(
           (phrase.endTime >= m.startTime && phrase.endTime <= m.endTime),
       );
       if (!alreadyDetected) mistakes.push(phrase);
+    }
+  }
+
+  // ── 6. Self-correction patterns ─────────────────────────────────
+  // Detect patterns like: "go left, I mean right" or "Tuesday, sorry, Wednesday"
+  // The corrected part (before the signal) should be removed, keeping the correction.
+  if (config.removeSelfCorrections) {
+    // Correction signal phrases to look for
+    const correctionSignals: Array<{ words: string[]; label: string }> = [
+      { words: ['i', 'mean'], label: 'I mean' },
+      { words: ['i', 'meant'], label: 'I meant' },
+      { words: ['or', 'rather'], label: 'or rather' },
+      { words: ['well', 'actually'], label: 'well actually' },
+      { words: ['no', 'wait'], label: 'no wait' },
+    ];
+    // Single-word correction signals (need tighter context)
+    const singleSignals = ['sorry', 'actually', 'wait'];
+
+    for (let i = 0; i < words.length; i++) {
+      const norm = normalizeWord(words[i].word);
+
+      // Check two-word signals first
+      for (const signal of correctionSignals) {
+        if (
+          norm === signal.words[0] &&
+          i + 1 < words.length &&
+          normalizeWord(words[i + 1].word) === signal.words[1]
+        ) {
+          // Found a correction signal — look backward for the incorrect part
+          // Go back up to 4 words, stopping at a long gap (> 0.5s) or sentence boundary
+          let corrStart = i - 1;
+          if (corrStart < 0) break;
+
+          while (corrStart > 0) {
+            const gap = words[corrStart].start - words[corrStart - 1].end;
+            if (gap > 0.5) break;
+            if (i - corrStart >= 4) break;
+            corrStart--;
+          }
+
+          if (corrStart < i) {
+            const corrText = words.slice(corrStart, i).map(w => w.word).join(' ');
+            const signalText = words.slice(i, i + signal.words.length).map(w => w.word).join(' ');
+            const alreadyDetected = mistakes.some(
+              m => m.startTime >= words[corrStart].start - 0.05 && m.startTime <= words[i].start + 0.05,
+            );
+            if (!alreadyDetected) {
+              mistakes.push({
+                type: 'self_correction',
+                startTime: words[corrStart].start,
+                endTime: words[i + signal.words.length - 1].end,
+                text: `${corrText} ${signalText}`,
+                reason: `Self-correction with "${signal.label}" — keeping the corrected version`,
+                confidence: 0.65,
+              });
+            }
+          }
+          i += signal.words.length - 1; // Skip signal words
+          break;
+        }
+      }
+
+      // Check single-word signals (need a gap or filler before them to confirm)
+      if (singleSignals.includes(norm) && i > 0 && i < words.length - 1) {
+        const gapBefore = words[i].start - words[i - 1].end;
+        const gapAfter = i + 1 < words.length ? words[i + 1].start - words[i].end : 999;
+
+        // Only flag if there's a brief pause context (speaker pauses to correct)
+        if (gapBefore > 0.1 || gapAfter > 0.1) {
+          // Look backward for what's being corrected (1-3 words)
+          let corrStart = i - 1;
+          while (corrStart > 0 && i - corrStart < 3) {
+            const gap = words[corrStart].start - words[corrStart - 1].end;
+            if (gap > 0.5) break;
+            corrStart--;
+          }
+
+          if (corrStart < i) {
+            const corrText = words.slice(corrStart, i).map(w => w.word).join(' ');
+            const alreadyDetected = mistakes.some(
+              m => m.startTime >= words[corrStart].start - 0.05 && m.startTime <= words[i].start + 0.05,
+            );
+            if (!alreadyDetected) {
+              mistakes.push({
+                type: 'self_correction',
+                startTime: words[corrStart].start,
+                endTime: words[i].end,
+                text: `${corrText} ${words[i].word}`,
+                reason: `Self-correction with "${words[i].word}" — keeping the corrected version`,
+                confidence: 0.55, // Lower confidence for single-word signals
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ── 7. False start detection ────────────────────────────────────
+  // Detect abandoned thoughts: short phrase → pause → completely different continuation
+  // Only flag with low confidence — GPT confirmation will boost.
+  if (config.removeFalseStarts) {
+    for (let i = 0; i < words.length - 1; i++) {
+      const gap = words[i + 1].start - words[i].end;
+
+      // Need a meaningful gap (0.3s+) that suggests the speaker paused to restart
+      if (gap < 0.3) continue;
+
+      // Find the start of the current phrase (backward from i)
+      let phraseStart = i;
+      while (phraseStart > 0) {
+        const prevGap = words[phraseStart].start - words[phraseStart - 1].end;
+        if (prevGap > 0.4) break;
+        phraseStart--;
+      }
+
+      const phraseLen = i - phraseStart + 1;
+
+      // Only consider short phrases (1-4 words) as potential false starts
+      // Longer phrases are more likely to be complete thoughts
+      if (phraseLen < 1 || phraseLen > 4) continue;
+
+      // Skip if the phrase is a common sentence opener that's intentional
+      const phraseText = words.slice(phraseStart, i + 1).map(w => normalizeWord(w.word)).join(' ');
+      if (fillerConfig.commonPhrasesToSkip.has(phraseText)) continue;
+
+      // Check that the next phrase starts differently (not a continuation)
+      const nextWord = normalizeWord(words[i + 1].word);
+      const phraseFirstWord = normalizeWord(words[phraseStart].word);
+
+      // If next phrase starts with same word, this could be a restart (caught by repeated phrases)
+      if (nextWord === phraseFirstWord) continue;
+
+      // Skip if this phrase already overlaps with a detected mistake
+      const alreadyDetected = mistakes.some(
+        m =>
+          (words[phraseStart].start >= m.startTime && words[phraseStart].start <= m.endTime) ||
+          (words[i].end >= m.startTime && words[i].end <= m.endTime),
+      );
+      if (alreadyDetected) continue;
+
+      // Additional check: phrase should contain at least one content word
+      const hasContentWord = words.slice(phraseStart, i + 1).some(w => {
+        const n = normalizeWord(w.word);
+        return n.length > 2 && !['the', 'a', 'an', 'i', 'to', 'of', 'in', 'on', 'is', 'it'].includes(n);
+      });
+
+      if (hasContentWord && phraseLen >= 2) {
+        // Flag with low confidence — needs GPT confirmation
+        const originalText = words.slice(phraseStart, i + 1).map(w => w.word).join(' ');
+        mistakes.push({
+          type: 'false_start',
+          startTime: words[phraseStart].start,
+          endTime: words[i].end,
+          text: originalText,
+          reason: `Possible false start: "${originalText}" followed by ${(gap * 1000).toFixed(0)}ms pause`,
+          confidence: 0.45, // Low confidence — relies on GPT to confirm/boost
+        });
+      }
     }
   }
 
@@ -686,25 +1125,46 @@ export async function detectSpeechMistakesWithGPT(
 
   const aggressivenessNote =
     config.aggressiveness === 'aggressive'
-      ? 'Be thorough — remove anything that sounds like a speech mistake.'
+      ? 'Be thorough — remove anything that sounds like a speech mistake, including verbal tics and discourse markers used as fillers.'
       : config.aggressiveness === 'conservative'
-        ? 'Be very conservative — only remove things that are clearly mistakes.'
-        : 'Remove clear mistakes but preserve natural speech rhythm.';
+        ? 'Be very conservative — only remove things that are clearly and unambiguously mistakes. When in doubt, keep the word.'
+        : 'Remove clear mistakes but preserve natural speech rhythm. Remove fillers that disrupt flow but keep ones that serve as intentional transitions.';
 
-  const systemPrompt = `You clean up spoken transcripts by removing speech mistakes.
+  const systemPrompt = `You are an expert speech editor. Clean up this spoken transcript by removing speech mistakes while preserving the speaker's intended message and natural flow.
 
-Remove ONLY:
+Remove ONLY these types of speech mistakes:
 ${removalTypes.join('\n')}
 
-Rules:
-- Use ONLY words from the original — never add, rephrase, or reorder words
-- Only REMOVE words, never insert new ones
-- Keep all meaningful content intact
-- For self-corrections, keep the CORRECTED version (the second attempt)
-- For false starts, keep the completed thought
-- ${aggressivenessNote}
+CRITICAL RULES:
+1. Use ONLY words from the original — NEVER add, rephrase, or reorder words
+2. Only REMOVE words, never insert new ones
+3. Keep ALL meaningful content and intentional speech intact
+4. For self-corrections ("go left, I mean right"), remove the INCORRECT part and the correction signal ("go left, I mean"), keeping "right"
+5. For false starts, remove the abandoned thought and keep the completed version
+6. For repeated words/phrases, keep ONLY ONE occurrence (the later one if they differ slightly)
+7. NEVER remove words that serve a grammatical or semantic purpose in their sentence
+8. "Like" is a filler ONLY when used as a pause word, NOT when used as a verb ("I like"), comparison ("looks like"), or conjunction ("like I said")
+9. "So" is a filler ONLY at the very start of a thought or after a long pause, NOT when used as a conjunction connecting clauses
+10. "Actually" is a filler when used as a hedge, but NOT when it contrasts or corrects ("it's actually blue, not green")
 
-Return ONLY the cleaned transcript text. No explanations, no formatting, no quotes around it.`;
+${aggressivenessNote}
+
+Examples of correct cleaning:
+- "Um so like basically the thing is" → "the thing is"
+- "I went to the the store" → "I went to the store"
+- "Go left, I mean, go right at the light" → "go right at the light"
+- "I think, I think we should" → "I think we should"
+- "The revenue was like honestly really good" → "The revenue was really good"
+- "So yeah, we basically, we need to focus" → "we need to focus"
+
+Examples of what to KEEP (do NOT remove):
+- "I like this product" (like = verb)
+- "It looks like rain" (like = comparison)
+- "So we need to act fast" (so = conjunction starting a conclusion)
+- "It was actually quite good" (actually = meaningful contrast)
+- "Right, let's move on" (right = acknowledgment starting new topic)
+
+Return ONLY the cleaned transcript text with no explanation, no formatting, no quotes.`;
 
   // Process chunks (in parallel for speed)
   const chunkResults = await Promise.all(
@@ -849,6 +1309,111 @@ Return ONLY the cleaned transcript text. No explanations, no formatting, no quot
 
   console.log(`[Speech Correction] GPT clean-transcript-diff detected ${mistakes.length} mistakes`);
   return mistakes;
+}
+
+// ---------------------------------------------------------------------------
+// Confidence refinement: silence proximity + clustering + position
+//
+// Post-processing step that adjusts confidence scores based on contextual
+// signals beyond the text level:
+//  1. Silence proximity: mistakes bracketed by silence are more likely real
+//  2. Clustering: multiple fillers near each other boost each other
+//  3. Sentence position: fillers at start/end of clauses are more common
+// ---------------------------------------------------------------------------
+
+function refineConfidenceScores(
+  mistakes: SpeechMistake[],
+  silenceMap: SilenceInterval[],
+  words: TranscriptionWord[],
+): void {
+  if (mistakes.length === 0) return;
+
+  // 1. Silence proximity: if a filler/stutter is bracketed by silence
+  //    within ±150ms, it's more likely a genuine mistake
+  if (silenceMap.length > 0) {
+    for (const mistake of mistakes) {
+      let hasSilenceBefore = false;
+      let hasSilenceAfter = false;
+
+      for (const silence of silenceMap) {
+        // Silence ending near or overlapping mistake start
+        if (silence.end >= mistake.startTime - 0.15 && silence.end <= mistake.startTime + 0.05) {
+          hasSilenceBefore = true;
+        }
+        // Silence starting near or overlapping mistake end
+        if (silence.start >= mistake.endTime - 0.05 && silence.start <= mistake.endTime + 0.15) {
+          hasSilenceAfter = true;
+        }
+      }
+
+      if (hasSilenceBefore && hasSilenceAfter) {
+        // Fully bracketed by silence — strong signal
+        mistake.confidence = Math.min(0.95, mistake.confidence + 0.06);
+        mistake.reason += ' [silence-bracketed]';
+      } else if (hasSilenceBefore || hasSilenceAfter) {
+        // Partially bracketed — mild signal
+        mistake.confidence = Math.min(0.95, mistake.confidence + 0.03);
+      }
+    }
+  }
+
+  // 2. Clustering: multiple mistakes within 2 seconds of each other
+  //    suggest a "disfluency cluster" — boost all in the cluster
+  const sortedByTime = [...mistakes].sort((a, b) => a.startTime - b.startTime);
+  for (let i = 0; i < sortedByTime.length; i++) {
+    const current = sortedByTime[i];
+    let clusterSize = 1;
+
+    // Count nearby mistakes (within 2s window)
+    for (let j = i + 1; j < sortedByTime.length; j++) {
+      if (sortedByTime[j].startTime - current.endTime <= 2.0) {
+        clusterSize++;
+      } else {
+        break;
+      }
+    }
+
+    // Boost confidence for all mistakes in clusters of 3+
+    if (clusterSize >= 3) {
+      for (let j = i; j < i + clusterSize && j < sortedByTime.length; j++) {
+        sortedByTime[j].confidence = Math.min(0.95, sortedByTime[j].confidence + 0.05);
+      }
+    } else if (clusterSize === 2) {
+      // Small boost for pairs
+      for (let j = i; j < i + clusterSize && j < sortedByTime.length; j++) {
+        sortedByTime[j].confidence = Math.min(0.95, sortedByTime[j].confidence + 0.02);
+      }
+    }
+  }
+
+  // 3. Sentence position: fillers at the very start of speech (first 2 words)
+  //    or right after a long gap (>0.5s) are very likely genuine fillers
+  for (const mistake of mistakes) {
+    if (mistake.type !== 'filler_word') continue;
+
+    // Check if this filler is at the start of the transcript
+    const isVeryFirst = words.length > 0 && Math.abs(mistake.startTime - words[0].start) < 0.1;
+
+    // Check if this filler follows a long pause
+    let followsLongPause = false;
+    for (const w of words) {
+      if (Math.abs(w.start - mistake.startTime) < 0.05) {
+        // Found the matching word — check gap before it
+        const wordIdx = words.indexOf(w);
+        if (wordIdx > 0) {
+          const gap = w.start - words[wordIdx - 1].end;
+          if (gap > 0.5) followsLongPause = true;
+        }
+        break;
+      }
+    }
+
+    if (isVeryFirst || followsLongPause) {
+      mistake.confidence = Math.min(0.95, mistake.confidence + 0.05);
+      if (isVeryFirst) mistake.reason += ' [sentence-start]';
+      if (followsLongPause) mistake.reason += ' [after-pause]';
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1117,7 +1682,7 @@ export async function correctSpeechMistakes(
   segmentsRemoved: number;
   timeRemoved: number;
 }> {
-  console.log('[Speech Correction] Starting full speech correction pipeline...');
+  console.log('[Speech Correction] Starting full speech correction pipeline (enhanced)...');
   console.log(`[Speech Correction] Config: ${JSON.stringify(config)}`);
 
   const outputDir = path.dirname(outputPath);
@@ -1146,7 +1711,25 @@ export async function correctSpeechMistakes(
     `[Speech Correction] Detection: ${transcriptMistakes.length} mistakes, Silence map: ${silenceMap.length} intervals`,
   );
 
-  // Step 2: Filter by confidence threshold
+  // Step 2: Refine confidence scores using contextual signals.
+  // This uses silence proximity, clustering, and position to adjust
+  // confidence scores before applying the threshold filter.
+  console.log('[Speech Correction] Refining confidence scores with contextual signals...');
+  refineConfidenceScores(transcriptMistakes, silenceMap, words);
+
+  // Step 2.5: Audio energy validation — validate filler/stutter detections
+  // by comparing their audio energy to surrounding speech levels.
+  // Runs in parallel with nothing (it's a quick analysis), but after
+  // detection so we only analyze already-detected regions.
+  console.log('[Speech Correction] Validating detections with audio energy analysis...');
+  try {
+    await validateWithAudioEnergy(transcriptMistakes, inputPath, outputDir, words);
+  } catch (energyError) {
+    // Non-fatal — continue without energy validation
+    console.warn('[Speech Correction] Audio energy validation failed, continuing without:', energyError);
+  }
+
+  // Step 3: Filter by confidence threshold (after refinement)
   const allMistakes = transcriptMistakes.filter(m => m.confidence >= confidenceThreshold);
 
   console.log(
@@ -1159,7 +1742,7 @@ export async function correctSpeechMistakes(
     return { outputPath, mistakes: transcriptMistakes, segmentsRemoved: 0, timeRemoved: 0 };
   }
 
-  // Step 3: Snap mistake boundaries to silence edges.
+  // Step 4: Snap mistake boundaries to silence edges.
   // This replaces the old fixed-padding approach. Instead of cutting at
   // Whisper word timestamps ± arbitrary ms, we expand each cut into the
   // surrounding silence intervals for clean, natural-sounding edits.
@@ -1174,7 +1757,7 @@ export async function correctSpeechMistakes(
     );
   });
 
-  // Step 4: Apply corrections
+  // Step 5: Apply corrections
   console.log('[Speech Correction] Applying corrections...');
   const result = await applySpeechCorrections(inputPath, outputPath, allMistakes, undefined, confidenceThreshold);
 
