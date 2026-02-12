@@ -147,7 +147,7 @@ function buildLearningPrompt(learning: LearningContext): string {
 
 // ─── Creator Profile Prompt ──────────────────────────────────────────
 
-function buildCreatorPrompt(ctx: CreatorContext): string {
+export function buildCreatorPrompt(ctx: CreatorContext): string {
   const parts = [
     `CREATOR PROFILE:`,
     `- Niche: ${ctx.niche}`,
