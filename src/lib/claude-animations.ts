@@ -1,11 +1,17 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import puppeteer from 'puppeteer-core';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { logger } from './logger';
 
-const anthropic = new Anthropic();
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not set');
+  }
+  return new OpenAI({ apiKey });
+}
 
 /**
  * Generate animation HTML/CSS using Claude API
@@ -52,24 +58,13 @@ Return ONLY the complete HTML code, no explanations. The HTML should work standa
 
   logger.debug(`[ClaudeAnimation] Generating animation for: "${context.slice(0, 50)}..."`);
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+  const completion = await getOpenAIClient().chat.completions.create({
+    model: 'gpt-4o',
     max_tokens: 4096,
-    messages: [
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ],
+    messages: [{ role: 'user', content: prompt }],
   });
 
-  // Extract HTML from response
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response type from Claude');
-  }
-
-  let html = content.text;
+  let html = completion.choices[0]?.message?.content?.trim() || '';
 
   // Clean up the response - remove markdown code blocks if present
   html = html.replace(/```html\n?/g, '').replace(/```\n?/g, '').trim();
