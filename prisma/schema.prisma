@@ -35,6 +35,11 @@ model User {
   googleDriveRefreshToken String?
   googleDriveTokenExpiry  DateTime?
   googleDriveConnected Boolean @default(false)
+
+  // Ideate: AI script generation
+  creatorProfile      CreatorProfile?
+  ideas               Idea[]
+  scripts             Script[]
 }
 
 model UserProcessingPreferences {
@@ -260,4 +265,117 @@ enum PostStatus {
   PUBLISHED
   FAILED
   CANCELLED
+}
+
+// ─── Ideate: AI Script Generation ────────────────────────────────────
+
+model CreatorProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Core identity
+  niche               String   @default("")
+  targetAudience      String   @default("")
+  contentGoal         String   @default("")
+
+  // SPCL Framework fields
+  statusProof         String[]
+  powerExamples       String[]
+  credibilityMarkers  String[]
+  likenessTraits      String[]
+
+  // Voice & style
+  toneOfVoice         String   @default("direct")
+  personalCatchphrases String[]
+  avoidTopics         String[]
+  exampleScripts      String[]
+
+  // Platform preferences
+  primaryPlatform     String   @default("instagram")
+  typicalVideoLength  Int      @default(60)
+
+  isComplete          Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Idea {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title         String
+  hook          String
+  angle         String
+  spclElements  Json
+  targetEmotion String
+  estimatedLength Int  @default(60)
+
+  status        IdeaStatus @default(SAVED)
+  scripts       Script[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+}
+
+enum IdeaStatus {
+  SAVED
+  SCRIPTED
+  FILMED
+  ARCHIVED
+}
+
+model Script {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ideaId    String?
+  idea      Idea?    @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+
+  title     String
+  hook      String
+  body      String
+  cta       String
+  fullScript String
+
+  // Metadata
+  estimatedDuration Int  @default(60)
+  wordCount         Int  @default(0)
+  spclBreakdown     Json?
+
+  // User edits
+  isEdited    Boolean  @default(false)
+  version     Int      @default(1)
+
+  // AI Learning: ratings
+  rating      String?
+
+  // AI Learning: original AI-generated content (before user edits)
+  originalHook       String?
+  originalBody       String?
+  originalCta        String?
+  originalFullScript String?
+
+  status      ScriptStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([ideaId])
+  @@index([userId, status])
+  @@index([userId, rating])
+}
+
+enum ScriptStatus {
+  DRAFT
+  READY
+  FILMED
+  ARCHIVED
 }

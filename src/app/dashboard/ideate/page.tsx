@@ -3,9 +3,9 @@ import { getOrCreateUser } from '@/lib/user'
 import { getEnabledFeatures } from '@/lib/featureFlags'
 import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
-import ScheduleDashboard from './ScheduleDashboard'
+import IdeateDashboard from './IdeateDashboard'
 
-export default async function SchedulePage() {
+export default async function IdeatePage() {
   const user = await getOrCreateUser()
 
   if (!user) {
@@ -14,7 +14,7 @@ export default async function SchedulePage() {
 
   const features = getEnabledFeatures(user.email)
 
-  if (!features.instagramScheduling) {
+  if (!features.ideate) {
     redirect('/dashboard')
   }
 
@@ -34,20 +34,20 @@ export default async function SchedulePage() {
             >
               Editor
             </Link>
-            <Link
-              href="/dashboard/schedule"
-              className="text-white font-medium text-sm"
-            >
-              Schedule
-            </Link>
-            {features.ideate && (
+            {features.instagramScheduling && (
               <Link
-                href="/dashboard/ideate"
+                href="/dashboard/schedule"
                 className="text-gray-400 hover:text-white transition-colors text-sm"
               >
-                Ideate
+                Schedule
               </Link>
             )}
+            <Link
+              href="/dashboard/ideate"
+              className="text-white font-medium text-sm"
+            >
+              Ideate
+            </Link>
             <Link
               href="/account/subscription"
               className="text-gray-400 hover:text-white transition-colors text-sm"
@@ -60,7 +60,7 @@ export default async function SchedulePage() {
       </header>
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <ScheduleDashboard />
+        <IdeateDashboard />
       </div>
     </div>
   )
