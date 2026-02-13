@@ -389,7 +389,7 @@ Return ONLY valid JSON array (no markdown, no code fences):
 
   try {
     const message = await getAnthropicClient().messages.create({
-      model: 'claude-opus-4-6-20260204',
+      model: 'claude-opus-4-6',
       max_tokens: 4096,
       temperature: 0.9,
       messages: [{ role: 'user', content: prompt }],
@@ -531,7 +531,7 @@ Return ONLY valid JSON (no markdown, no code fences):
 
   try {
     const message = await getAnthropicClient().messages.create({
-      model: 'claude-opus-4-6-20260204',
+      model: 'claude-opus-4-6',
       max_tokens: 4096,
       temperature: 0.7,
       messages: [{ role: 'user', content: prompt }],
