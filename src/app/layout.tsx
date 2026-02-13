@@ -14,8 +14,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "TimeBack - Remove Silence from Videos Automatically",
-  description: "Save hours of editing time. TimeBack uses AI to automatically remove silence, filler words, and dead air from your videos.",
+  title: "TimeBack - Become the Authority in Your Industry with AI-Powered Content",
+  description: "TimeBack is AI software that writes your scripts, edits your videos, and posts for you — so you become the go-to authority in your industry without breaking the bank. No content experience needed.",
 };
 
 export default function RootLayout({
