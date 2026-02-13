@@ -67,7 +67,7 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
 COPY --from=builder /app/node_modules/@img ./node_modules/@img
 COPY --from=builder /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
-COPY --from=builder /app/node_modules/@anthropic-ai ./node_modules/@anthropic-ai
+COPY --from=builder /app/node_modules/openai ./node_modules/openai
 
 EXPOSE 3000
 
