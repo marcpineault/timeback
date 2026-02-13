@@ -53,11 +53,11 @@ export default async function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-            Become the Authority in Your Niche
-            <span className="text-cyan-400"> Without Creating a Thing</span>
+            Become the Authority in Your Industry
+            <span className="text-cyan-400"> Without Breaking the Bank or Spending Hours on Social Media</span>
           </h1>
           <p className="text-lg sm:text-xl text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
-            TimeBack is AI software that writes your video scripts, edits your footage, and keeps you posting consistently — so your audience grows on autopilot. No content experience required. No editors or writers to hire.
+            TimeBack is AI software that writes your scripts, edits your videos, and posts for you — so you build authority on autopilot. No content experience needed. No expensive editors or agencies.
           </p>
 
           {/* Single focused CTA */}
@@ -183,7 +183,7 @@ export default async function LandingPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Tell Us Your Niche</h3>
+              <h3 className="text-xl font-semibold text-white mb-2">Tell Us Your Industry</h3>
               <p className="text-gray-400">
                 Pick your topic and audience. TimeBack's AI instantly generates scroll-stopping video scripts tailored to your expertise.
               </p>
@@ -215,7 +215,7 @@ export default async function LandingPage() {
               </div>
               <h3 className="text-xl font-semibold text-white mb-2">Publish and Grow</h3>
               <p className="text-gray-400">
-                Get a finished, professional video ready to post. Stay consistent, build trust, and become the go-to name in your niche.
+                Get a finished, professional video ready to post. Stay consistent, build trust, and become the go-to name in your industry.
               </p>
             </div>
           </div>
@@ -361,7 +361,7 @@ export default async function LandingPage() {
 
             <div className="relative">
               <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                Your Niche Is Waiting for Its Next Authority
+                Your Industry Is Waiting for Its Next Authority
               </h2>
               <p className="text-violet-100 text-lg mb-8 max-w-lg mx-auto">
                 Scripts written. Videos edited. Content posted consistently. All by AI software that costs less than a single freelancer. Start building your authority today.

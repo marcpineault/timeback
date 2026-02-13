@@ -14,8 +14,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "TimeBack - Become the Authority in Your Niche with AI-Powered Content",
-  description: "TimeBack is AI software that writes your scripts, edits your videos, and helps you post consistently — so you become the go-to authority in your niche. No content experience needed.",
+  title: "TimeBack - Become the Authority in Your Industry with AI-Powered Content",
+  description: "TimeBack is AI software that writes your scripts, edits your videos, and posts for you — so you become the go-to authority in your industry without breaking the bank. No content experience needed.",
 };
 
 export default function RootLayout({
