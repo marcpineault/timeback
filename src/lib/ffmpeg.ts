@@ -57,7 +57,7 @@ export type HeadlineStyle = 'classic' | 'speech-bubble';
 
 export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
-  silenceDuration?: number; // minimum silence duration in seconds, default 0.3 (aggressive)
+  silenceDuration?: number; // minimum silence duration in seconds, default 0.35
   autoSilenceThreshold?: boolean; // auto-detect optimal threshold based on audio noise floor
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
@@ -538,7 +538,7 @@ export async function detectNoiseFloor(
 export async function detectSilence(
   inputPath: string,
   threshold: number = -20,
-  minDuration: number = 0.3,  // AGGRESSIVE: Reduced from 0.5 to catch shorter silences
+  minDuration: number = 0.35,  // Slightly relaxed from 0.3 to avoid cutting sentence endings
   useSpeechBandFilter: boolean = true  // Filter to speech frequencies for noise rejection
 ): Promise<SilenceInterval[]> {
   return new Promise((resolve, reject) => {
@@ -617,7 +617,7 @@ export function getNonSilentSegments(
   const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms
   const mergeGap = options.mergeGap ?? 0.075; // Merge segments less than 75ms apart (reduces choppiness)
   const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room before speech
-  const timebackPaddingEnd = 0.2; // 200ms after speech — punchier cuts at end of sentences
+  const timebackPaddingEnd = 0.35; // 350ms after speech — more room for sentence endings to breathe
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
@@ -709,7 +709,7 @@ export async function removeSilence(
   validateFileExists(inputPath, 'silence removal');
 
   let threshold = options.silenceThreshold ?? -20;
-  const minDuration = options.silenceDuration ?? 0.3;  // AGGRESSIVE: Reduced from 0.5
+  const minDuration = options.silenceDuration ?? 0.35;  // Slightly relaxed from 0.3 to avoid clipping sentence tails
   let silences: SilenceInterval[];
   let duration: number;
 
