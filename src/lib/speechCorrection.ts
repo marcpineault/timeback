@@ -1481,7 +1481,7 @@ export function calculateSegmentsToKeep(
   confidenceThreshold: number,
   padding = 0.03,
   timebackPadding = 0.25,
-  timebackPaddingEnd = 0.2,
+  timebackPaddingEnd = 0.35,
 ): Array<{ start: number; end: number }> {
   // Filter mistakes below confidence threshold
   const confidentMistakes = mistakes.filter(m => m.confidence >= confidenceThreshold);

@@ -272,8 +272,8 @@ function calculateAdaptiveThreshold(
   weights.push(isNoisyAudio ? 1.5 : 1.0);
 
   // Method 2: Mean-based threshold (less reliable for noisy audio)
-  // AGGRESSIVE: Reduced from 5 to 2dB - tighter around mean level
-  const meanBasedThreshold = medianMean - 2;
+  // Slightly relaxed from 2 to 3dB offset - less likely to clip trailing speech
+  const meanBasedThreshold = medianMean - 3;
   thresholds.push(meanBasedThreshold);
   // Lower weight for noisy audio since mean is elevated by noise
   weights.push(isNoisyAudio ? 0.2 : 0.5);
@@ -538,7 +538,7 @@ export async function detectNoiseFloor(
 export async function detectSilence(
   inputPath: string,
   threshold: number = -20,
-  minDuration: number = 0.3,  // AGGRESSIVE: Reduced from 0.5 to catch shorter silences
+  minDuration: number = 0.35,  // Slightly relaxed from 0.3 to avoid cutting trailing speech
   useSpeechBandFilter: boolean = true  // Filter to speech frequencies for noise rejection
 ): Promise<SilenceInterval[]> {
   return new Promise((resolve, reject) => {
@@ -617,7 +617,7 @@ export function getNonSilentSegments(
   const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms
   const mergeGap = options.mergeGap ?? 0.075; // Merge segments less than 75ms apart (reduces choppiness)
   const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room before speech
-  const timebackPaddingEnd = 0.2; // 200ms after speech — punchier cuts at end of sentences
+  const timebackPaddingEnd = 0.35; // 350ms after speech — more room for sentences to breathe
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
