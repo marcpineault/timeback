@@ -1,4 +1,5 @@
 import ffmpeg from 'fluent-ffmpeg';
+import sharp from 'sharp';
 import path from 'path';
 import fs, { existsSync } from 'fs';
 import { spawn } from 'child_process';
@@ -939,12 +940,105 @@ function splitHeadlineIntoTwoLines(headline: string): [string, string] {
 }
 
 /**
+ * Estimate the pixel width of text rendered in a bold sans-serif font
+ */
+function estimateTextWidth(text: string, fontSize: number): number {
+  let width = 0;
+  for (const ch of text) {
+    if (ch === ' ') width += fontSize * 0.28;
+    else if (ch >= 'A' && ch <= 'Z') width += fontSize * 0.65;
+    else if (ch >= 'a' && ch <= 'z') width += fontSize * 0.52;
+    else if (ch >= '0' && ch <= '9') width += fontSize * 0.56;
+    else width += fontSize * 0.55; // punctuation, symbols
+  }
+  return width;
+}
+
+/**
+ * Generate a transparent PNG image of a headline with rounded-rectangle background
+ * Uses Sharp SVG rendering for Instagram-native rounded corners
+ */
+async function generateHeadlinePNG(
+  headline: string,
+  style: HeadlineStyle,
+  outputDir: string,
+  canvasWidth: number = 1080
+): Promise<{ pngPath: string; imageWidth: number; imageHeight: number }> {
+  // XML-escape for SVG (not FFmpeg escaping)
+  const xmlEscape = (s: string) => s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const sanitized = headline
+    .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const [rawLine1, rawLine2] = splitHeadlineIntoTwoLines(sanitized);
+  const line1 = xmlEscape(rawLine1);
+  const line2 = xmlEscape(rawLine2);
+  const hasSecondLine = rawLine2.length > 0;
+
+  const fontSize = 48;
+  const paddingX = 40;
+  const paddingY = 28;
+  const lineGap = 16;
+  const borderRadius = 20;
+  const maxWidth = canvasWidth - 120; // 60px margin each side
+  const minWidth = 200;
+
+  // Estimate text widths
+  const line1Width = estimateTextWidth(rawLine1, fontSize);
+  const line2Width = hasSecondLine ? estimateTextWidth(rawLine2, fontSize) : 0;
+  const maxLineWidth = Math.max(line1Width, line2Width);
+
+  // Clamp box width
+  let boxWidth = Math.ceil(maxLineWidth + paddingX * 2);
+  boxWidth = Math.max(minWidth, Math.min(boxWidth, maxWidth));
+
+  // Calculate box height
+  const lineCount = hasSecondLine ? 2 : 1;
+  const boxHeight = Math.ceil(paddingY * 2 + fontSize * lineCount + lineGap * (lineCount - 1));
+
+  // Style-specific colors
+  const bgFill = style === 'speech-bubble' ? 'white' : 'black';
+  const bgOpacity = style === 'speech-bubble' ? '0.98' : '0.7';
+  const textFill = style === 'speech-bubble' ? 'black' : 'white';
+
+  // Build SVG with centered text on rounded rectangle
+  const centerX = boxWidth / 2;
+  // Vertical positioning: center text block within box
+  const textBlockHeight = fontSize * lineCount + lineGap * (lineCount - 1);
+  const textStartY = (boxHeight - textBlockHeight) / 2 + fontSize * 0.78; // 0.78 = approximate ascender ratio
+
+  let textElements = `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${textFill}">${line1}</text>`;
+
+  if (hasSecondLine) {
+    const line2Y = textStartY + fontSize + lineGap;
+    textElements += `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${textFill}">${line2}</text>`;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${boxWidth}" height="${boxHeight}">
+  <rect x="0" y="0" width="${boxWidth}" height="${boxHeight}" rx="${borderRadius}" ry="${borderRadius}" fill="${bgFill}" fill-opacity="${bgOpacity}"/>
+  ${textElements}
+</svg>`;
+
+  const pngPath = path.join(outputDir, `headline_${Date.now()}.png`);
+  await sharp(Buffer.from(svg)).png().toFile(pngPath);
+
+  logger.debug(`[Headline] Generated PNG: ${boxWidth}x${boxHeight} at ${pngPath}`);
+  return { pngPath, imageWidth: boxWidth, imageHeight: boxHeight };
+}
+
+/**
  * Add headline text overlay to video with selectable styling
+ * Uses Sharp-generated PNG with rounded corners overlaid via FFmpeg
  * Styles:
- * - 'speech-bubble': White background with rounded corners, black bold text, triangle tail
- * - 'classic': Semi-transparent black background with rounded corners, white bold text
- * Always displays as 2 lines for better visual balance
- * Positioned in safe zone: below top 200px, avoiding right 150px for engagement buttons
+ * - 'speech-bubble': White rounded rectangle, black bold text (Instagram-native)
+ * - 'classic': Semi-transparent dark rounded rectangle, white bold text
+ * Headline appears instantly and fades out after 5 seconds
  */
 export async function addHeadline(
   inputPath: string,
@@ -955,10 +1049,6 @@ export async function addHeadline(
   headlineStyle: HeadlineStyle = 'speech-bubble'
 ): Promise<string> {
   validateFileExists(inputPath, 'add headline');
-  // Validate input file exists
-  if (!fs.existsSync(inputPath)) {
-    throw new Error(`[Headline] Input file does not exist: ${inputPath}`);
-  }
 
   // Validate headline is not empty after sanitization
   const sanitizedTest = headline.replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '').trim();
@@ -971,109 +1061,51 @@ export async function addHeadline(
   // Y positions optimized for safe zones (1080x1920)
   const baseYPositions: Record<string, number> = {
     top: 350,
-    center: 860,  // Approximate center for 1920 height
+    center: 860,
     bottom: 1350,
   };
 
-  // Sanitize and escape special characters for FFmpeg drawtext filter
-  const escapedHeadline = headline
-    .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, '')
-    .replace(/"/g, '')
-    .replace(/%/g, '%%')
-    .replace(/;/g, '\\;')
-    .replace(/:/g, '\\:');
-
-  // Always split into 2 lines for visual balance
-  const [line1, line2] = splitHeadlineIntoTwoLines(escapedHeadline);
-  const hasSecondLine = line2.length > 0;
-
-  // Smooth fade-in (0-0.5s) and fade-out (4.5-5s)
-  const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
+  const processDir = path.dirname(outputPath);
+  const { pngPath, imageHeight } = await generateHeadlinePNG(headline, headlineStyle, processDir);
 
   const baseY = baseYPositions[position];
-  const fontSize = 54;
-  const lineHeight = 70;
-  const boxPadding = 15;  // Padding around text in the auto-sized box
+  // Center the headline image vertically around the target Y position
+  const overlayY = Math.max(0, baseY - Math.floor(imageHeight / 2));
 
-  let filterString: string;
+  // Overlay the PNG on the video: appears instantly, fades out at 4.5-5s
+  const filterComplex = [
+    `[1:v]format=rgba,fade=t=out:st=4.5:d=0.5:alpha=1[hl]`,
+    `[0:v][hl]overlay=x=(W-w)/2:y=${overlayY}:eof_action=pass[out]`
+  ].join(';');
 
-  if (headlineStyle === 'speech-bubble') {
-    // Speech bubble style: white background box (auto-sized), black bold text
-    const textColor = 'black';
-    const boxColor = 'white@0.98';
-
-    // Line 1 text with auto-sized background box
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`;
-    // Bold overlay (no box, just text slightly offset)
-    const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
-
-    // Line 2 text (if exists)
-    const line2Y = baseY + lineHeight;
-    const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`
-      : '';
-    const line2BoldFilter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
-      : '';
-
-    const filters = [line1Filter, line1BoldFilter];
-    if (hasSecondLine) {
-      filters.push(line2Filter, line2BoldFilter);
-    }
-    filterString = filters.join(',');
-
-  } else {
-    // Classic style: semi-transparent dark background box (auto-sized), white bold text
-    const boxColor = 'black@0.7';
-
-    // Line 1 text with auto-sized background box and shadow
-    const line1Filter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`;
-    const line1BoldFilter = `drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`;
-
-    // Line 2 text (if exists)
-    const line2Y = baseY + lineHeight;
-    const line2Filter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`
-      : '';
-    const line2BoldFilter = hasSecondLine
-      ? `drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`
-      : '';
-
-    const filters = [line1Filter, line1BoldFilter];
-    if (hasSecondLine) {
-      filters.push(line2Filter, line2BoldFilter);
-    }
-    filterString = filters.join(',');
-  }
-
-  logger.debug(`[Headline] Adding 2-line headline: "${line1}" / "${line2}" at ${position} (${headlineStyle})`);
+  logger.debug(`[Headline] Adding headline at ${position} (${headlineStyle}), y=${overlayY}`);
 
   const processConfig: FFmpegProcessConfig = {
-    timeout: 3 * 60 * 1000, // 3 minutes should be enough for headline
+    timeout: 3 * 60 * 1000,
     maxRetries: 1,
     context: 'Headline',
   };
 
   try {
-    await runFFmpegWithRetry(() => {
-      return ffmpeg(inputPath)
-        .videoFilters(filterString)
-        .outputOptions([
-          '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '28',
-          '-threads', '4',
-          '-max_muxing_queue_size', '512',
-          '-bufsize', '1M',
-          '-c:a', 'copy',
-        ])
-        .output(outputPath);
-    }, processConfig);
+    const args = [
+      '-y',
+      '-i', inputPath,
+      '-loop', '1', '-t', '5', '-i', pngPath,
+      '-filter_complex', filterComplex,
+      '-map', '[out]',
+      '-map', '0:a?',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-crf', '28',
+      '-threads', '4',
+      '-max_muxing_queue_size', '512',
+      '-bufsize', '1M',
+      '-c:a', 'copy',
+      '-shortest',
+      outputPath
+    ];
 
+    await runFFmpegSpawn(args, processConfig);
     logger.debug(`[Headline] Complete!`);
     return outputPath;
   } catch (err) {
@@ -1082,6 +1114,8 @@ export async function addHeadline(
     }
     logger.error(`[Headline] Error:`, err instanceof Error ? err : new Error(String(err)));
     throw err;
+  } finally {
+    try { fs.unlinkSync(pngPath); } catch { /* ignore cleanup errors */ }
   }
 }
 
@@ -1486,105 +1520,42 @@ export async function applyCombinedFilters(
   outputPath: string,
   options: CombinedProcessingOptions
 ): Promise<string> {
-  const filters: string[] = [];
+  // Build caption filter string (if captions provided)
+  let captionFilter: string | null = null;
+  let tempSubPath: string | null = null;
 
-  // Add caption/subtitle filter if SRT path provided
   if (options.srtPath && fs.existsSync(options.srtPath)) {
     const isAnimated = options.srtPath.endsWith('.ass');
 
     // Copy subtitle to a temp file with simple name to avoid FFmpeg path escaping issues
     const tempSubName = isAnimated ? 'temp_subs.ass' : 'temp_subs.srt';
     const subDir = path.dirname(options.srtPath);
-    const tempSubPath = path.join(subDir, tempSubName);
+    tempSubPath = path.join(subDir, tempSubName);
     fs.copyFileSync(options.srtPath, tempSubPath);
 
-    const escapedPath = tempSubPath.replace(/:/g, '\\:').replace(/'/g, "'\\''");
+    const escapedPath = tempSubPath!.replace(/:/g, '\\:').replace(/'/g, "'\\''");
 
     if (isAnimated) {
-      filters.push(`ass='${escapedPath}'`);
+      captionFilter = `ass='${escapedPath}'`;
     } else {
-      // Instagram style caption
       const subtitleStyle = 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53';
-      filters.push(`subtitles='${escapedPath}':force_style='${subtitleStyle}'`);
+      captionFilter = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
     }
 
     logger.debug(`[Combined] Added caption filter for: ${options.srtPath}`);
   }
 
-  // Add headline filter if specified (with selectable styling)
-  if (options.headline) {
-    // Y positions optimized for safe zones (1080x1920)
-    const baseYPositions: Record<string, number> = {
-      top: 350,
-      center: 860,
-      bottom: 1350,
-    };
-
-    // Sanitize and escape special characters for FFmpeg drawtext filter
-    const escapedHeadline = options.headline
-      .replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, '')
-      .replace(/"/g, '')
-      .replace(/%/g, '%%')
-      .replace(/;/g, '\\;')
-      .replace(/:/g, '\\:');
-
-    const position = options.headlinePosition || 'top';
-    const style = options.headlineStyle || 'speech-bubble';
-    const alphaExpr = "alpha='if(lt(t\\,0.5)\\,t*2\\,if(gt(t\\,4.5)\\,(5-t)*2\\,1))'";
-
-    // Always split into 2 lines for visual balance
-    const [line1, line2] = splitHeadlineIntoTwoLines(escapedHeadline);
-    const hasSecondLine = line2.length > 0;
-
-    const baseY = baseYPositions[position];
-    const fontSize = 54;
-    const lineHeight = 70;
-    const boxPadding = 15;  // Padding around text in the auto-sized box
-
-    if (style === 'speech-bubble') {
-      // Speech bubble style: white background box (auto-sized), black bold text
-      const textColor = 'black';
-      const boxColor = 'white@0.98';
-
-      // Line 1 text with auto-sized background box
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
-      // Bold overlay (no box)
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
-
-      if (hasSecondLine) {
-        const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=${textColor}:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
-      }
-    } else {
-      // Classic style: semi-transparent dark background box (auto-sized), white bold text
-      const boxColor = 'black@0.7';
-
-      // Line 1 text with auto-sized background box and shadow
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${baseY}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-      filters.push(`drawtext=text='${line1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${baseY}:${alphaExpr}:enable='between(t,0,5)'`);
-
-      if (hasSecondLine) {
-        const line2Y = baseY + lineHeight;
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=${line2Y}:box=1:boxcolor=${boxColor}:boxborderw=${boxPadding}:${alphaExpr}:shadowcolor=black@0.9:shadowx=2:shadowy=2:enable='between(t,0,5)'`);
-        filters.push(`drawtext=text='${line2}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2+1:y=${line2Y}:${alphaExpr}:enable='between(t,0,5)'`);
-      }
-    }
-  }
+  // Check if headline is needed
+  const hasHeadline = !!options.headline;
+  const hasCaptions = !!captionFilter;
+  let headlinePngPath: string | null = null;
 
   // If no filters to apply, just copy the file
-  if (filters.length === 0) {
+  if (!hasHeadline && !hasCaptions) {
     logger.debug('[Combined] No filters to apply, copying file');
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
-
-  const filterString = filters.join(',');
-  logger.debug(`[Combined] Applying ${filters.length} filters in single pass`);
 
   const processConfig: FFmpegProcessConfig = {
     timeout: 5 * 60 * 1000,
@@ -1593,20 +1564,81 @@ export async function applyCombinedFilters(
   };
 
   try {
-    await runFFmpegWithRetry(() => {
-      return ffmpeg(inputPath)
-        .videoFilters(filterString)
-        .outputOptions([
-          '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '28',
-          '-threads', '4',
-          '-max_muxing_queue_size', '512',
-          '-bufsize', '1M',
-          '-c:a', 'copy',
-        ])
-        .output(outputPath);
-    }, processConfig);
+    if (hasHeadline) {
+      // Headline present: use PNG overlay via filter_complex + runFFmpegSpawn
+      const processDir = path.dirname(outputPath);
+      const headlineStyle = options.headlineStyle || 'speech-bubble';
+      const position = options.headlinePosition || 'top';
+
+      const baseYPositions: Record<string, number> = {
+        top: 350,
+        center: 860,
+        bottom: 1350,
+      };
+
+      const { pngPath, imageHeight } = await generateHeadlinePNG(
+        options.headline!, headlineStyle, processDir
+      );
+      headlinePngPath = pngPath;
+
+      const baseY = baseYPositions[position];
+      const overlayY = Math.max(0, baseY - Math.floor(imageHeight / 2));
+
+      // Build filter_complex chain
+      const filterParts: string[] = [];
+
+      if (hasCaptions) {
+        // Captions + Headline: apply captions first, then overlay headline PNG
+        filterParts.push(`[0:v]${captionFilter}[captioned]`);
+        filterParts.push(`[1:v]format=rgba,fade=t=out:st=4.5:d=0.5:alpha=1[hl]`);
+        filterParts.push(`[captioned][hl]overlay=x=(W-w)/2:y=${overlayY}:eof_action=pass[out]`);
+      } else {
+        // Headline only
+        filterParts.push(`[1:v]format=rgba,fade=t=out:st=4.5:d=0.5:alpha=1[hl]`);
+        filterParts.push(`[0:v][hl]overlay=x=(W-w)/2:y=${overlayY}:eof_action=pass[out]`);
+      }
+
+      const filterComplex = filterParts.join(';');
+      logger.debug(`[Combined] Applying ${hasCaptions ? 'captions + ' : ''}headline overlay in single pass`);
+
+      const args = [
+        '-y',
+        '-i', inputPath,
+        '-loop', '1', '-t', '5', '-i', pngPath,
+        '-filter_complex', filterComplex,
+        '-map', '[out]',
+        '-map', '0:a?',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-threads', '4',
+        '-max_muxing_queue_size', '512',
+        '-bufsize', '1M',
+        '-c:a', 'copy',
+        '-shortest',
+        outputPath
+      ];
+
+      await runFFmpegSpawn(args, processConfig);
+    } else {
+      // Captions only (no headline): use existing videoFilters approach
+      logger.debug(`[Combined] Applying caption filter in single pass`);
+
+      await runFFmpegWithRetry(() => {
+        return ffmpeg(inputPath)
+          .videoFilters(captionFilter!)
+          .outputOptions([
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-crf', '28',
+            '-threads', '4',
+            '-max_muxing_queue_size', '512',
+            '-bufsize', '1M',
+            '-c:a', 'copy',
+          ])
+          .output(outputPath);
+      }, processConfig);
+    }
 
     logger.debug(`[Combined] Processing complete!`);
     return outputPath;
@@ -1616,6 +1648,15 @@ export async function applyCombinedFilters(
     }
     logger.error(`[Combined] Error:`, err instanceof Error ? err : new Error(String(err)));
     throw err;
+  } finally {
+    // Clean up temp headline PNG
+    if (headlinePngPath) {
+      try { fs.unlinkSync(headlinePngPath); } catch { /* ignore */ }
+    }
+    // Clean up temp subtitle file
+    if (tempSubPath) {
+      try { fs.unlinkSync(tempSubPath); } catch { /* ignore */ }
+    }
   }
 }
 
