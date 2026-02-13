@@ -945,11 +945,11 @@ function splitHeadlineIntoTwoLines(headline: string): [string, string] {
 function estimateTextWidth(text: string, fontSize: number): number {
   let width = 0;
   for (const ch of text) {
-    if (ch === ' ') width += fontSize * 0.28;
-    else if (ch >= 'A' && ch <= 'Z') width += fontSize * 0.65;
-    else if (ch >= 'a' && ch <= 'z') width += fontSize * 0.52;
-    else if (ch >= '0' && ch <= '9') width += fontSize * 0.56;
-    else width += fontSize * 0.55; // punctuation, symbols
+    if (ch === ' ') width += fontSize * 0.30;
+    else if (ch >= 'A' && ch <= 'Z') width += fontSize * 0.73;
+    else if (ch >= 'a' && ch <= 'z') width += fontSize * 0.58;
+    else if (ch >= '0' && ch <= '9') width += fontSize * 0.62;
+    else width += fontSize * 0.60; // punctuation, symbols
   }
   return width;
 }
@@ -1004,7 +1004,7 @@ async function generateHeadlinePNG(
 
   // Style-specific colors
   const bgFill = style === 'speech-bubble' ? 'white' : 'black';
-  const bgOpacity = style === 'speech-bubble' ? '0.98' : '0.7';
+  const bgOpacity = style === 'speech-bubble' ? '1' : '0.7';
   const textFill = style === 'speech-bubble' ? 'black' : 'white';
 
   // Build SVG with centered text on rounded rectangle
