@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getOrCreateUser } from '@/lib/user'
+import { getOrCreateUser, getUserUsage } from '@/lib/user'
 import { getEnabledFeatures } from '@/lib/featureFlags'
 import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
@@ -17,6 +17,8 @@ export default async function IdeatePage() {
   if (!features.ideate) {
     redirect('/dashboard')
   }
+
+  const usage = await getUserUsage(user.id)
 
   return (
     <div className="min-h-screen bg-[#0F0F14]">
@@ -60,7 +62,11 @@ export default async function IdeatePage() {
       </header>
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <IdeateDashboard />
+        <IdeateDashboard
+          ideateUsed={usage?.ideateUsed ?? 0}
+          ideateLimit={usage?.planDetails.ideateGenerationsPerMonth ?? null}
+          plan={usage?.plan ?? 'FREE'}
+        />
       </div>
     </div>
   )

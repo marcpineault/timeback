@@ -46,6 +46,7 @@ export async function getOrCreateUser() {
       where: { id: user.id },
       data: {
         videosThisMonth: 0,
+        ideateGenerationsThisMonth: 0,
         resetDate: now,
       },
     })
@@ -89,6 +90,40 @@ export async function incrementVideoCount(userId: string) {
   })
 }
 
+export async function canGenerateIdeate(userId: string): Promise<{ allowed: boolean; reason?: string }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  })
+
+  if (!user) {
+    return { allowed: false, reason: 'User not found' }
+  }
+
+  const plan = PLANS[user.plan as PlanType]
+
+  if (plan.ideateGenerationsPerMonth === null) {
+    return { allowed: true }
+  }
+
+  if (user.ideateGenerationsThisMonth >= plan.ideateGenerationsPerMonth) {
+    return {
+      allowed: false,
+      reason: `You've reached your monthly limit of ${plan.ideateGenerationsPerMonth} AI generations. Upgrade your plan to generate more ideas and scripts.`,
+    }
+  }
+
+  return { allowed: true }
+}
+
+export async function incrementIdeateCount(userId: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ideateGenerationsThisMonth: { increment: 1 },
+    },
+  })
+}
+
 export async function getUserUsage(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -108,11 +143,16 @@ export async function getUserUsage(userId: string) {
   const videosPerMonth = plan.videosPerMonth
   const videosRemaining = videosPerMonth === null ? null : Math.max(0, videosPerMonth - user.videosThisMonth)
 
+  const ideatePerMonth = plan.ideateGenerationsPerMonth
+  const ideateRemaining = ideatePerMonth === null ? null : Math.max(0, ideatePerMonth - user.ideateGenerationsThisMonth)
+
   return {
     plan: user.plan,
     planDetails: plan,
     videosUsed: user.videosThisMonth,
     videosRemaining,
+    ideateUsed: user.ideateGenerationsThisMonth,
+    ideateRemaining,
     recentVideos: user.videos,
     hasCompletedOnboarding: user.hasCompletedOnboarding,
   }

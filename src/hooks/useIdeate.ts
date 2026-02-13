@@ -26,7 +26,10 @@ export interface IdeaData {
   id: string;
   title: string;
   hook: string;
+  hookVariations: string[];
   angle: string;
+  contentType: 'reach' | 'authority' | 'conversion' | null;
+  engagementPlay: 'saves' | 'shares' | 'comments' | 'follows' | null;
   spclElements: {
     status: string;
     power: string;

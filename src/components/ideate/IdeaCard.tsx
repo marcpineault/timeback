@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { IdeaData } from '@/hooks/useIdeate'
 
 interface Props {
@@ -25,7 +26,22 @@ const STATUS_COLORS: Record<string, string> = {
   ARCHIVED: 'bg-gray-500/20 text-gray-500',
 }
 
+const CONTENT_TYPE_COLORS: Record<string, string> = {
+  reach: 'bg-blue-500/20 text-blue-400',
+  authority: 'bg-amber-500/20 text-amber-400',
+  conversion: 'bg-green-500/20 text-green-400',
+}
+
+const ENGAGEMENT_ICONS: Record<string, string> = {
+  saves: 'Saves',
+  shares: 'Shares',
+  comments: 'Comments',
+  follows: 'Follows',
+}
+
 export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating }: Props) {
+  const [showHookVariations, setShowHookVariations] = useState(false)
+
   return (
     <div className="bg-[#2A2A3A] rounded-lg p-4 hover:bg-[#2F2F40] transition-colors">
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -37,12 +53,45 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
 
       <p className="text-cyan-400 text-sm italic mb-2">&ldquo;{idea.hook}&rdquo;</p>
 
+      {/* Hook Variations */}
+      {idea.hookVariations && idea.hookVariations.length > 0 && (
+        <div className="mb-2">
+          <button
+            onClick={() => setShowHookVariations(!showHookVariations)}
+            className="text-gray-500 hover:text-gray-300 text-[10px] uppercase tracking-wider transition-colors"
+          >
+            {showHookVariations ? 'Hide' : 'Show'} hook variations ({idea.hookVariations.length})
+          </button>
+          {showHookVariations && (
+            <div className="mt-1.5 space-y-1">
+              {idea.hookVariations.map((variation, i) => (
+                <p key={i} className="text-gray-400 text-xs italic pl-2 border-l border-gray-700">
+                  &ldquo;{variation}&rdquo;
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <p className="text-gray-400 text-xs mb-3 line-clamp-2">{idea.angle}</p>
 
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {/* Content Type Badge */}
+        {idea.contentType && (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CONTENT_TYPE_COLORS[idea.contentType] || 'bg-gray-500/20 text-gray-400'}`}>
+            {idea.contentType}
+          </span>
+        )}
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${EMOTION_COLORS[idea.targetEmotion] || 'bg-gray-500/20 text-gray-400'}`}>
           {idea.targetEmotion}
         </span>
+        {/* Engagement Play */}
+        {idea.engagementPlay && (
+          <span className="text-gray-500 text-xs">
+            {ENGAGEMENT_ICONS[idea.engagementPlay] || idea.engagementPlay}
+          </span>
+        )}
         <span className="text-gray-500 text-xs">{idea.estimatedLength}s</span>
       </div>
 
