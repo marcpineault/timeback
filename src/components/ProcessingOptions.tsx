@@ -769,15 +769,12 @@ export default function ProcessingOptions({
                 }`}
               >
                 <div className="flex flex-col items-center gap-2">
-                  {/* Speech bubble preview */}
-                  <div className="relative">
-                    <div className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded">
-                      Headline
-                    </div>
-                    <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-white mx-auto" />
+                  {/* Instagram style preview */}
+                  <div className="bg-white text-black text-xs font-bold px-4 py-2 rounded-xl">
+                    Headline
                   </div>
                   <span className={`text-xs ${config.headlineStyle === 'speech-bubble' ? 'text-cyan-400' : 'text-gray-400'}`}>
-                    Speech Bubble
+                    Instagram
                   </span>
                 </div>
               </button>
@@ -793,7 +790,7 @@ export default function ProcessingOptions({
               >
                 <div className="flex flex-col items-center gap-2">
                   {/* Classic preview */}
-                  <div className="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded shadow-lg">
+                  <div className="bg-black/60 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg">
                     Headline
                   </div>
                   <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-cyan-400' : 'text-gray-400'}`}>
