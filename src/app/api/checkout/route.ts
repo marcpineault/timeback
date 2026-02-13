@@ -91,10 +91,10 @@ export async function POST(req: Request) {
               data: { plan },
             })
 
-            // Redirect to success page - upgrade is complete with proration
+            // Redirect to thank-you page - upgrade is complete with proration
             return NextResponse.redirect(
               new URL(
-                `/dashboard?success=true&upgraded=true`,
+                `/thank-you`,
                 process.env.NEXT_PUBLIC_APP_URL
               ),
               { status: 303 }
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/thank-you`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
       metadata: {
         userId: user.id,
