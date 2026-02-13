@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { getOrCreateUser } from '@/lib/user';
+import { getOrCreateUser, canGenerateIdeate, incrementIdeateCount } from '@/lib/user';
 import { prisma } from '@/lib/db';
 import { generateScript, type CreatorContext } from '@/lib/scriptGenerator';
 
@@ -54,6 +54,12 @@ export async function POST(request: NextRequest) {
     const user = await getOrCreateUser();
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check ideate generation limit
+    const { allowed, reason } = await canGenerateIdeate(user.id);
+    if (!allowed) {
+      return NextResponse.json({ error: reason }, { status: 403 });
     }
 
     const body = await request.json();
@@ -131,6 +137,9 @@ export async function POST(request: NextRequest) {
       where: { id: idea.id },
       data: { status: 'SCRIPTED' },
     });
+
+    // Increment usage counter
+    await incrementIdeateCount(user.id);
 
     return NextResponse.json({ script });
   } catch (error) {

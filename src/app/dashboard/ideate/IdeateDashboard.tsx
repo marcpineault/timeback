@@ -11,7 +11,13 @@ import { useCreatorProfile, useScripts, useScript, type ScriptData } from '@/hoo
 
 type Tab = 'ideas' | 'scripts' | 'swipefile' | 'teleprompter' | 'profile'
 
-export default function IdeateDashboard() {
+interface DashboardProps {
+  ideateUsed: number
+  ideateLimit: number | null
+  plan: string
+}
+
+export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: DashboardProps) {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useCreatorProfile()
   const { scripts, loading: scriptsLoading, refetch: refetchScripts } = useScripts()
   const [activeTab, setActiveTab] = useState<Tab>('ideas')
@@ -52,12 +58,40 @@ export default function IdeateDashboard() {
 
   return (
     <div>
-      {/* Page Title */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Ideate</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Generate video ideas and scripts powered by the SPCL framework
-        </p>
+      {/* Page Title + Usage */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Ideate</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Generate video ideas and scripts powered by the SPCL framework
+          </p>
+        </div>
+        {ideateLimit !== null && (
+          <div className="flex items-center gap-3 bg-[#1A1A24] rounded-lg px-4 py-2.5 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-white text-sm font-medium">
+                {ideateUsed} / {ideateLimit}
+              </p>
+              <p className="text-gray-500 text-xs">generations this month</p>
+            </div>
+            {ideateUsed >= ideateLimit && (
+              <a
+                href="/pricing"
+                className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-md text-xs font-medium transition-colors"
+              >
+                Upgrade
+              </a>
+            )}
+            {ideateUsed < ideateLimit && plan === 'FREE' && (
+              <a
+                href="/pricing"
+                className="text-violet-400 hover:text-violet-300 text-xs transition-colors"
+              >
+                Upgrade
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

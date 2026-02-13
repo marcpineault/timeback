@@ -13,8 +13,7 @@ const BETA_TESTER_EMAILS = new Set([
 // Features that are currently in beta
 export type BetaFeature =
   | 'speechCorrection'
-  | 'instagramScheduling'
-  | 'ideate';
+  | 'instagramScheduling';
 
 /**
  * Check if an email has access to beta features
@@ -35,7 +34,6 @@ export function isFeatureEnabled(
   const betaFeatures: Set<BetaFeature> = new Set([
     'speechCorrection',
     'instagramScheduling',
-    'ideate',
   ]);
 
   // If the feature is in beta, check if user is a beta tester
@@ -59,6 +57,6 @@ export function getEnabledFeatures(email: string | null | undefined): {
     // Disabled: speech correction is causing issues with silence removal
     speechCorrection: false,
     instagramScheduling: isBetaTester(email),
-    ideate: isBetaTester(email),
+    ideate: true,
   };
 }

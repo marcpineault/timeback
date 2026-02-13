@@ -16,6 +16,7 @@ model User {
   stripeCustomerId String?
   stripeSubscriptionId String?
   videosThisMonth Int       @default(0)
+  ideateGenerationsThisMonth Int @default(0)
   resetDate       DateTime  @default(now())
   hasCompletedOnboarding Boolean @default(false)
   createdAt       DateTime  @default(now())
@@ -309,7 +310,10 @@ model Idea {
 
   title         String
   hook          String
+  hookVariations String[]
   angle         String
+  contentType   String?       // 'reach' | 'authority' | 'conversion'
+  engagementPlay String?      // 'saves' | 'shares' | 'comments' | 'follows'
   spclElements  Json
   targetEmotion String
   estimatedLength Int  @default(60)

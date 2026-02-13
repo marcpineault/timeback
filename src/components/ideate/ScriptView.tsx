@@ -10,6 +10,50 @@ interface Props {
   onScriptUpdated: (script: ScriptData) => void
 }
 
+function renderScriptWithNotes(text: string) {
+  const parts = text.split(/(\[TEXT OVERLAY:[^\]]*\]|\[B-ROLL:[^\]]*\]|\[ENERGY SHIFT:[^\]]*\]|\[PATTERN INTERRUPT\]|\[PAUSE\])/)
+
+  return parts.map((part, i) => {
+    if (part.startsWith('[TEXT OVERLAY:')) {
+      const content = part.replace('[TEXT OVERLAY:', '').replace(']', '').trim().replace(/^"|"$/g, '')
+      return (
+        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded text-xs font-medium mx-0.5">
+          TEXT: {content}
+        </span>
+      )
+    }
+    if (part.startsWith('[B-ROLL:')) {
+      const content = part.replace('[B-ROLL:', '').replace(']', '').trim()
+      return (
+        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-500/15 text-gray-400 rounded text-xs italic mx-0.5">
+          B-Roll: {content}
+        </span>
+      )
+    }
+    if (part.startsWith('[ENERGY SHIFT:')) {
+      const content = part.replace('[ENERGY SHIFT:', '').replace(']', '').trim()
+      return (
+        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500/15 text-yellow-400 rounded text-xs mx-0.5">
+          Energy: {content}
+        </span>
+      )
+    }
+    if (part === '[PATTERN INTERRUPT]') {
+      return (
+        <span key={i} className="block my-2 border-t border-dashed border-orange-500/40 pt-1 text-orange-400 text-[10px] uppercase tracking-wider">
+          pattern interrupt — cut/zoom/angle change
+        </span>
+      )
+    }
+    if (part === '[PAUSE]') {
+      return (
+        <span key={i} className="text-gray-600 text-xs mx-0.5">||</span>
+      )
+    }
+    return <span key={i} className="text-gray-200">{part}</span>
+  })
+}
+
 export default function ScriptView({ script, onBack, onOpenTeleprompter, onScriptUpdated }: Props) {
   const [hook, setHook] = useState(script.hook)
   const [body, setBody] = useState(script.body)
@@ -18,6 +62,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
   const [saved, setSaved] = useState(false)
   const [currentRating, setCurrentRating] = useState<string | null>(script.rating)
   const [showSpcl, setShowSpcl] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     setHook(script.hook)
@@ -27,7 +72,13 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
   }, [script])
 
   const fullText = `${hook}\n\n${body}\n\n${cta}`
-  const wordCount = fullText.replace(/\[PAUSE\]/g, '').split(/\s+/).filter(Boolean).length
+  const spokenText = fullText
+    .replace(/\[PAUSE\]/g, '')
+    .replace(/\[TEXT OVERLAY:[^\]]*\]/g, '')
+    .replace(/\[B-ROLL:[^\]]*\]/g, '')
+    .replace(/\[ENERGY SHIFT:[^\]]*\]/g, '')
+    .replace(/\[PATTERN INTERRUPT\]/g, '')
+  const wordCount = spokenText.split(/\s+/).filter(Boolean).length
   const estimatedDuration = Math.round((wordCount / 150) * 60)
 
   const hasChanges = hook !== script.hook || body !== script.body || cta !== script.cta
@@ -161,6 +212,25 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
           />
         </div>
       </div>
+
+      {/* Script Preview with Production Notes */}
+      {(fullText.includes('[TEXT OVERLAY:') || fullText.includes('[PATTERN INTERRUPT]') || fullText.includes('[B-ROLL:') || fullText.includes('[ENERGY SHIFT:')) && (
+        <div className="mb-6">
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="text-gray-400 hover:text-white text-sm transition-colors flex items-center gap-1 mb-3"
+          >
+            <span>{showPreview ? '▼' : '▶'}</span> Production Notes Preview
+          </button>
+          {showPreview && (
+            <div className="bg-[#1A1A24] rounded-xl p-5">
+              <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                {renderScriptWithNotes(fullText)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* SPCL Breakdown */}
       {spcl && (
