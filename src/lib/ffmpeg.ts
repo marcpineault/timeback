@@ -319,9 +319,9 @@ function calculateAdaptiveThreshold(
 
   let threshold = weightedSum / totalWeight;
 
-  // AGGRESSIVE: Clamp to bounds (-50 to -12 dB) - raised upper limit from -15 to -12
+  // Clamp to bounds (-50 to -13 dB) - pulled back 1dB from -12 to reduce occasional sentence clipping
   // For noisy audio, allow even higher threshold (up to -10dB)
-  const upperLimit = isNoisyAudio ? -10 : -12;
+  const upperLimit = isNoisyAudio ? -10 : -13;
   threshold = Math.min(upperLimit, Math.max(-50, threshold));
 
   // Enhanced logging for debugging
