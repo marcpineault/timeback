@@ -57,7 +57,7 @@ export type HeadlineStyle = 'classic' | 'speech-bubble';
 
 export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
-  silenceDuration?: number; // minimum silence duration in seconds, default 0.3 (aggressive)
+  silenceDuration?: number; // minimum silence duration in seconds, default 0.35
   autoSilenceThreshold?: boolean; // auto-detect optimal threshold based on audio noise floor
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
@@ -319,9 +319,9 @@ function calculateAdaptiveThreshold(
 
   let threshold = weightedSum / totalWeight;
 
-  // AGGRESSIVE: Clamp to bounds (-50 to -12 dB) - raised upper limit from -15 to -12
+  // Clamp to bounds (-50 to -13 dB) - pulled back 1dB from -12 to reduce occasional sentence clipping
   // For noisy audio, allow even higher threshold (up to -10dB)
-  const upperLimit = isNoisyAudio ? -10 : -12;
+  const upperLimit = isNoisyAudio ? -10 : -13;
   threshold = Math.min(upperLimit, Math.max(-50, threshold));
 
   // Enhanced logging for debugging
@@ -538,7 +538,7 @@ export async function detectNoiseFloor(
 export async function detectSilence(
   inputPath: string,
   threshold: number = -20,
-  minDuration: number = 0.3,  // AGGRESSIVE: Reduced from 0.5 to catch shorter silences
+  minDuration: number = 0.35,  // Slightly relaxed from 0.3 to avoid cutting sentence endings
   useSpeechBandFilter: boolean = true  // Filter to speech frequencies for noise rejection
 ): Promise<SilenceInterval[]> {
   return new Promise((resolve, reject) => {
@@ -617,7 +617,7 @@ export function getNonSilentSegments(
   const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms
   const mergeGap = options.mergeGap ?? 0.075; // Merge segments less than 75ms apart (reduces choppiness)
   const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room before speech
-  const timebackPaddingEnd = 0.2; // 200ms after speech — punchier cuts at end of sentences
+  const timebackPaddingEnd = 0.25; // 250ms after speech — slight buffer to avoid clipping sentence tails
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
@@ -709,7 +709,7 @@ export async function removeSilence(
   validateFileExists(inputPath, 'silence removal');
 
   let threshold = options.silenceThreshold ?? -20;
-  const minDuration = options.silenceDuration ?? 0.3;  // AGGRESSIVE: Reduced from 0.5
+  const minDuration = options.silenceDuration ?? 0.35;  // Slightly relaxed from 0.3 to avoid clipping sentence tails
   let silences: SilenceInterval[];
   let duration: number;
 
