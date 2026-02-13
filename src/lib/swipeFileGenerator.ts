@@ -6,16 +6,16 @@
  * Claude's deep knowledge of viral content, not scraped from specific URLs.
  */
 
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { buildCreatorPrompt, type CreatorContext } from './scriptGenerator';
 import { logger } from './logger';
 
-function getOpenAIClient(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY;
+function getAnthropicClient(): Anthropic {
+  const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is not set');
+    throw new Error('CLAUDE_API_KEY environment variable is not set');
   }
-  return new OpenAI({ apiKey });
+  return new Anthropic({ apiKey });
 }
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -145,14 +145,14 @@ IMPORTANT: Make each entry DISTINCT — different patterns, different psychologi
   logger.debug(`[SwipeFileGenerator] Generating ${count} entries for user ${userId} (category: ${categoryFilter || 'ALL'})`);
 
   try {
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
+    const message = await getAnthropicClient().messages.create({
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 8192,
       temperature: 0.9,
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const raw = completion.choices[0]?.message?.content?.trim() || '';
+    const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
     const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
     const entries: GeneratedSwipeEntry[] = JSON.parse(jsonStr);
 
