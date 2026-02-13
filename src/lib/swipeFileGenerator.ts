@@ -45,6 +45,7 @@ Generate diverse hook styles using PROVEN psychological triggers:
 - Story open ("Last week something happened that changed everything...")
 - Data shock ("97% of people get this wrong — and it's costing them...")
 - Value promise ("In the next 30 seconds, I'll show you the exact system for X")
+- Open loop ("I was about to quit my business — until I discovered this one thing..." — teases without revealing)
 
 For each entry, the "hook" field should be the PRIMARY focus — a ready-to-use opening line.
 The "analysis" field should explain the EFFECT ON VIEWER — what psychological trigger makes this hook work and what emotion/action it drives.
