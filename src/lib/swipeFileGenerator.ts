@@ -106,7 +106,7 @@ export async function generateSwipeEntries(
 
   const prompt = `You are a viral video content analyst with deep expertise in short-form video content that gets millions of views. You study patterns across TikTok, Instagram Reels, YouTube Shorts, and other platforms.
 
-Your job is to generate a "swipe file" — a collection of proven content patterns, frameworks, and examples that a creator can draw inspiration from.
+Your job is to generate an "inspiration file" — a collection of proven content patterns, frameworks, and examples that a creator can draw inspiration from.
 
 ${buildCreatorPrompt(creatorContext)}
 
@@ -115,7 +115,7 @@ ${topic ? `TOPIC FOCUS: ${topic}` : ''}
 
 ${categoryInstruction}
 
-Generate ${count} swipe file entries. Each entry should:
+Generate ${count} inspiration entries. Each entry should:
 1. Be based on PROVEN viral content patterns you've observed across millions of videos
 2. Be ADAPTED to the creator's specific niche and audience
 3. Include "Effect on Viewer" analysis — explain the SPECIFIC psychological mechanism (cognitive bias, emotional trigger, or behavioral pattern) that makes this work. Name the bias/trigger explicitly (e.g., "curiosity gap," "loss aversion," "social proof," "authority bias").
