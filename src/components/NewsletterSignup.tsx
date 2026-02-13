@@ -63,10 +63,10 @@ export default function NewsletterSignup() {
     <section className="py-16 sm:py-24 px-4 bg-[#1A1A24]/50">
       <div className="max-w-xl mx-auto text-center">
         <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-          Stay in the Loop
+          Get Content Growth Tips
         </h2>
         <p className="text-gray-400 text-lg mb-8">
-          Get updates on new features and tips for faster video editing.
+          Get weekly tips on growing your authority through consistent content — plus be first to know about new features.
         </p>
 
         {status === 'idle' || status === 'loading' ? (
