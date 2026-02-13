@@ -617,7 +617,7 @@ export function getNonSilentSegments(
   const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms
   const mergeGap = options.mergeGap ?? 0.075; // Merge segments less than 75ms apart (reduces choppiness)
   const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room before speech
-  const timebackPaddingEnd = 0.35; // 350ms after speech — more room for sentence endings to breathe
+  const timebackPaddingEnd = 0.25; // 250ms after speech — slight buffer to avoid clipping sentence tails
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
