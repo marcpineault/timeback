@@ -53,8 +53,8 @@ export default async function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-            Become the Authority in Your Industry
-            <span className="text-cyan-400"> Without Breaking the Bank or Spending Hours on Social Media</span>
+            Become the authority in your industry
+            <span className="text-cyan-400"> — without editing a single video, posting every day, or hiring a full content team</span>
           </h1>
           <p className="text-lg sm:text-xl text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
             TimeBack is AI software that writes your scripts, edits your videos, and posts for you — so you build authority on autopilot. No content experience needed. No expensive editors or agencies.
