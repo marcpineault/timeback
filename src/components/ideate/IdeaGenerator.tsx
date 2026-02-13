@@ -15,6 +15,7 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
   const { ideas, loading, refetch } = useIdeas(statusFilter || undefined)
   const [topic, setTopic] = useState('')
   const [count, setCount] = useState(5)
+  const [contentStyle, setContentStyle] = useState('auto')
   const [generating, setGenerating] = useState(false)
   const [generatingScriptId, setGeneratingScriptId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -27,7 +28,7 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
       const res = await fetch('/api/ideate/ideas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim() || undefined, count }),
+        body: JSON.stringify({ topic: topic.trim() || undefined, count, contentStyle: contentStyle !== 'auto' ? contentStyle : undefined }),
       })
 
       if (!res.ok) {
@@ -91,7 +92,7 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
       <div className="bg-[#1A1A24] rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold text-white mb-1">Generate Video Ideas</h2>
         <p className="text-gray-500 text-sm mb-4">
-          AI will create ideas using your SPCL profile. Optionally focus on a topic.
+          AI creates ideas tailored to your profile. Pick a style, or let AI choose for you.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -111,6 +112,18 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
             <option value={3}>3</option>
             <option value={5}>5</option>
             <option value={10}>10</option>
+          </select>
+          <select
+            value={contentStyle}
+            onChange={(e) => setContentStyle(e.target.value)}
+            className="bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500"
+          >
+            <option value="auto">Any Style</option>
+            <option value="hook-story-lesson">Story + Lesson</option>
+            <option value="contrarian-take">Contrarian Take</option>
+            <option value="step-by-step">How-To / Steps</option>
+            <option value="before-after">Before & After</option>
+            <option value="myth-buster">Myth Buster</option>
           </select>
           <button
             onClick={handleGenerate}

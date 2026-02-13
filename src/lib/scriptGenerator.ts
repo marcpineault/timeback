@@ -75,6 +75,69 @@ interface LearningContext {
   editedScripts: { originalFullScript: string; editedFullScript: string }[];
 }
 
+// ─── Content Styles (Expert-Informed Formats) ────────────────────────
+
+export const CONTENT_STYLES = {
+  'auto': {
+    label: 'Any Style',
+    description: 'AI picks the best format for each idea',
+    promptInstructions: '',
+  },
+  'hook-story-lesson': {
+    label: 'Story + Lesson',
+    description: 'Tell a short story, end with a takeaway',
+    promptInstructions: `CONTENT FORMAT: Story + Lesson
+Each idea MUST follow this structure:
+- HOOK: A pattern-interrupting opening that creates immediate curiosity about a specific outcome or event
+- STORY: A brief narrative (personal experience, client story, or observed situation) that illustrates the point. Keep it vivid but under 30 seconds.
+- TAKEAWAY: A single, clear, actionable lesson the viewer walks away with
+The story is the vehicle — the takeaway is the payload. The hook promises something the story delivers.
+Think: "What happened?" → "Here's what I learned" → "Here's what you should do."`,
+  },
+  'contrarian-take': {
+    label: 'Contrarian Take',
+    description: 'Challenge common wisdom with a surprising perspective',
+    promptInstructions: `CONTENT FORMAT: Contrarian Take
+Each idea MUST follow this structure:
+- HOOK: State the commonly-held belief, then immediately challenge it ("Everyone says X. They're wrong.")
+- BODY: Present evidence/experience that proves the contrarian position. Use specific numbers, timelines, or results.
+- CLOSE: Reframe the viewer's understanding — give them a new mental model
+The power comes from cognitive dissonance — the viewer's existing belief collides with your evidence. This drives comments (agreement/disagreement) and shares ("you need to see this").`,
+  },
+  'step-by-step': {
+    label: 'How-To / Steps',
+    description: 'Teach something in clear numbered steps',
+    promptInstructions: `CONTENT FORMAT: Numbered Steps / How-To
+Each idea MUST follow this structure:
+- HOOK: Promise a specific outcome with a specific number of steps ("3 steps to X" or "Do this to get Y")
+- BODY: Deliver exactly the promised number of steps. Each step: (1) Named clearly, (2) Explained in 1-2 sentences, (3) Given a specific example or micro-action
+- CLOSE: Summarize what they now have ("You now have a complete system for X") + CTA to save
+This format maximizes SAVES because it delivers screenshot-worthy, reference-back value. Each step should deliver standalone value.`,
+  },
+  'before-after': {
+    label: 'Before & After',
+    description: 'Show transformation — what changed and how',
+    promptInstructions: `CONTENT FORMAT: Before → After → Bridge
+Each idea MUST follow this structure:
+- HOOK: Paint the "before" state vividly — the pain, frustration, or struggle the audience recognizes
+- BODY: Show the "after" state — specific results, feelings, or outcomes. Then reveal the BRIDGE — the specific thing that changed.
+- CLOSE: Give the viewer the first step to cross that same bridge
+This format works because viewers self-identify with the "before" state and are pulled through by wanting the "after." The bridge is where CREDIBILITY and POWER shine.`,
+  },
+  'myth-buster': {
+    label: 'Myth Buster',
+    description: 'Debunk a common mistake your audience makes',
+    promptInstructions: `CONTENT FORMAT: Myth Buster
+Each idea MUST follow this structure:
+- HOOK: State the myth as if it were true, then shatter it ("You've been told X. Here's why that's costing you Y.")
+- BODY: Explain WHY the myth exists (shows depth), then present what actually works with proof
+- CLOSE: Give the corrected approach in one clear sentence + CTA
+This triggers the "I need to know what I'm doing wrong" response. It positions the creator as someone who sees what others miss — driving FOLLOWS and SHARES.`,
+  },
+} as const;
+
+export type ContentStyle = keyof typeof CONTENT_STYLES;
+
 // ─── Learning Context ────────────────────────────────────────────────
 
 /**
@@ -248,12 +311,22 @@ export async function generateIdeas(
   creatorContext: CreatorContext,
   userId: string,
   topic?: string,
-  count: number = 5
+  count: number = 5,
+  contentStyle: ContentStyle = 'auto'
 ): Promise<GeneratedIdea[]> {
   const learning = await getLearningContext(userId);
   const learningPrompt = buildLearningPrompt(learning);
 
-  const prompt = `You are an elite short-form video strategist who has studied what makes videos go viral across TikTok, Instagram Reels, and YouTube Shorts. You specialize in the SPCL framework (Status, Power, Credibility, Likeness) and understand platform algorithms deeply.
+  const styleInstructions = CONTENT_STYLES[contentStyle]?.promptInstructions || '';
+
+  const prompt = `You are an elite short-form video strategist who has generated billions of views studying what makes videos go viral across TikTok, Instagram Reels, and YouTube Shorts. You specialize in the SPCL framework (Status, Power, Credibility, Likeness) and understand platform algorithms deeply.
+
+CORE PRINCIPLES:
+- VALUE EQUATION: Every idea must maximize (Dream Outcome x Perceived Likelihood of Achievement) while minimizing (Time Delay x Effort) for the viewer. High-value content promises a desirable outcome that feels achievable quickly and easily.
+- NEWS-STYLE HOOKS: Every hook should read like a headline — it must contain at least one trigger: recency ("just discovered"), relevancy ("if you're a [audience]"), conflict ("why X is wrong"), or unusualness ("the weird trick").
+- EFFECT ON VIEWER: For each idea, consider not just WHAT the content does, but WHY it works psychologically. What emotion does it trigger? What action does it compel?
+- ONE CLEAR FOCUS: Each video = ONE clear problem, ONE clear insight, ONE clear next step. Never try to cover multiple topics in a single video.
+- GIVE VALUE FREELY: For every 3 value-giving videos, only 1 should ask for something. Weight toward generosity — the audience should feel they got more than expected.
 
 Your job is to generate video ideas that will actually get VIEWS, FOLLOWERS, and LEADS for this creator:
 
@@ -267,7 +340,7 @@ CONTENT STRATEGY: Of the ${count} ideas, aim for this strategic mix:
 - ~30% AUTHORITY content (tutorials, frameworks, case studies — converts viewers to followers)
 - ~30% CONVERSION content (testimonials, behind-the-scenes, soft offers — turns followers into leads/customers)
 Label each idea with its contentType.
-
+${styleInstructions ? `\n${styleInstructions}\n` : ''}
 Generate ${count} video ideas. Each idea MUST:
 1. Open with a SCROLL-STOPPING hook (first 1-3 seconds determine if the algorithm promotes your video)
 2. Promise POWER — actionable value the viewer will gain
@@ -275,7 +348,10 @@ Generate ${count} video ideas. Each idea MUST:
 4. Include a LIKENESS element that makes the creator relatable
 5. Target "interest media" — people actively interested in this topic, not random virality
 6. Be filmable as a simple talking-head video (no fancy production needed)
-7. Include 3 HOOK VARIATIONS using different psychological triggers (pattern interrupt, curiosity gap, bold claim, controversy, story open, data shock)
+7. Include 3 HOOK VARIATIONS, each using a DIFFERENT proven trigger:
+   - NEWS-STYLE: reads like a headline (recency, conflict, relevancy, or unusualness)
+   - CURIOSITY GAP: creates an open loop the viewer MUST close ("The one thing about X that nobody mentions...")
+   - BOLD CLAIM / DATA SHOCK: leads with a specific, surprising number or result
 8. Identify the PRIMARY ENGAGEMENT PLAY — what action this video is designed to trigger from the viewer
 
 ${topic ? `Focus on this topic area: ${topic}` : "Generate diverse ideas across the creator's expertise."}
@@ -355,6 +431,8 @@ export async function generateScript(
 
   const prompt = `You are an elite short-form video scriptwriter who understands what makes videos get views, followers, and leads. You write teleprompter-ready scripts optimized for RETENTION (keeping viewers watching) and ENGAGEMENT (driving saves, shares, comments).
 
+Every script you write must pass the VALUE EQUATION test: Does the viewer's perceived Dream Outcome and Likelihood of Success outweigh the Time and Effort they invest watching? If the viewer doesn't feel "I can do this and it will work" by the end, the script fails.
+
 ${buildCreatorPrompt(creatorContext)}
 
 ${buildPlatformPrompt(creatorContext.primaryPlatform)}
@@ -375,7 +453,9 @@ Write a teleprompter-ready script following this EXACT structure:
 HOOK (first 1-3 seconds, ~5-15 words):
 - Must be the ABSOLUTE FIRST thing said on camera — no warmup, no intro
 - Create a pattern interrupt or curiosity gap that stops the scroll
+- The hook should read like a news headline — lead with recency, conflict, relevancy, or unusualness
 - The hook determines whether the algorithm promotes your video — make it count
+- RETAIN: Within the first 10 seconds, give the viewer a reason to stay for the ENTIRE video (preview the payoff)
 - Include a [TEXT OVERLAY: "short punchy text"] for the on-screen text that appears during the hook
 - Demonstrate status naturally (not bragging)
 
@@ -384,6 +464,8 @@ BODY (main content, 3-5 short sections):
   Examples: "Here's the thing though...", "But it gets better...", "Nobody tells you this part...", "And this is where it gets interesting..."
 - Use OPEN LOOPS to keep viewers watching — hint at what's coming before delivering it:
   Example: "There are 3 reasons this works. The third one changed everything for me."
+- REWARD the viewer at regular intervals — don't save all the value for the end. Each section should deliver a standalone insight.
+- Give value generously. The body should feel like the viewer is getting more than expected, not like a sales pitch.
 - Each section: 2-4 sentences max
 - Provide actionable value (POWER element)
 - Weave in credibility markers naturally — don't announce them, embed them
@@ -400,6 +482,7 @@ CTA (closing 5-10 seconds):
   * COMMENT: "Drop [specific word] in the comments if [specific relatable situation]"
   * FOLLOW: "I'm breaking down [specific topic] in part 2 — follow so you don't miss it"
   * CONVERT: "I put the full [resource] in my bio" (only for conversion content)
+- IMPORTANT: The CTA should feel EARNED, not forced. The viewer should feel they received so much value that the CTA is a natural next step, not an interruption. Match CTA intensity to how much value was delivered.
 - Include likeness element (be real/authentic)
 - End with a STRONG final line — never trail off
 

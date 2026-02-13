@@ -193,32 +193,32 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
         <div className="space-y-4">
           <SPCLSection
             title="Status"
-            subtitle="What results have you achieved? What scarce resources do you control?"
-            placeholder="e.g. Built a $2M agency in 18 months"
+            subtitle="What results have you achieved? Even small wins count!"
+            placeholder="e.g. Helped 50 clients, grew my account to 10K followers"
             items={statusProof}
             onItemsChange={setStatusProof}
             color="cyan"
           />
           <SPCLSection
             title="Power"
-            subtitle="What frameworks or step-by-step processes do you teach that lead to results?"
-            placeholder="e.g. My 5-step cold outreach system that books 20 calls/week"
+            subtitle="What useful methods or advice do you share? What's your unique approach?"
+            placeholder="e.g. My morning routine that boosted productivity, a simple budgeting method"
             items={powerExamples}
             onItemsChange={setPowerExamples}
             color="violet"
           />
           <SPCLSection
             title="Credibility"
-            subtitle="What external validation do you have? Press features, client count, certifications?"
-            placeholder="e.g. Featured in Forbes, 500+ clients served"
+            subtitle="What makes people trust you? Experience, testimonials, or certifications all count."
+            placeholder="e.g. 5 years of experience, certified coach, great client feedback"
             items={credibilityMarkers}
             onItemsChange={setCredibilityMarkers}
             color="amber"
           />
           <SPCLSection
             title="Likeness"
-            subtitle="What makes you relatable? Personal details your audience connects with."
-            placeholder="e.g. College dropout, dad of 3, started from zero"
+            subtitle="What makes you human and relatable? The real stuff people connect with."
+            placeholder="e.g. Self-taught, working parent, failed twice before this worked"
             items={likenessTraits}
             onItemsChange={setLikenessTraits}
             color="green"
