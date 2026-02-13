@@ -146,7 +146,7 @@ IMPORTANT: Make each entry DISTINCT — different patterns, different psychologi
 
   try {
     const message = await getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-opus-4-6-20260204',
       max_tokens: 8192,
       temperature: 0.9,
       messages: [{ role: 'user', content: prompt }],
