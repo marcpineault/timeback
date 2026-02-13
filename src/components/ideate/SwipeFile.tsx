@@ -78,9 +78,9 @@ export default function SwipeFile({ onUseAsIdea }: Props) {
     <div>
       {/* Generation Area */}
       <div className="bg-[#1A1A24] rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-1">Find Proven Patterns</h2>
+        <h2 className="text-lg font-semibold text-white mb-1">Get Inspiration from Other Creators</h2>
         <p className="text-gray-500 text-sm mb-4">
-          AI analyzes viral content patterns in your niche and generates ready-to-use hooks, body structures, and CTAs.
+          See what&apos;s working for top creators in your niche. AI generates proven hooks, structures, and CTAs you can adapt.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -114,10 +114,10 @@ export default function SwipeFile({ onUseAsIdea }: Props) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Finding Patterns...
+                Finding Inspiration...
               </span>
             ) : (
-              'Find Patterns'
+              'Get Inspired'
             )}
           </button>
         </div>
@@ -158,16 +158,16 @@ export default function SwipeFile({ onUseAsIdea }: Props) {
 
       {/* Entries Grid */}
       {loading ? (
-        <div className="text-gray-500 text-center py-12">Loading swipe file...</div>
+        <div className="text-gray-500 text-center py-12">Loading inspiration...</div>
       ) : entries.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-400 mb-2">
-            {savedOnly ? 'No saved entries yet' : 'No swipe entries yet'}
+            {savedOnly ? 'No saved entries yet' : 'No inspiration entries yet'}
           </p>
           <p className="text-gray-500 text-sm">
             {savedOnly
               ? 'Save your favorite patterns using the bookmark icon.'
-              : 'Click "Find Patterns" above to discover proven viral content patterns in your niche.'}
+              : 'Click "Get Inspired" above to discover proven content patterns in your niche.'}
           </p>
         </div>
       ) : (

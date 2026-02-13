@@ -273,7 +273,8 @@ function buildPlatformPrompt(platform: string): string {
 - Design for duets/stitches (leave room for reactions)
 - Comments drive the algorithm — create comment-bait ("Am I wrong?", "What would you do?")
 - Optimal length: 30-60 seconds for most niches
-- Saves and shares weight heavily — make content screenshot-worthy or send-worthy`,
+- Saves and shares weight heavily — make content screenshot-worthy or send-worthy
+- Use open loops in the first 2 seconds — tease an outcome the viewer must stay to see`,
 
     'instagram': `PLATFORM: Instagram Reels
 - Saves are the #1 algorithm signal. Create save-worthy educational content.
@@ -281,7 +282,8 @@ function buildPlatformPrompt(platform: string): string {
 - Slightly more polished than TikTok — aesthetic matters but authenticity wins
 - Hook can be 10-12 words but must stop the scroll in the first 1-2 seconds
 - Optimal length: 30-90 seconds
-- Carousel-adjacent value (content worth saving for later) outperforms entertainment-only`,
+- Carousel-adjacent value (content worth saving for later) outperforms entertainment-only
+- Open loops drive completion rate — tease a payoff early that you deliver at the end`,
 
     'youtube-shorts': `PLATFORM: YouTube Shorts
 - Searchability matters more than other platforms — title should match search intent
@@ -289,7 +291,8 @@ function buildPlatformPrompt(platform: string): string {
 - Watch time is weighted HEAVILY — build in retention hooks throughout
 - Longer content (60-90s) works well because YouTube favors total watch time
 - Subscribers matter more — use strategic follow CTAs
-- Pattern interrupts every 8-10 seconds minimum to maintain retention`,
+- Pattern interrupts every 8-10 seconds minimum to maintain retention
+- Open loops are critical for watch time — promise a reveal or payoff the viewer can't leave without seeing`,
 
     'youtube': `PLATFORM: YouTube (long form)
 - Cold open must hook in the first 10 seconds — NO intros, logos, or "hey guys"
@@ -327,6 +330,7 @@ CORE PRINCIPLES:
 - EFFECT ON VIEWER: For each idea, consider not just WHAT the content does, but WHY it works psychologically. What emotion does it trigger? What action does it compel?
 - ONE CLEAR FOCUS: Each video = ONE clear problem, ONE clear insight, ONE clear next step. Never try to cover multiple topics in a single video.
 - GIVE VALUE FREELY: For every 3 value-giving videos, only 1 should ask for something. Weight toward generosity — the audience should feel they got more than expected.
+- OPEN LOOPS: The most powerful retention tool. An open loop is an unresolved question, tease, or promise that the viewer's brain NEEDS to close. Open a loop in the hook ("I'll show you the one thing that changed everything"), keep it open through the body, and close it near the end. The viewer literally cannot swipe away until the loop is closed. Layer multiple loops for maximum retention.
 
 Your job is to generate video ideas that will actually get VIEWS, FOLLOWERS, and LEADS for this creator:
 
@@ -353,6 +357,7 @@ Generate ${count} video ideas. Each idea MUST:
    - CURIOSITY GAP: creates an open loop the viewer MUST close ("The one thing about X that nobody mentions...")
    - BOLD CLAIM / DATA SHOCK: leads with a specific, surprising number or result
 8. Identify the PRIMARY ENGAGEMENT PLAY — what action this video is designed to trigger from the viewer
+9. Build in at least ONE open loop — an unresolved question or tease embedded in the hook or angle that keeps the viewer watching to the end. The idea should make the viewer think "I HAVE to see how this ends."
 
 ${topic ? `Focus on this topic area: ${topic}` : "Generate diverse ideas across the creator's expertise."}
 
@@ -456,14 +461,18 @@ HOOK (first 1-3 seconds, ~5-15 words):
 - The hook should read like a news headline — lead with recency, conflict, relevancy, or unusualness
 - The hook determines whether the algorithm promotes your video — make it count
 - RETAIN: Within the first 10 seconds, give the viewer a reason to stay for the ENTIRE video (preview the payoff)
+- OPEN A LOOP: The hook should create an unresolved question the viewer MUST stay to answer. Tease an outcome, a number, a method, or a story — but don't reveal it yet.
 - Include a [TEXT OVERLAY: "short punchy text"] for the on-screen text that appears during the hook
 - Demonstrate status naturally (not bragging)
 
 BODY (main content, 3-5 short sections):
 - START each section with a MICRO-HOOK — a short phrase that re-engages attention:
   Examples: "Here's the thing though...", "But it gets better...", "Nobody tells you this part...", "And this is where it gets interesting..."
-- Use OPEN LOOPS to keep viewers watching — hint at what's coming before delivering it:
-  Example: "There are 3 reasons this works. The third one changed everything for me."
+- OPEN LOOPS are your #1 retention weapon. An open loop is an unresolved question or tease that the viewer's brain NEEDS to close — they literally cannot swipe away until it's resolved. Layer them throughout:
+  * MACRO LOOP: Open in the hook, close near the end ("I'll show you the exact method..." — don't reveal it until the final section)
+  * MICRO LOOPS: Open and close within each section to pull viewers through ("There are 3 reasons this works. The third one is the one nobody talks about." — then deliver #1 and #2 before revealing #3)
+  * STACKING: When closing one loop, open the next ("Now that you know X, here's why that alone won't work...")
+  Example: "I lost 10 clients in one week. [OPEN] But it turned out to be the best thing that happened to my business. [TEASE] Here's why — and the exact system I built because of it. [PROMISE]"
 - REWARD the viewer at regular intervals — don't save all the value for the end. Each section should deliver a standalone insight.
 - Give value generously. The body should feel like the viewer is getting more than expected, not like a sales pitch.
 - Each section: 2-4 sentences max
@@ -482,6 +491,7 @@ CTA (closing 5-10 seconds):
   * COMMENT: "Drop [specific word] in the comments if [specific relatable situation]"
   * FOLLOW: "I'm breaking down [specific topic] in part 2 — follow so you don't miss it"
   * CONVERT: "I put the full [resource] in my bio" (only for conversion content)
+  * CLIFFHANGER: Open a NEW loop for the next video ("But there's a second part to this that's even more important — I'll break it down in part 2")
 - IMPORTANT: The CTA should feel EARNED, not forced. The viewer should feel they received so much value that the CTA is a natural next step, not an interruption. Match CTA intensity to how much value was delivered.
 - Include likeness element (be real/authentic)
 - End with a STRONG final line — never trail off

@@ -45,6 +45,7 @@ Generate diverse hook styles using PROVEN psychological triggers:
 - Story open ("Last week something happened that changed everything...")
 - Data shock ("97% of people get this wrong — and it's costing them...")
 - Value promise ("In the next 30 seconds, I'll show you the exact system for X")
+- Open loop ("I was about to quit my business — until I discovered this one thing..." — teases without revealing)
 
 For each entry, the "hook" field should be the PRIMARY focus — a ready-to-use opening line.
 The "analysis" field should explain the EFFECT ON VIEWER — what psychological trigger makes this hook work and what emotion/action it drives.
@@ -106,7 +107,7 @@ export async function generateSwipeEntries(
 
   const prompt = `You are a viral video content analyst with deep expertise in short-form video content that gets millions of views. You study patterns across TikTok, Instagram Reels, YouTube Shorts, and other platforms.
 
-Your job is to generate a "swipe file" — a collection of proven content patterns, frameworks, and examples that a creator can draw inspiration from.
+Your job is to generate an "inspiration file" — a collection of proven content patterns, frameworks, and examples that a creator can draw inspiration from.
 
 ${buildCreatorPrompt(creatorContext)}
 
@@ -115,7 +116,7 @@ ${topic ? `TOPIC FOCUS: ${topic}` : ''}
 
 ${categoryInstruction}
 
-Generate ${count} swipe file entries. Each entry should:
+Generate ${count} inspiration entries. Each entry should:
 1. Be based on PROVEN viral content patterns you've observed across millions of videos
 2. Be ADAPTED to the creator's specific niche and audience
 3. Include "Effect on Viewer" analysis — explain the SPECIFIC psychological mechanism (cognitive bias, emotional trigger, or behavioral pattern) that makes this work. Name the bias/trigger explicitly (e.g., "curiosity gap," "loss aversion," "social proof," "authority bias").

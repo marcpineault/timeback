@@ -49,7 +49,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
   const tabs: { id: Tab; label: string }[] = [
     { id: 'ideas', label: 'Ideas' },
     { id: 'scripts', label: 'Scripts' },
-    { id: 'swipefile', label: 'Swipe File' },
+    { id: 'swipefile', label: 'Inspiration' },
     { id: 'teleprompter', label: 'Teleprompter' },
     { id: 'profile', label: 'Profile' },
   ]

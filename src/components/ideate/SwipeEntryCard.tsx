@@ -31,7 +31,7 @@ export default function SwipeEntryCard({ entry, onUseAsIdea, onRefresh }: Props)
   }
 
   async function handleDelete() {
-    if (!confirm('Delete this swipe entry?')) return
+    if (!confirm('Delete this entry?')) return
     setDeleting(true)
     try {
       await fetch(`/api/ideate/swipefile/${entry.id}`, { method: 'DELETE' })
