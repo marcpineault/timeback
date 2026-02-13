@@ -36,15 +36,18 @@ export interface GeneratedSwipeEntry {
 
 const CATEGORY_INSTRUCTIONS: Record<string, string> = {
   HOOK: `Focus on HOOKS — the first 3-5 seconds of a video that stop the scroll.
-Generate diverse hook styles:
-- Pattern interrupt ("Stop doing X...")
-- Curiosity gap ("Nobody talks about this...")
-- Bold claim ("I made $X in Y days doing Z")
-- Controversy ("Unpopular opinion: X is dead")
+Generate diverse hook styles using PROVEN psychological triggers:
+- News-style headline (recency: "I just found...", conflict: "Why X is killing your Y", relevancy: "If you're a [audience], stop scrolling", unusualness: "The weird reason...")
+- Pattern interrupt ("Stop doing X right now...")
+- Curiosity gap ("Nobody talks about this one thing...")
+- Bold claim with proof ("I made $X in Y days — here's exactly how")
+- Controversy ("Unpopular opinion: X is dead and here's the data")
 - Story open ("Last week something happened that changed everything...")
-- Data shock ("97% of people get this wrong...")
+- Data shock ("97% of people get this wrong — and it's costing them...")
+- Value promise ("In the next 30 seconds, I'll show you the exact system for X")
 
 For each entry, the "hook" field should be the PRIMARY focus — a ready-to-use opening line.
+The "analysis" field should explain the EFFECT ON VIEWER — what psychological trigger makes this hook work and what emotion/action it drives.
 The "meat" and "cta" fields should show how this hook style naturally flows into content.`,
 
   MEAT: `Focus on BODY STRUCTURES (the "meat") — the main content delivery framework.
@@ -73,14 +76,17 @@ For each entry, the "cta" field should be the PRIMARY focus — a ready-to-use c
 The "hook" and "meat" should show what naturally precedes this CTA style.`,
 
   FULL: `Generate COMPLETE video scripts where hook, meat, and CTA work together as a cohesive unit.
-Each entry should be a different viral format:
-- The "Hot Take" (controversial opinion → evidence → reframe)
-- The "Behind the Scenes" (pull back the curtain → show process → invite in)
-- The "Story Time" (hook with outcome → tell story → lesson + CTA)
-- The "Myth Buster" (common belief → why it's wrong → what to do instead)
-- The "Tutorial" (promise result → deliver steps → next level CTA)
-- The "Social Proof Stack" (result → how → proof → offer)
+Each entry should use a DIFFERENT proven viral format:
+- "Hook → Story → Takeaway" (open with curiosity, tell a brief story, end with one clear lesson)
+- "Contrarian Take" (challenge common belief → evidence → reframe the viewer's understanding)
+- "Before/After Transformation" (paint the pain → show the result → reveal the bridge)
+- "The Myth Buster" (state common mistake → explain why it persists → correct approach)
+- "Step-by-Step Value Stack" (promise outcome → deliver numbered steps → save CTA)
+- "Behind the Numbers" (surprising result → break down how it happened → invite them in)
+- "Day in the Life + Lesson" (show an authentic moment → extract a business/life insight)
+- "The Unexpected Expert" (unusual angle into a topic → prove credibility through story → deliver insight)
 
+Each entry should name which format it uses in the "source" field.
 All three sections should be equally detailed and work together.`,
 };
 
@@ -112,7 +118,7 @@ ${categoryInstruction}
 Generate ${count} swipe file entries. Each entry should:
 1. Be based on PROVEN viral content patterns you've observed across millions of videos
 2. Be ADAPTED to the creator's specific niche and audience
-3. Include psychological analysis of WHY the pattern works
+3. Include "Effect on Viewer" analysis — explain the SPECIFIC psychological mechanism (cognitive bias, emotional trigger, or behavioral pattern) that makes this work. Name the bias/trigger explicitly (e.g., "curiosity gap," "loss aversion," "social proof," "authority bias").
 4. Be directly usable — the creator could film this today
 5. Include the source pattern type (what viral format it's modeled after)
 
@@ -123,7 +129,7 @@ Return ONLY valid JSON array (no markdown, no code fences):
     "meat": "the body/main content structure with key points and transitions",
     "cta": "the closing call to action",
     "fullExample": "the complete script combining all three sections as one continuous read",
-    "analysis": "2-3 sentences explaining WHY this pattern works psychologically (what cognitive bias or emotional trigger it leverages)",
+    "analysis": "EFFECT ON VIEWER: 2-3 sentences explaining the specific psychological mechanism — name the cognitive bias or emotional trigger (e.g., curiosity gap, loss aversion, social proof, authority bias) and explain how it drives the viewer to watch, save, share, or follow",
     "source": "the viral content pattern this models (e.g., 'Curiosity Gap + Authority Stack', 'Story Loop + Problem-Agitate-Solve')",
     "category": "${categoryFilter || 'FULL'}",
     "format": "the video format (e.g., 'direct-to-camera', 'talking-head with text overlay', 'story time', 'tutorial walkthrough')",

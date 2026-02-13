@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { topic, count = 5 } = body;
+    const { topic, count = 5, contentStyle } = body;
 
     // Fetch creator profile
     const profile = await prisma.creatorProfile.findUnique({
@@ -100,7 +100,8 @@ export async function POST(request: NextRequest) {
       creatorContext,
       user.id,
       topic || undefined,
-      Math.min(count, 10)
+      Math.min(count, 10),
+      contentStyle || 'auto'
     );
 
     // Save to database
