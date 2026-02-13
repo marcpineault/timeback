@@ -4,6 +4,16 @@ import Script from 'next/script';
 
 const FB_PIXEL_ID = '984449098085824';
 
+declare global {
+  interface Window {
+    fbq?: (
+      command: 'track' | 'init' | 'trackCustom',
+      eventName: string,
+      params?: Record<string, unknown>
+    ) => void;
+  }
+}
+
 export function FacebookPixel() {
   return (
     <>
