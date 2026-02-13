@@ -8,6 +8,7 @@ interface HealthCheck {
     database: { status: 'ok' | 'error'; latency?: number; error?: string };
     storage: { status: 'ok' | 'error' | 'not_configured'; type: string };
     openai: { status: 'ok' | 'error' | 'not_configured' };
+    claude: { status: 'ok' | 'error' | 'not_configured' };
     stripe: { status: 'ok' | 'not_configured' };
   };
   timestamp: string;
@@ -20,6 +21,7 @@ export async function GET() {
     database: { status: 'ok' },
     storage: { status: 'ok', type: 'local' },
     openai: { status: 'ok' },
+    claude: { status: 'ok' },
     stripe: { status: 'ok' },
   };
 
@@ -51,6 +53,13 @@ export async function GET() {
     checks.openai = { status: 'not_configured' };
   }
 
+  // Check Claude (Anthropic) configuration
+  if (process.env.CLAUDE_API_KEY) {
+    checks.claude = { status: 'ok' };
+  } else {
+    checks.claude = { status: 'not_configured' };
+  }
+
   // Check Stripe configuration
   if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET) {
     checks.stripe = { status: 'ok' };
@@ -62,7 +71,7 @@ export async function GET() {
   let status: HealthCheck['status'] = 'healthy';
   if (checks.database.status === 'error') {
     status = 'unhealthy';
-  } else if (checks.openai.status === 'not_configured') {
+  } else if (checks.openai.status === 'not_configured' || checks.claude.status === 'not_configured') {
     status = 'degraded';
   }
 

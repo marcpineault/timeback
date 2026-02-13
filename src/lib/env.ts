@@ -18,6 +18,9 @@ const ENV_VARS: EnvVar[] = [
   // OpenAI
   { name: 'OPENAI_API_KEY', required: true, description: 'OpenAI API key for transcription' },
 
+  // Anthropic (Claude)
+  { name: 'CLAUDE_API_KEY', required: true, description: 'Anthropic Claude API key for ideation' },
+
   // Stripe (optional - can be disabled)
   { name: 'STRIPE_SECRET_KEY', required: false, description: 'Stripe secret key for payments' },
   { name: 'STRIPE_WEBHOOK_SECRET', required: false, description: 'Stripe webhook signing secret' },
