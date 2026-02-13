@@ -1004,7 +1004,7 @@ async function generateHeadlinePNG(
 
   // Style-specific colors
   const bgFill = style === 'speech-bubble' ? 'white' : 'black';
-  const bgOpacity = style === 'speech-bubble' ? '0.98' : '0.7';
+  const bgOpacity = style === 'speech-bubble' ? '1' : '0.7';
   const textFill = style === 'speech-bubble' ? 'black' : 'white';
 
   // Build SVG with centered text on rounded rectangle
