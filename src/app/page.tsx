@@ -43,6 +43,11 @@ export default async function LandingPage() {
           <a href="#how-it-works" className="btn-secondary">See how it works</a>
         </div>
         <p className="hero-proof">No credit card required · <strong>5 free videos</strong> to start · Cancel anytime</p>
+
+        {/* HERO SCREENSHOT PLACEHOLDER */}
+        <div className="hero-screenshot">
+          <p className="hero-screenshot-text">Product screenshot — replace with app.timebackvideo.com dashboard screenshot</p>
+        </div>
       </section>
 
       {/* NUMBERS */}
