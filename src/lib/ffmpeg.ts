@@ -532,7 +532,7 @@ export async function detectNoiseFloor(
 /**
  * Detect silent intervals in a video
  *
- * NOISE-AWARE: Uses speech-band filtering (200Hz-3500Hz) to focus on voice frequencies
+ * NOISE-AWARE: Uses speech-band filtering (200Hz-6000Hz) to focus on voice frequencies
  * and ignore background noise (low rumble, high hiss) that can interfere with detection
  */
 export async function detectSilence(
