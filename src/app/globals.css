@@ -247,12 +247,60 @@ body {
   font-weight: 600;
 }
 
+/* ── HERO SCREENSHOT ── */
+.hero-screenshot {
+  width: 100%;
+  max-width: 900px;
+  margin: 3rem auto 0;
+  aspect-ratio: 16 / 9;
+  background: #ffffff;
+  border: 1px solid var(--lp-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  animation: fadeUp 0.8s ease 0.5s both;
+}
+
+.hero-screenshot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: #f5f3f0;
+  border-bottom: 1px solid var(--lp-border);
+  border-radius: 12px 12px 0 0;
+}
+
+.hero-screenshot::after {
+  content: '\25CF  \25CF  \25CF';
+  position: absolute;
+  top: 8px;
+  left: 14px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #c5c0ba;
+}
+
+.hero-screenshot-text {
+  font-size: 0.9rem;
+  color: var(--lp-muted);
+  padding: 2rem;
+  text-align: center;
+  margin-top: 16px;
+}
+
 /* ── NUMBERS BAR ── */
 .lp-numbers {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   max-width: 800px;
-  margin: 0 auto 6rem;
+  margin: 0 auto 3.5rem;
   padding: 0 2rem;
   gap: 2rem;
   animation: fadeUp 0.8s ease 0.5s both;
@@ -292,7 +340,7 @@ body {
 
 /* ── PROBLEM SECTION ── */
 .lp-problem {
-  padding: 5rem 2rem;
+  padding: 3rem 2rem;
   text-align: center;
   max-width: 750px;
   margin: 0 auto;
@@ -316,7 +364,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
-  margin-top: 3rem;
+  margin-top: 2rem;
   text-align: left;
 }
 
@@ -352,7 +400,7 @@ body {
 
 /* ── HOW IT WORKS ── */
 .lp-how {
-  padding: 6rem 2rem;
+  padding: 3.5rem 2rem;
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -366,7 +414,7 @@ body {
   font-family: 'Instrument Serif', serif;
   font-size: clamp(2rem, 4vw, 3rem);
   letter-spacing: -0.02em;
-  margin-bottom: 4rem;
+  margin-bottom: 2.5rem;
 }
 
 .steps {
@@ -425,7 +473,7 @@ body {
 
 /* ── FEATURES ── */
 .lp-features {
-  padding: 6rem 2rem;
+  padding: 3.5rem 2rem;
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -439,7 +487,7 @@ body {
   font-family: 'Instrument Serif', serif;
   font-size: clamp(2rem, 4vw, 3rem);
   letter-spacing: -0.02em;
-  margin-bottom: 4rem;
+  margin-bottom: 2.5rem;
 }
 
 .feature-grid {
@@ -463,18 +511,22 @@ body {
 
 .feature-card.highlight {
   grid-column: span 2;
-  background: var(--lp-black);
-  color: var(--lp-white);
+  background: #0a0a0a;
+  color: #ffffff;
   border-color: transparent;
 }
 
+.feature-card.highlight h3 {
+  color: #ffffff;
+}
+
 .feature-card.highlight p {
-  color: rgba(255,255,255,0.6);
+  color: rgba(255,255,255,0.7);
 }
 
 .feature-card.highlight .feature-tag {
-  background: rgba(232, 93, 38, 0.2);
-  color: var(--lp-accent);
+  background: rgba(232, 93, 38, 0.25);
+  color: #e85d26;
 }
 
 .feature-tag {
@@ -505,7 +557,7 @@ body {
 
 /* ── WHO IT'S FOR ── */
 .lp-audience {
-  padding: 6rem 2rem;
+  padding: 3.5rem 2rem;
   max-width: 900px;
   margin: 0 auto;
   text-align: center;
@@ -522,7 +574,7 @@ body {
   color: var(--lp-muted);
   font-size: 1.05rem;
   max-width: 600px;
-  margin: 0 auto 3rem;
+  margin: 0 auto 2rem;
 }
 
 .audience-grid {
@@ -562,7 +614,7 @@ body {
 
 /* ── COMPARISON ── */
 .lp-comparison {
-  padding: 6rem 2rem;
+  padding: 3.5rem 2rem;
   max-width: 800px;
   margin: 0 auto;
   text-align: center;
@@ -572,7 +624,7 @@ body {
   font-family: 'Instrument Serif', serif;
   font-size: clamp(2rem, 4vw, 2.8rem);
   letter-spacing: -0.02em;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .compare-table {
@@ -633,7 +685,7 @@ body {
 
 /* ── SOCIAL PROOF ── */
 .lp-proof {
-  padding: 6rem 2rem;
+  padding: 3.5rem 2rem;
   max-width: 900px;
   margin: 0 auto;
   text-align: center;
@@ -643,7 +695,7 @@ body {
   font-family: 'Instrument Serif', serif;
   font-size: clamp(2rem, 4vw, 2.8rem);
   letter-spacing: -0.02em;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .testimonials {
@@ -705,7 +757,7 @@ body {
 
 /* ── PRICING TEASER ── */
 .lp-pricing {
-  padding: 6rem 2rem;
+  padding: 3.5rem 2rem;
   max-width: 650px;
   margin: 0 auto;
   text-align: center;
@@ -720,7 +772,7 @@ body {
 
 .lp-pricing > p {
   color: var(--lp-muted);
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
   font-size: 1.05rem;
 }
 
@@ -840,7 +892,7 @@ body {
 
 /* ── FINAL CTA ── */
 .lp-final-cta {
-  padding: 8rem 2rem;
+  padding: 5rem 2rem;
   text-align: center;
   position: relative;
 }
@@ -976,6 +1028,13 @@ body {
   .compare-cell {
     padding: 0.8rem 0.6rem;
     font-size: 0.78rem;
+  }
+  .hero-screenshot {
+    margin: 2rem auto 0;
+  }
+  .hero-screenshot-text {
+    font-size: 0.8rem;
+    padding: 1.5rem 1rem;
   }
 }
 
