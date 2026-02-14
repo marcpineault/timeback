@@ -14,8 +14,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "TimeBack - Become the Authority in Your Industry with AI-Powered Content",
-  description: "TimeBack is AI software that writes your scripts, edits your videos, and posts for you — so you become the go-to authority in your industry without breaking the bank. No content experience needed.",
+  title: "TimeBack — A Month of Content in One Afternoon",
+  description: "TimeBack writes your scripts, edits your videos, and posts to Instagram — all on autopilot. Upload a batch, walk away with a full content calendar.",
 };
 
 export default function RootLayout({
@@ -26,6 +26,14 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+          <link
+            href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
+            rel="stylesheet"
+          />
+        </head>
         <body className="font-sans antialiased">
           <GoogleAnalytics />
           <FacebookPixel />

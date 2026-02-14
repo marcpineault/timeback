@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import NewsletterSignup from '@/components/NewsletterSignup'
+import ScrollReveal from '@/components/ScrollReveal'
 
 export default async function LandingPage() {
   const { userId } = await auth()
@@ -11,403 +11,308 @@ export default async function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F0F14]">
-      {/* Header - Minimal, clean */}
-      <header className="border-b border-gray-800/50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <img src="/logo.svg" alt="TimeBack" className="w-8 h-8" />
-            <span className="text-xl font-bold text-white">TimeBack</span>
-          </span>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link href="/pricing" className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base">
-              Pricing
-            </Link>
-            <a
-              href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base"
-            >
-              Tutorials
-            </a>
-            <Link
-              href="/sign-in"
-              className="hidden sm:block text-gray-400 hover:text-white transition-colors"
-            >
-              Sign In
-            </Link>
-          </div>
+    <div className="landing-page">
+      <ScrollReveal />
+
+      {/* NAV */}
+      <nav className="lp-nav">
+        <Link href="/" className="nav-logo">TimeBack</Link>
+        <div className="nav-links">
+          <a href="#how-it-works">How It Works</a>
+          <a href="#pricing">Pricing</a>
+          <a
+            href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Tutorials
+          </a>
+          <Link href="/sign-up" className="nav-cta">Start Free</Link>
         </div>
-      </header>
+      </nav>
 
-      {/* Hero - Strong value proposition with single CTA */}
-      <section className="py-16 sm:py-24 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Trust badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 border border-violet-500/20 rounded-full text-violet-400 text-sm mb-6">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-            </svg>
-            <span>AI-powered content creation software</span>
+      {/* HERO */}
+      <section className="lp-hero">
+        <div className="hero-badge"><span></span> AI-powered content creation</div>
+        <h1>A month of content. <em>One afternoon.</em></h1>
+        <p className="hero-sub">
+          TimeBack writes your scripts, edits your videos, and posts to Instagram — all on autopilot. Upload a batch, walk away with a full content calendar.
+        </p>
+        <div className="hero-ctas">
+          <Link href="/sign-up" className="btn-primary">Start Creating Free →</Link>
+          <a href="#how-it-works" className="btn-secondary">See how it works</a>
+        </div>
+        <p className="hero-proof">No credit card required · <strong>5 free videos</strong> to start · Cancel anytime</p>
+      </section>
+
+      {/* NUMBERS */}
+      <div className="lp-numbers">
+        <div className="number-item">
+          <div className="big">50</div>
+          <div className="label">Videos per batch upload</div>
+        </div>
+        <div className="number-item">
+          <div className="big">0</div>
+          <div className="label">Editing skills needed</div>
+        </div>
+        <div className="number-item">
+          <div className="big">1</div>
+          <div className="label">Afternoon to a month of content</div>
+        </div>
+      </div>
+
+      {/* PROBLEM */}
+      <section className="lp-problem reveal">
+        <div className="section-label">The Problem</div>
+        <h2>You know you should be posting. But you&apos;re not.</h2>
+        <p>You&apos;re good at what you do — coaching, selling homes, advising clients. But growing on social media feels like a second full-time job you didn&apos;t sign up for.</p>
+        <div className="pain-grid">
+          <div className="pain-card">
+            <div className="icon">⏰</div>
+            <h4>No time to edit</h4>
+            <p>You recorded 10 videos last weekend. They&apos;re still sitting in your camera roll, unedited.</p>
           </div>
-
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-            Create Content That Makes You the Authority in Your Industry
-            <span className="text-cyan-400"> — Without Spending Hours on Social Media</span>
-          </h1>
-          <p className="text-lg sm:text-xl text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
-            TimeBack is AI software that writes your scripts, edits your videos, and posts for you — so you build authority on autopilot. No content experience needed. No expensive editors or agencies.
-          </p>
-
-          {/* Single focused CTA */}
-          <div className="flex flex-col items-center gap-4">
-            <Link
-              href="/sign-up"
-              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 active:from-indigo-700 active:to-violet-700 text-white rounded-xl font-semibold text-lg transition-all hover:scale-105 shadow-lg shadow-violet-500/25"
-            >
-              Start Creating Free
-            </Link>
-            <p className="text-gray-500 text-sm flex items-center gap-2">
-              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              No credit card required — Start with 5 free videos
-            </p>
-            <p className="text-gray-500 text-sm flex items-center gap-2">
-              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              Software, not an agency — cancel anytime
-            </p>
+          <div className="pain-card">
+            <div className="icon">🤷</div>
+            <h4>No idea what to say</h4>
+            <p>Staring at the camera with nothing to talk about is worse than not posting at all.</p>
+          </div>
+          <div className="pain-card">
+            <div className="icon">💸</div>
+            <h4>Can&apos;t afford an agency</h4>
+            <p>$2K–$5K/month for a content agency isn&apos;t realistic when you&apos;re building your business.</p>
+          </div>
+          <div className="pain-card">
+            <div className="icon">📉</div>
+            <h4>Inconsistent posting</h4>
+            <p>You go hard for a week, disappear for a month, then wonder why nobody&apos;s engaging.</p>
           </div>
         </div>
       </section>
 
-      {/* Product Demo/Screenshot Section */}
-      <section className="px-4 pb-16 sm:pb-24">
-        <div className="max-w-5xl mx-auto">
-          <div className="relative bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
-            {/* Browser chrome */}
-            <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border-b border-gray-700">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
-              </div>
-              <div className="flex-1 mx-4">
-                <div className="bg-gray-700 rounded-lg px-3 py-1 text-sm text-gray-400 text-center max-w-xs mx-auto">
-                  app.timebackvideo.com
-                </div>
-              </div>
-            </div>
-            {/* App preview */}
-            <div className="aspect-video bg-[#0F0F14] flex items-center justify-center p-8">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-violet-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-10 h-10 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-gray-400 text-lg">From script to finished video — powered by AI</p>
-                <p className="text-gray-500 text-sm mt-2">See how TimeBack writes, edits, and publishes for you</p>
-              </div>
-            </div>
+      {/* HOW IT WORKS */}
+      <section className="lp-how reveal" id="how-it-works">
+        <div className="section-label">How It Works</div>
+        <h2>From zero to a full feed in 3 steps</h2>
+        <div className="steps">
+          <div className="step">
+            <div className="step-number">01</div>
+            <h3>Pick your topics</h3>
+            <p>Tell TimeBack your industry and audience. AI generates a batch of scroll-stopping scripts you can customize or use as-is.</p>
+            <span className="time-tag">⚡ 5 minutes</span>
+          </div>
+          <div className="step">
+            <div className="step-number">02</div>
+            <h3>Batch record &amp; upload</h3>
+            <p>Film your videos back to back, then upload up to 50 at once. No teleprompter needed — just talk and AI handles the rest.</p>
+            <span className="time-tag">⚡ 1–2 hours</span>
+          </div>
+          <div className="step">
+            <div className="step-number">03</div>
+            <h3>Auto-edit &amp; auto-post</h3>
+            <p>TimeBack removes silences, adds captions, polishes your cuts, and auto-schedules everything to Instagram. You&apos;re done.</p>
+            <span className="time-tag">⚡ Automatic</span>
           </div>
         </div>
       </section>
 
-      {/* Features Strip */}
-      <section className="py-12 px-4 bg-[#1A1A24]/50 border-y border-gray-800">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <div className="text-white font-semibold mb-1">AI Script Writing</div>
-              <div className="text-gray-400 text-sm">Get video scripts generated instantly</div>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="text-white font-semibold mb-1">Automatic Editing</div>
-              <div className="text-gray-400 text-sm">Your footage, edited by AI</div>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                </svg>
-              </div>
-              <div className="text-white font-semibold mb-1">Zero Experience Needed</div>
-              <div className="text-gray-400 text-sm">Built for complete beginners</div>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <div className="text-white font-semibold mb-1">Fraction of the Cost</div>
-              <div className="text-gray-400 text-sm">Software, not an agency</div>
-            </div>
+      {/* FEATURES */}
+      <section className="lp-features reveal">
+        <div className="section-label">Features</div>
+        <h2>Everything between &ldquo;record&rdquo; and &ldquo;posted&rdquo;</h2>
+        <div className="feature-grid">
+          <div className="feature-card highlight">
+            <span className="feature-tag">Core Feature</span>
+            <h3>Bulk upload. Bulk edit. Bulk schedule.</h3>
+            <p>Upload up to 50 raw videos at once. TimeBack edits every single one — removing dead air, adding captions, tightening pacing — then queues them all to post. One session, one month of content.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">AI Scripts</span>
+            <h3>Never run out of things to say</h3>
+            <p>AI generates video scripts tailored to your industry and audience. Pick the ones you like, hit record, and read.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">Smart Editing</span>
+            <h3>Silence removal that just works</h3>
+            <p>Awkward pauses, ums, dead air — all cut automatically. Your videos sound crisp and confident without touching an editor.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">Captions</span>
+            <h3>Auto-captions on every video</h3>
+            <p>Captions added automatically so your content works in the feed with sound off — where most people scroll.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">Scheduling</span>
+            <h3>Auto-post to Instagram</h3>
+            <p>Set it and forget it. TimeBack publishes your finished videos on a schedule so you stay consistent without thinking about it.</p>
           </div>
         </div>
       </section>
 
-      {/* How It Works - Simplified */}
-      <section className="py-16 sm:py-24 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              Three Steps to Becoming the Authority
-            </h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              No content experience needed. No editors to hire. Just show up and let the AI handle the rest.
-            </p>
+      {/* WHO IT'S FOR */}
+      <section className="lp-audience reveal">
+        <div className="section-label">Who It&apos;s For</div>
+        <h2>Built for experts, not influencers</h2>
+        <p>You don&apos;t need to be a content creator. You just need something worth saying.</p>
+        <div className="audience-grid">
+          <div className="audience-card">
+            <div className="emoji">🏡</div>
+            <h4>Real Estate Agents</h4>
+            <p>Become the local expert people call first</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="relative bg-[#1A1A24]/50 rounded-2xl p-6 border border-gray-700/50">
-              <div className="absolute -top-3 -left-3 w-8 h-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                1
-              </div>
-              <div className="w-14 h-14 bg-violet-500/10 rounded-xl flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Tell Us Your Industry</h3>
-              <p className="text-gray-400">
-                Pick your topic and audience. TimeBack's AI instantly generates scroll-stopping video scripts tailored to your expertise.
-              </p>
-            </div>
-
-            <div className="relative bg-[#1A1A24]/50 rounded-2xl p-6 border border-gray-700/50">
-              <div className="absolute -top-3 -left-3 w-8 h-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                2
-              </div>
-              <div className="w-14 h-14 bg-violet-500/10 rounded-xl flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Record and Let AI Edit</h3>
-              <p className="text-gray-400">
-                Hit record and read your script. Our AI then edits your footage automatically — cuts, pacing, polish — all handled for you.
-              </p>
-            </div>
-
-            <div className="relative bg-[#1A1A24]/50 rounded-2xl p-6 border border-gray-700/50">
-              <div className="absolute -top-3 -left-3 w-8 h-8 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                3
-              </div>
-              <div className="w-14 h-14 bg-violet-500/10 rounded-xl flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Publish and Grow</h3>
-              <p className="text-gray-400">
-                Get a finished, professional video ready to post. Stay consistent, build trust, and become the go-to name in your industry.
-              </p>
-            </div>
+          <div className="audience-card">
+            <div className="emoji">💼</div>
+            <h4>Financial Advisors</h4>
+            <p>Build trust before the first meeting</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">🎯</div>
+            <h4>Coaches &amp; Consultants</h4>
+            <p>Establish authority and attract inbound leads</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">⚖️</div>
+            <h4>Lawyers</h4>
+            <p>Demystify your expertise and get referrals</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">💪</div>
+            <h4>Personal Trainers</h4>
+            <p>Fill your client roster from your feed</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">🚀</div>
+            <h4>Founders &amp; CEOs</h4>
+            <p>Build a personal brand while running your company</p>
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-16 sm:py-24 px-4 bg-[#1A1A24]/50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              What People Are Saying
-            </h2>
+      {/* COMPARISON */}
+      <section className="lp-comparison reveal">
+        <div className="section-label">Why TimeBack</div>
+        <h2>The math is simple</h2>
+        <div className="compare-table">
+          <div className="compare-row header">
+            <div className="compare-cell"></div>
+            <div className="compare-cell">TimeBack</div>
+            <div className="compare-cell">Hiring an Editor</div>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-[#1A1A24] rounded-2xl p-6 border border-gray-700">
-              <div className="flex gap-1 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="text-gray-300 mb-4">
-                &ldquo;Super easy to use. I just upload my video and it removes all the awkward pauses automatically. Saves me so much time!&rdquo;
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center text-white font-semibold">
-                  A
-                </div>
-                <div>
-                  <div className="text-white font-medium">Alain</div>
-                </div>
+          <div className="compare-row">
+            <div className="compare-cell">Cost</div>
+            <div className="compare-cell"><span className="yes">From $0/mo</span></div>
+            <div className="compare-cell">$1,500–$5,000/mo</div>
+          </div>
+          <div className="compare-row">
+            <div className="compare-cell">Turnaround</div>
+            <div className="compare-cell"><span className="yes">Instant</span></div>
+            <div className="compare-cell">2–5 business days</div>
+          </div>
+          <div className="compare-row">
+            <div className="compare-cell">Bulk editing</div>
+            <div className="compare-cell"><span className="yes">50 videos at once</span></div>
+            <div className="compare-cell"><span className="no">One at a time</span></div>
+          </div>
+          <div className="compare-row">
+            <div className="compare-cell">Auto-scheduling</div>
+            <div className="compare-cell"><span className="yes">Built in</span></div>
+            <div className="compare-cell"><span className="no">Extra tool needed</span></div>
+          </div>
+          <div className="compare-row">
+            <div className="compare-cell">Script writing</div>
+            <div className="compare-cell"><span className="yes">AI-generated</span></div>
+            <div className="compare-cell"><span className="no">You write them</span></div>
+          </div>
+        </div>
+      </section>
+
+      {/* SOCIAL PROOF */}
+      <section className="lp-proof reveal">
+        <h2>People are saving hours every week</h2>
+        <div className="testimonials">
+          <div className="testimonial">
+            <div className="stars">★★★★★</div>
+            <blockquote>&ldquo;I upload my videos and it removes all the awkward pauses automatically. Saves me so much time — I went from posting once a month to 4x a week.&rdquo;</blockquote>
+            <div className="author">
+              <div className="avatar">A</div>
+              <div className="author-info">
+                <div className="name">Alain</div>
+                <div className="role">Consultant</div>
               </div>
             </div>
-
-            <div className="bg-[#1A1A24] rounded-2xl p-6 border border-gray-700">
-              <div className="flex gap-1 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="text-gray-300 mb-4">
-                &ldquo;Finally a tool that does exactly what it promises. The silence detection is spot on and the interface is clean.&rdquo;
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center text-white font-semibold">
-                  M
-                </div>
-                <div>
-                  <div className="text-white font-medium">Marc</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1A1A24] rounded-2xl p-6 border border-gray-700">
-              <div className="flex gap-1 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <p className="text-gray-300 mb-4">
-                &ldquo;Great for cleaning up recorded content. Makes my videos look way more professional without any editing skills.&rdquo;
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-violet-700 rounded-full flex items-center justify-center text-white font-semibold">
-                  P
-                </div>
-                <div>
-                  <div className="text-white font-medium">Pablo</div>
-                </div>
+          </div>
+          <div className="testimonial">
+            <div className="stars">★★★★★</div>
+            <blockquote>&ldquo;The silence detection is spot on and the interface is clean. I batch-recorded 20 videos on Sunday and they posted all month.&rdquo;</blockquote>
+            <div className="author">
+              <div className="avatar">P</div>
+              <div className="author-info">
+                <div className="name">Pablo</div>
+                <div className="role">Content Creator</div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Use Cases */}
-      <section className="py-16 sm:py-24 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              Built for Anyone Who Wants to Be Heard
-            </h2>
+      {/* PRICING */}
+      <section className="lp-pricing reveal" id="pricing">
+        <div className="section-label">Pricing</div>
+        <h2>Less than your morning coffee habit</h2>
+        <p>Start free. Upgrade when you&apos;re hooked.</p>
+        <div className="price-cards">
+          <div className="price-card">
+            <div className="tier">Starter</div>
+            <div className="amount">$19<span>/mo</span></div>
+            <div className="per">35 videos per month</div>
+            <ul>
+              <li>AI script generation</li>
+              <li>Auto silence removal</li>
+              <li>Auto captions</li>
+              <li>Instagram scheduling</li>
+            </ul>
+            <Link href="/sign-up" className="btn-outline">Get Started</Link>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
-              <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                </svg>
-              </div>
-              <h3 className="text-white font-semibold mb-1">Coaches & Consultants</h3>
-              <p className="text-gray-400 text-sm">Establish authority fast</p>
-            </div>
-
-            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
-              <div className="w-12 h-12 bg-violet-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <h3 className="text-white font-semibold mb-1">Founders & CEOs</h3>
-              <p className="text-gray-400 text-sm">Build your personal brand</p>
-            </div>
-
-            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
-              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <h3 className="text-white font-semibold mb-1">Real Estate Agents</h3>
-              <p className="text-gray-400 text-sm">Become the local expert</p>
-            </div>
-
-            <div className="bg-[#1A1A24]/50 rounded-xl p-5 border border-gray-700/50 text-center">
-              <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-white font-semibold mb-1">Service Providers</h3>
-              <p className="text-gray-400 text-sm">Attract clients on autopilot</p>
-            </div>
+          <div className="price-card featured">
+            <div className="tier">Creator</div>
+            <div className="amount">$39<span>/mo</span></div>
+            <div className="per">120 videos per month</div>
+            <ul>
+              <li>Everything in Starter</li>
+              <li>Bulk upload (50 at once)</li>
+              <li>Priority processing</li>
+              <li>Advanced captions</li>
+            </ul>
+            <Link href="/sign-up" className="btn-primary">Start Free Trial</Link>
           </div>
         </div>
       </section>
 
-      {/* Newsletter Signup */}
-      <NewsletterSignup />
-
-      {/* Final CTA */}
-      <section className="py-16 sm:py-24 px-4">
-        <div className="max-w-3xl mx-auto">
-          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden">
-            {/* Background decoration */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0tNiA2aC0ydi00aDJ2NHptMC02aC0ydi00aDJ2NHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-30"></div>
-
-            <div className="relative">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-                Your Industry Is Waiting for Its Next Authority
-              </h2>
-              <p className="text-violet-100 text-lg mb-8 max-w-lg mx-auto">
-                Scripts written. Videos edited. Content posted consistently. All by AI software that costs less than a single freelancer. Start building your authority today.
-              </p>
-              <Link
-                href="/sign-up"
-                className="inline-flex px-8 py-4 bg-white hover:bg-gray-100 text-violet-600 rounded-xl font-semibold text-lg transition-all hover:scale-105 shadow-lg"
-              >
-                Start Creating Free
-              </Link>
-              <p className="text-violet-200 text-sm mt-4">
-                No credit card required · Software, not an agency · Cancel anytime
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* FINAL CTA */}
+      <section className="lp-final-cta reveal">
+        <h2>Stop overthinking. <em>Start posting.</em></h2>
+        <p>Your next 30 days of content are one afternoon away. No editing skills. No content calendar anxiety. Just results.</p>
+        <Link href="/sign-up" className="btn-primary" style={{ fontSize: '1.1rem', padding: '1.1rem 2.8rem' }}>Start Creating Free →</Link>
+        <div className="final-footer">5 free videos · No credit card · Cancel anytime</div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 px-4 border-t border-gray-800">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <img src="/logo.svg" alt="TimeBack" className="w-6 h-6" />
-              <span className="text-white font-semibold">TimeBack</span>
-              <span className="text-gray-500 text-sm hidden sm:inline">- AI content creation software</span>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-gray-500">
-              <Link href="/pricing" className="hover:text-gray-300 transition-colors">Pricing</Link>
-              <a
-                href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-gray-300 transition-colors"
-              >
-                Tutorials
-              </a>
-              <a href="mailto:support@timebackvideo.com" className="hover:text-gray-300 transition-colors">Support</a>
-              <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
-              <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms</Link>
-            </div>
-          </div>
-          <div className="mt-6 pt-6 border-t border-gray-800 text-center text-gray-500 text-sm">
-            &copy; {new Date().getFullYear()} TimeBack. All rights reserved.
-          </div>
+      {/* FOOTER */}
+      <footer className="lp-footer">
+        <div className="footer-logo">TimeBack</div>
+        <div className="footer-links">
+          <Link href="/pricing">Pricing</Link>
+          <a
+            href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Tutorials
+          </a>
+          <a href="mailto:support@timebackvideo.com">Support</a>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
         </div>
+        <div className="copyright">&copy; 2026 TimeBack. All rights reserved.</div>
       </footer>
     </div>
   )
