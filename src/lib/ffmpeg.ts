@@ -265,7 +265,7 @@ function calculateAdaptiveThreshold(
   // Method 1: Traditional max - offset (primary method for noisy audio)
   // For noisy audio: use smaller offset since speech-noise gap is small
   // For clean audio: use 14dB offset to preserve soft consonants and trailing syllables
-  const peakOffset = isNoisyAudio ? 10 : (isModerateNoise ? 12 : 14);
+  const peakOffset = isNoisyAudio ? 9 : (isModerateNoise ? 10 : 12);
   const traditionalThreshold = medianMax - peakOffset;
   thresholds.push(traditionalThreshold);
   // Higher weight for noisy audio since mean/RMS are less reliable
@@ -273,7 +273,7 @@ function calculateAdaptiveThreshold(
 
   // Method 2: Mean-based threshold (less reliable for noisy audio)
   // 5dB below mean preserves natural speech dynamics (soft consonants, trailing syllables)
-  const meanBasedThreshold = medianMean - 5;
+  const meanBasedThreshold = medianMean - 4;
   thresholds.push(meanBasedThreshold);
   // Lower weight for noisy audio since mean is elevated by noise
   weights.push(isNoisyAudio ? 0.2 : 0.5);
@@ -282,7 +282,7 @@ function calculateAdaptiveThreshold(
   if (rmsLevel !== undefined && dynamicRange !== undefined) {
     // RMS represents the "energy" of the audio, silence should be well below RMS
     // For noisy audio: RMS is elevated, use smaller offset
-    const rmsOffset = isNoisyAudio ? 4 : 7;
+    const rmsOffset = isNoisyAudio ? 3 : 5;
     const rmsBasedThreshold = rmsLevel - rmsOffset;
     thresholds.push(rmsBasedThreshold);
     // Lower weight for noisy audio
@@ -292,7 +292,7 @@ function calculateAdaptiveThreshold(
     if (dynamicRange > 15) {
       // High dynamic range = clear distinction between speech and silence
       // Use 16dB offset — still well within the speech-silence gap
-      const aggressiveThreshold = medianMax - 16;
+      const aggressiveThreshold = medianMax - 14;
       thresholds.push(aggressiveThreshold);
       weights.push(0.5);
     }
@@ -319,9 +319,9 @@ function calculateAdaptiveThreshold(
 
   let threshold = weightedSum / totalWeight;
 
-  // Clamp to bounds (-50 to -18 dB) to prevent threshold from getting too close to speech levels
-  // For noisy audio, allow higher threshold (up to -12dB) since speech-noise gap is smaller
-  const upperLimit = isNoisyAudio ? -12 : -18;
+  // Clamp to bounds (-50 to -16 dB) to prevent threshold from getting too close to speech levels
+  // For noisy audio, allow higher threshold (up to -11dB) since speech-noise gap is smaller
+  const upperLimit = isNoisyAudio ? -11 : -16;
   threshold = Math.min(upperLimit, Math.max(-50, threshold));
 
   // Enhanced logging for debugging
