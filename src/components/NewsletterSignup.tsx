@@ -60,12 +60,12 @@ export default function NewsletterSignup() {
   }
 
   return (
-    <section className="py-16 sm:py-24 px-4 bg-[#1A1A24]/50">
+    <section className="py-16 sm:py-24 px-4 bg-white border border-[#e0dbd4]">
       <div className="max-w-xl mx-auto text-center">
-        <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+        <h2 className="text-3xl sm:text-4xl font-bold text-[#0a0a0a] mb-4">
           Get Content Growth Tips
         </h2>
-        <p className="text-gray-400 text-lg mb-8">
+        <p className="text-[#8a8580] text-lg mb-8">
           Get weekly tips on growing your authority through consistent content — plus be first to know about new features.
         </p>
 
@@ -77,12 +77,12 @@ export default function NewsletterSignup() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full sm:w-auto sm:min-w-[300px] px-4 py-3 bg-[#0F0F14] border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
+              className="w-full sm:w-auto sm:min-w-[300px] px-4 py-3 bg-[#faf7f2] border border-[#e0dbd4] rounded-2xl text-[#0a0a0a] placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26] focus:ring-1 focus:ring-[#e85d26] transition-colors"
             />
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all hover:scale-105 shadow-lg shadow-violet-500/25"
+              className="w-full sm:w-auto px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-70 disabled:cursor-not-allowed text-white rounded-full font-semibold transition-all hover:scale-105 shadow-lg shadow-[#e85d26]/25"
             >
               {status === 'loading' ? 'Please wait...' : 'Join Waitlist'}
             </button>
@@ -92,7 +92,7 @@ export default function NewsletterSignup() {
             <p className="text-green-400 text-lg">Thanks! We&apos;ll be in touch!</p>
             <button
               onClick={handleReset}
-              className="text-gray-400 hover:text-white hover:underline transition-colors"
+              className="text-[#8a8580] hover:text-[#0a0a0a] hover:underline transition-colors"
             >
               &larr; Back
             </button>
@@ -102,7 +102,7 @@ export default function NewsletterSignup() {
             <p className="text-red-400">{errorMessage}</p>
             <button
               onClick={handleReset}
-              className="text-gray-400 hover:text-white hover:underline transition-colors"
+              className="text-[#8a8580] hover:text-[#0a0a0a] hover:underline transition-colors"
             >
               &larr; Back
             </button>

@@ -12,7 +12,7 @@ interface PostCardProps {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   QUEUED: { bg: 'bg-gray-500/20', text: 'text-gray-400', label: 'Queued' },
-  SCHEDULED: { bg: 'bg-violet-500/20', text: 'text-violet-400', label: 'Scheduled' },
+  SCHEDULED: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]', label: 'Scheduled' },
   PROCESSING_VIDEO: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', label: 'Processing' },
   UPLOADING: { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'Uploading' },
   PUBLISHED: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Published' },
@@ -30,26 +30,26 @@ export default function PostCard({ post, onEdit, onRemove, onPublishNow, publish
   const captionPreview = post.caption.split('\n')[0]?.slice(0, 80) || 'No caption'
 
   return (
-    <div className="flex items-start gap-4 p-4 bg-[#2A2A3A] rounded-lg hover:bg-[#2F2F40] transition-colors">
+    <div className="flex items-start gap-4 p-4 bg-[#f5f0e8] rounded-2xl hover:bg-[#e0dbd4] transition-colors">
       {/* Time */}
       <div className="flex-shrink-0 text-center w-16">
-        <p className="text-white font-medium text-sm">{timeStr}</p>
-        <p className="text-gray-500 text-xs">{dateStr}</p>
+        <p className="text-[#0a0a0a] font-medium text-sm">{timeStr}</p>
+        <p className="text-[#8a8580] text-xs">{dateStr}</p>
       </div>
 
       {/* Video info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-white text-sm font-medium truncate">
+          <span className="text-[#0a0a0a] text-sm font-medium truncate">
             {post.video.originalName}
           </span>
           <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
             {status.label}
           </span>
         </div>
-        <p className="text-gray-400 text-sm truncate">{captionPreview}</p>
+        <p className="text-[#8a8580] text-sm truncate">{captionPreview}</p>
         <div className="flex items-center gap-1 mt-1">
-          <span className="text-gray-500 text-xs">@{post.instagramAccount.instagramUsername}</span>
+          <span className="text-[#8a8580] text-xs">@{post.instagramAccount.instagramUsername}</span>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export default function PostCard({ post, onEdit, onRemove, onPublishNow, publish
             <button
               onClick={() => onPublishNow(post.id)}
               disabled={publishingId === post.id}
-              className="px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
             >
               {publishingId === post.id ? (
                 <>
@@ -77,13 +77,13 @@ export default function PostCard({ post, onEdit, onRemove, onPublishNow, publish
           )}
           <button
             onClick={() => onEdit(post)}
-            className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-[#3A3A4A] rounded-lg text-xs transition-colors"
+            className="px-3 py-1.5 text-[#8a8580] hover:text-[#0a0a0a] hover:bg-[#e0dbd4] rounded-full text-xs transition-colors"
           >
             Edit
           </button>
           <button
             onClick={() => onRemove(post.id)}
-            className="px-3 py-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg text-xs transition-colors"
+            className="px-3 py-1.5 text-[#8a8580] hover:text-red-400 hover:bg-red-500/10 rounded-full text-xs transition-colors"
           >
             Remove
           </button>
@@ -95,7 +95,7 @@ export default function PostCard({ post, onEdit, onRemove, onPublishNow, publish
           href={post.igPermalink}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-3 py-1.5 text-cyan-400 hover:text-cyan-300 text-xs flex-shrink-0"
+          className="px-3 py-1.5 text-[#e85d26] hover:text-[#d14d1a] text-xs flex-shrink-0"
         >
           View Post
         </a>

@@ -96,10 +96,10 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
             onClick={() => setStep(s)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               step === s
-                ? 'bg-violet-500 text-white'
+                ? 'bg-[#e85d26] text-[#0a0a0a]'
                 : s < step || (s === 1 && isStep1Valid)
-                  ? 'bg-violet-500/20 text-violet-400'
-                  : 'bg-[#2A2A3A] text-gray-500'
+                  ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]'
+                  : 'bg-[#f5f0e8] text-[#8a8580]'
             }`}
           >
             {s}. {s === 1 ? 'Identity' : s === 2 ? 'SPCL Framework' : 'Voice & Style'}
@@ -110,51 +110,51 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
       {/* Step 1: Identity */}
       {step === 1 && (
         <div className="space-y-4">
-          <div className="bg-[#1A1A24] rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-1">Your Identity</h2>
-            <p className="text-gray-500 text-sm mb-6">Tell us about you and your content goals.</p>
+          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Your Identity</h2>
+            <p className="text-[#8a8580] text-sm mb-6">Tell us about you and your content goals.</p>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Niche *</label>
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Niche *</label>
                 <input
                   type="text"
                   value={niche}
                   onChange={(e) => setNiche(e.target.value)}
                   placeholder="e.g. SaaS founders, real estate investing, fitness for busy professionals"
-                  className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500"
+                  className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Target Audience *</label>
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Target Audience *</label>
                 <input
                   type="text"
                   value={targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value)}
                   placeholder="e.g. Entrepreneurs doing $1M-$10M/year who want to scale"
-                  className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500"
+                  className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Content Goal</label>
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Content Goal</label>
                 <input
                   type="text"
                   value={contentGoal}
                   onChange={(e) => setContentGoal(e.target.value)}
                   placeholder="e.g. Generate leads for my agency, build personal brand"
-                  className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500"
+                  className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Platform</label>
+                  <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Platform</label>
                   <select
                     value={primaryPlatform}
                     onChange={(e) => setPrimaryPlatform(e.target.value)}
-                    className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500"
+                    className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:border-[#e85d26]"
                   >
                     {PLATFORM_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -162,14 +162,14 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Video Length (sec)</label>
+                  <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Video Length (sec)</label>
                   <input
                     type="number"
                     value={typicalVideoLength}
                     onChange={(e) => setTypicalVideoLength(parseInt(e.target.value) || 60)}
                     min={15}
                     max={600}
-                    className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500"
+                    className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:border-[#e85d26]"
                   />
                 </div>
               </div>
@@ -180,7 +180,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
             <button
               onClick={() => setStep(2)}
               disabled={!isStep1Valid}
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 disabled:cursor-not-allowed text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
             >
               Next: SPCL Framework
             </button>
@@ -227,13 +227,13 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
           <div className="flex justify-between">
             <button
               onClick={() => setStep(1)}
-              className="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors"
+              className="px-4 py-2 text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
             >
               Back
             </button>
             <button
               onClick={() => setStep(3)}
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
             >
               Next: Voice & Style
             </button>
@@ -244,17 +244,17 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
       {/* Step 3: Voice & Style */}
       {step === 3 && (
         <div className="space-y-4">
-          <div className="bg-[#1A1A24] rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-1">Voice & Style</h2>
-            <p className="text-gray-500 text-sm mb-6">How you sound and what to include or avoid.</p>
+          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Voice & Style</h2>
+            <p className="text-[#8a8580] text-sm mb-6">How you sound and what to include or avoid.</p>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Tone of Voice</label>
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Tone of Voice</label>
                 <select
                   value={toneOfVoice}
                   onChange={(e) => setToneOfVoice(e.target.value)}
-                  className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500"
+                  className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:border-[#e85d26]"
                 >
                   {TONE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -277,7 +277,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">
                   Example Scripts (paste scripts you like, up to 3)
                 </label>
                 {[0, 1, 2].map((i) => (
@@ -291,7 +291,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
                     }}
                     placeholder={`Example script ${i + 1} (optional)`}
                     rows={3}
-                    className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500 mb-2 resize-none"
+                    className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26] mb-2 resize-none"
                   />
                 ))}
               </div>
@@ -301,14 +301,14 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
           <div className="flex justify-between">
             <button
               onClick={() => setStep(2)}
-              className="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors"
+              className="px-4 py-2 text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
             >
               Back
             </button>
             <button
               onClick={handleSave}
               disabled={saving || !isStep1Valid}
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
             >
               {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Profile'}
             </button>
@@ -338,23 +338,23 @@ function SPCLSection({
 }) {
   const colorMap: Record<string, string> = {
     cyan: 'text-cyan-400 border-cyan-500/30',
-    violet: 'text-violet-400 border-violet-500/30',
+    violet: 'text-[#e85d26] border-[#e85d26]/30',
     amber: 'text-amber-400 border-amber-500/30',
     green: 'text-green-400 border-green-500/30',
   }
   const chipBgMap: Record<string, string> = {
     cyan: 'bg-cyan-500/10 text-cyan-400',
-    violet: 'bg-violet-500/10 text-violet-400',
+    violet: 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]',
     amber: 'bg-amber-500/10 text-amber-400',
     green: 'bg-green-500/10 text-green-400',
   }
 
   return (
-    <div className={`bg-[#1A1A24] rounded-xl p-6 border ${colorMap[color]?.split(' ')[1] || 'border-gray-800'}`}>
-      <h3 className={`text-base font-semibold ${colorMap[color]?.split(' ')[0] || 'text-white'} mb-1`}>
+    <div className={`bg-white border border-[#e0dbd4] rounded-2xl p-6 border ${colorMap[color]?.split(' ')[1] || 'border-[#e0dbd4]'}`}>
+      <h3 className={`text-base font-semibold ${colorMap[color]?.split(' ')[0] || 'text-[#0a0a0a]'} mb-1`}>
         {title}
       </h3>
-      <p className="text-gray-500 text-sm mb-4">{subtitle}</p>
+      <p className="text-[#8a8580] text-sm mb-4">{subtitle}</p>
 
       <ChipInput
         placeholder={placeholder}
@@ -397,14 +397,14 @@ function ChipInput({
 
   return (
     <div>
-      {label && <label className="block text-sm font-medium text-gray-300 mb-1.5">{label}</label>}
+      {label && <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">{label}</label>}
 
       {items.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
           {items.map((item, i) => (
             <span
               key={i}
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${chipClassName || 'bg-violet-500/10 text-violet-400'}`}
+              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${chipClassName || 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]'}`}
             >
               {item}
               <button
@@ -424,7 +424,7 @@ function ChipInput({
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500"
+        className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26]"
       />
     </div>
   )

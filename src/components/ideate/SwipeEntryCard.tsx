@@ -11,7 +11,7 @@ interface Props {
 
 const CATEGORY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   HOOK: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', label: 'Hook' },
-  MEAT: { bg: 'bg-violet-500/20', text: 'text-violet-400', label: 'Meat' },
+  MEAT: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]', label: 'Meat' },
   CTA: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'CTA' },
   FULL: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Full' },
 }
@@ -43,14 +43,14 @@ export default function SwipeEntryCard({ entry, onUseAsIdea, onRefresh }: Props)
   }
 
   return (
-    <div className="bg-[#1A1A24] rounded-xl p-5 flex flex-col">
+    <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5 flex flex-col">
       {/* Header: category + format + save */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cat.bg} ${cat.text}`}>
             {cat.label}
           </span>
-          <span className="text-gray-600 text-xs">{entry.format}</span>
+          <span className="text-[#8a8580] text-xs">{entry.format}</span>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -59,7 +59,7 @@ export default function SwipeEntryCard({ entry, onUseAsIdea, onRefresh }: Props)
             className={`p-1.5 rounded transition-colors ${
               entry.isSaved
                 ? 'text-amber-400 hover:text-amber-300'
-                : 'text-gray-600 hover:text-amber-400'
+                : 'text-[#8a8580] hover:text-amber-400'
             }`}
             title={entry.isSaved ? 'Unsave' : 'Save'}
           >
@@ -70,7 +70,7 @@ export default function SwipeEntryCard({ entry, onUseAsIdea, onRefresh }: Props)
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="p-1.5 text-gray-600 hover:text-red-400 transition-colors"
+            className="p-1.5 text-[#8a8580] hover:text-red-400 transition-colors"
             title="Delete"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -81,34 +81,34 @@ export default function SwipeEntryCard({ entry, onUseAsIdea, onRefresh }: Props)
       </div>
 
       {/* Source line */}
-      <p className="text-gray-500 text-xs italic mb-3">{entry.source}</p>
+      <p className="text-[#8a8580] text-xs italic mb-3">{entry.source}</p>
 
       {/* Content sections */}
       <div className="space-y-3 flex-1">
         <div>
           <span className="text-cyan-400 text-xs font-semibold uppercase">Hook</span>
-          <p className="text-white text-sm mt-0.5">{entry.hook}</p>
+          <p className="text-[#0a0a0a] text-sm mt-0.5">{entry.hook}</p>
         </div>
         <div>
-          <span className="text-violet-400 text-xs font-semibold uppercase">Meat</span>
-          <p className="text-gray-300 text-sm mt-0.5 line-clamp-4">{entry.meat}</p>
+          <span className="text-[#e85d26] text-xs font-semibold uppercase">Meat</span>
+          <p className="text-[#0a0a0a] text-sm mt-0.5 line-clamp-4">{entry.meat}</p>
         </div>
         <div>
           <span className="text-green-400 text-xs font-semibold uppercase">CTA</span>
-          <p className="text-gray-300 text-sm mt-0.5">{entry.cta}</p>
+          <p className="text-[#0a0a0a] text-sm mt-0.5">{entry.cta}</p>
         </div>
       </div>
 
       {/* Why this works (expandable) */}
-      <div className="mt-3 pt-3 border-t border-gray-800">
+      <div className="mt-3 pt-3 border-t border-[#e0dbd4]">
         <button
           onClick={() => setShowAnalysis(!showAnalysis)}
-          className="text-gray-400 hover:text-white text-xs transition-colors flex items-center gap-1"
+          className="text-[#8a8580] hover:text-[#0a0a0a] text-xs transition-colors flex items-center gap-1"
         >
           <span>{showAnalysis ? '\u25BC' : '\u25B6'}</span> Why this works
         </button>
         {showAnalysis && (
-          <p className="text-gray-400 text-xs mt-2 leading-relaxed">{entry.analysis}</p>
+          <p className="text-[#8a8580] text-xs mt-2 leading-relaxed">{entry.analysis}</p>
         )}
       </div>
 
@@ -116,7 +116,7 @@ export default function SwipeEntryCard({ entry, onUseAsIdea, onRefresh }: Props)
       {entry.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-3">
           {entry.tags.map((tag) => (
-            <span key={tag} className="px-2 py-0.5 bg-[#2A2A3A] text-gray-500 rounded-full text-xs">
+            <span key={tag} className="px-2 py-0.5 bg-[#f5f0e8] text-[#8a8580] rounded-full text-xs">
               {tag}
             </span>
           ))}
@@ -126,7 +126,7 @@ export default function SwipeEntryCard({ entry, onUseAsIdea, onRefresh }: Props)
       {/* Use as idea button */}
       <button
         onClick={() => onUseAsIdea(entry.id)}
-        className="mt-4 w-full px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg text-sm font-medium transition-colors"
+        className="mt-4 w-full px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
       >
         Use as Idea
       </button>

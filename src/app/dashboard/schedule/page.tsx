@@ -19,47 +19,21 @@ export default async function SchedulePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F0F14]">
-      {/* Header */}
-      <header className="border-b border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/logo.svg" alt="TimeBack" className="w-8 h-8" />
-            <span className="text-xl font-bold text-white">TimeBack</span>
-          </Link>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <Link
-              href="/dashboard"
-              className="text-gray-400 hover:text-white transition-colors text-sm"
-            >
-              Editor
-            </Link>
-            <Link
-              href="/dashboard/schedule"
-              className="text-white font-medium text-sm"
-            >
-              Schedule
-            </Link>
-            {features.ideate && (
-              <Link
-                href="/dashboard/ideate"
-                className="text-gray-400 hover:text-white transition-colors text-sm"
-              >
-                Ideate
-              </Link>
-            )}
-            <Link
-              href="/account/subscription"
-              className="text-gray-400 hover:text-white transition-colors text-sm"
-            >
-              Subscription
-            </Link>
-            <UserButton afterSignOutUrl="/" />
-          </div>
+    <div className="landing-page min-h-screen">
+      <nav className="lp-nav">
+        <Link href="/" className="nav-logo">TimeBack</Link>
+        <div className="nav-links">
+          <Link href="/dashboard">Editor</Link>
+          <Link href="/dashboard/schedule" style={{ color: '#0a0a0a', fontWeight: 600 }}>Schedule</Link>
+          {features.ideate && (
+            <Link href="/dashboard/ideate">Ideate</Link>
+          )}
+          <Link href="/account/subscription">Subscription</Link>
+          <UserButton afterSignOutUrl="/" />
         </div>
-      </header>
+      </nav>
 
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8" style={{ paddingTop: '5rem' }}>
         <ScheduleDashboard />
       </div>
     </div>

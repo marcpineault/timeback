@@ -316,16 +316,16 @@ export default function ProcessingOptions({
   if (!uploadedFile) return null;
 
   return (
-    <form onSubmit={handleSubmit} className="bg-[#1A1A24] rounded-xl p-4 sm:p-6 space-y-5 sm:space-y-6">
-      <div className="flex items-center gap-3 pb-3 sm:pb-4 border-b border-gray-700">
+    <form onSubmit={handleSubmit} className="bg-white border border-[#e0dbd4] rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6">
+      <div className="flex items-center gap-3 pb-3 sm:pb-4 border-b border-[#e0dbd4]">
         <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
         <div className="min-w-0">
-          <p className="text-white font-medium text-sm sm:text-base truncate">
+          <p className="text-[#0a0a0a] font-medium text-sm sm:text-base truncate">
             {videoCount > 1 ? `${videoCount} videos` : uploadedFile.originalName}
           </p>
-          <p className="text-gray-500 text-xs sm:text-sm">
+          <p className="text-[#8a8580] text-xs sm:text-sm">
             {videoCount > 1 ? 'Same settings will apply to all videos' : 'Ready to process'}
           </p>
         </div>
@@ -333,13 +333,13 @@ export default function ProcessingOptions({
 
       {/* Silence Removal Settings */}
       <div className="space-y-3 sm:space-y-4">
-        <h3 className="text-base sm:text-lg font-medium text-white">Silence Removal</h3>
+        <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Silence Removal</h3>
 
         {/* Auto-detect toggle */}
-        <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+        <div className="flex items-center justify-between p-3 bg-[#f5f0e8] rounded-2xl">
           <div>
-            <span className="text-sm text-gray-300">Auto-detect threshold</span>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <span className="text-sm text-[#0a0a0a]">Auto-detect threshold</span>
+            <p className="text-xs text-[#8a8580] mt-0.5">
               Analyzes audio to find optimal settings for each video
             </p>
           </div>
@@ -350,30 +350,30 @@ export default function ProcessingOptions({
               onChange={(e) => setConfig({ ...config, autoSilenceThreshold: e.target.checked })}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-violet-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-indigo-500 peer-checked:to-violet-500"></div>
+            <div className="w-11 h-6 bg-[#e0dbd4] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#e85d26] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#e85d26]"></div>
           </label>
         </div>
 
         {/* Manual threshold controls - only show when auto is disabled */}
         {!config.autoSilenceThreshold && (
-          <div className="space-y-3 sm:space-y-4 p-3 border border-gray-700 rounded-lg">
+          <div className="space-y-3 sm:space-y-4 p-3 border border-[#e0dbd4] rounded-2xl">
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="text-xs sm:text-sm text-gray-400">
+                <label className="text-xs sm:text-sm text-[#8a8580]">
                   Silence Threshold
                 </label>
-                <span className="text-xs sm:text-sm text-white font-medium">{config.silenceThreshold} dB</span>
+                <span className="text-xs sm:text-sm text-[#0a0a0a] font-medium">{config.silenceThreshold} dB</span>
               </div>
               <input
                 type="range"
                 value={config.silenceThreshold}
                 onChange={(e) => setConfig({ ...config, silenceThreshold: Number(e.target.value) })}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                className="w-full h-2 bg-[#e0dbd4] rounded-full appearance-none cursor-pointer accent-[#e85d26]"
                 min="-50"
                 max="-15"
                 step="1"
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-[#8a8580] mt-1">
                 <span>Less aggressive</span>
                 <span>More aggressive</span>
               </div>
@@ -381,21 +381,21 @@ export default function ProcessingOptions({
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="text-xs sm:text-sm text-gray-400">
+                <label className="text-xs sm:text-sm text-[#8a8580]">
                   Min Silence Duration
                 </label>
-                <span className="text-xs sm:text-sm text-white font-medium">{config.silenceDuration}s</span>
+                <span className="text-xs sm:text-sm text-[#0a0a0a] font-medium">{config.silenceDuration}s</span>
               </div>
               <input
                 type="range"
                 value={config.silenceDuration}
                 onChange={(e) => setConfig({ ...config, silenceDuration: Number(e.target.value) })}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                className="w-full h-2 bg-[#e0dbd4] rounded-full appearance-none cursor-pointer accent-[#e85d26]"
                 min="0.2"
                 max="2"
                 step="0.1"
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-[#8a8580] mt-1">
                 <span>Short pauses</span>
                 <span>Long pauses</span>
               </div>
@@ -405,23 +405,23 @@ export default function ProcessingOptions({
 
         {/* Show min silence duration even when auto is enabled */}
         {config.autoSilenceThreshold && (
-          <div className="p-3 border border-gray-700 rounded-lg">
+          <div className="p-3 border border-[#e0dbd4] rounded-2xl">
             <div className="flex justify-between items-center mb-2">
-              <label className="text-xs sm:text-sm text-gray-400">
+              <label className="text-xs sm:text-sm text-[#8a8580]">
                 Min Silence Duration
               </label>
-              <span className="text-xs sm:text-sm text-white font-medium">{config.silenceDuration}s</span>
+              <span className="text-xs sm:text-sm text-[#0a0a0a] font-medium">{config.silenceDuration}s</span>
             </div>
             <input
               type="range"
               value={config.silenceDuration}
               onChange={(e) => setConfig({ ...config, silenceDuration: Number(e.target.value) })}
-              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              className="w-full h-2 bg-[#e0dbd4] rounded-full appearance-none cursor-pointer accent-[#e85d26]"
               min="0.2"
               max="2"
               step="0.1"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-[#8a8580] mt-1">
               <span>Short pauses</span>
               <span>Long pauses</span>
             </div>
@@ -431,17 +431,17 @@ export default function ProcessingOptions({
 
       {/* Audio Enhancement Settings */}
       <div className="space-y-3 sm:space-y-4">
-        <h3 className="text-base sm:text-lg font-medium text-white">Audio Enhancement</h3>
+        <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Audio Enhancement</h3>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={config.normalizeAudio}
             onChange={(e) => setConfig({ ...config, normalizeAudio: e.target.checked })}
-            className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
+            className="w-5 h-5 rounded bg-[#e0dbd4] border-[#e0dbd4] text-[#e85d26] focus:ring-[#e85d26]"
           />
-          <span className="text-gray-400">Normalize audio levels</span>
+          <span className="text-[#8a8580]">Normalize audio levels</span>
         </label>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-[#8a8580]">
           Ensures consistent volume throughout the video (-14 LUFS, optimal for social media)
         </p>
       </div>
@@ -450,7 +450,7 @@ export default function ProcessingOptions({
       {enabledFeatures.speechCorrection && (
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-white">Speech Correction</h3>
+          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Speech Correction</h3>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
@@ -458,10 +458,10 @@ export default function ProcessingOptions({
               onChange={(e) => setConfig({ ...config, speechCorrection: e.target.checked })}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-violet-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-indigo-500 peer-checked:to-violet-500"></div>
+            <div className="w-11 h-6 bg-[#e0dbd4] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#e85d26] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#e85d26]"></div>
           </label>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-[#8a8580]">
           Automatically removes filler words (um, uh), stutters, and speech mistakes from your video{config.generateCaptions ? ' and captions' : ''}
         </p>
 
@@ -483,19 +483,19 @@ export default function ProcessingOptions({
                       },
                     });
                   }}
-                  className={`p-3 rounded-lg border-2 transition-all text-center ${
+                  className={`p-3 rounded-2xl border-2 transition-all text-center ${
                     config.speechCorrectionPreset === key
-                      ? 'border-violet-500 bg-violet-500/10'
-                      : 'border-gray-700 hover:border-gray-500 bg-gray-700/30'
+                      ? 'border-[#e85d26] bg-[#e85d26]/10'
+                      : 'border-[#e0dbd4] hover:border-[#8a8580] bg-[#e0dbd4]/30'
                   }`}
                 >
                   <span className={`text-sm font-medium block ${
-                    config.speechCorrectionPreset === key ? 'text-white' : 'text-gray-300'
+                    config.speechCorrectionPreset === key ? 'text-[#0a0a0a]' : 'text-[#0a0a0a]'
                   }`}>
                     {preset.label}
                   </span>
                   <p className={`text-xs mt-1 ${
-                    config.speechCorrectionPreset === key ? 'text-gray-300' : 'text-gray-500'
+                    config.speechCorrectionPreset === key ? 'text-[#0a0a0a]' : 'text-[#8a8580]'
                   }`}>
                     {preset.description}
                   </p>
@@ -505,11 +505,11 @@ export default function ProcessingOptions({
 
             {/* Caption sync note */}
             {config.generateCaptions && (
-              <div className="flex items-start gap-2 p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-                <svg className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex items-start gap-2 p-2.5 bg-[#e85d26]/10 border border-[#e85d26]/20 rounded-2xl">
+                <svg className="w-4 h-4 text-[#e85d26] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-xs text-indigo-300">
+                <p className="text-xs text-[#e85d26]">
                   Captions will automatically update to match — removed words won&apos;t appear in your captions
                 </p>
               </div>
@@ -517,23 +517,23 @@ export default function ProcessingOptions({
 
             {/* Advanced settings toggle */}
             <details className="group">
-              <summary className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-400 transition-colors py-1">
+              <summary className="flex items-center gap-2 cursor-pointer text-xs text-[#8a8580] hover:text-[#8a8580] transition-colors py-1">
                 <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
                 Advanced settings
               </summary>
-              <div className="mt-3 space-y-3 p-3 bg-gray-700/30 rounded-lg border border-gray-700">
+              <div className="mt-3 space-y-3 p-3 bg-[#e0dbd4]/30 rounded-2xl border border-[#e0dbd4]">
                 {/* Language Selection */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Language</label>
+                  <label className="block text-sm text-[#8a8580] mb-1.5">Language</label>
                   <select
                     value={config.speechCorrectionConfig.language}
                     onChange={(e) => setConfig({
                       ...config,
                       speechCorrectionConfig: { ...config.speechCorrectionConfig, language: e.target.value }
                     })}
-                    className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full p-2 rounded-2xl bg-[#e0dbd4] text-[#0a0a0a] text-sm border border-[#e0dbd4] focus:ring-[#e85d26] focus:border-[#e85d26]"
                   >
                     <option value="auto">Auto-detect (English)</option>
                     <option value="en">English</option>
@@ -546,7 +546,7 @@ export default function ProcessingOptions({
 
                 {/* Custom Filler Words */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Custom words to remove</label>
+                  <label className="block text-sm text-[#8a8580] mb-1.5">Custom words to remove</label>
                   <input
                     type="text"
                     placeholder="e.g. literally, honestly, right (comma-separated)"
@@ -558,14 +558,14 @@ export default function ProcessingOptions({
                         customFillerWords: e.target.value.split(',').map(w => w.trim()).filter(Boolean),
                       }
                     })}
-                    className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500 placeholder-gray-500"
+                    className="w-full p-2 rounded-2xl bg-[#e0dbd4] text-[#0a0a0a] text-sm border border-[#e0dbd4] focus:ring-[#e85d26] focus:border-[#e85d26] placeholder-[#8a8580]"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Words specific to your speaking style</p>
+                  <p className="text-xs text-[#8a8580] mt-1">Words specific to your speaking style</p>
                 </div>
 
                 {/* Custom Filler Phrases */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">Custom phrases to remove</label>
+                  <label className="block text-sm text-[#8a8580] mb-1.5">Custom phrases to remove</label>
                   <input
                     type="text"
                     placeholder="e.g. at the end of the day, if that makes sense"
@@ -577,13 +577,13 @@ export default function ProcessingOptions({
                         customFillerPhrases: e.target.value.split(',').map(p => p.trim()).filter(Boolean),
                       }
                     })}
-                    className="w-full p-2 rounded-lg bg-gray-700 text-gray-300 text-sm border border-gray-600 focus:ring-violet-500 focus:border-violet-500 placeholder-gray-500"
+                    className="w-full p-2 rounded-2xl bg-[#e0dbd4] text-[#0a0a0a] text-sm border border-[#e0dbd4] focus:ring-[#e85d26] focus:border-[#e85d26] placeholder-[#8a8580]"
                   />
                 </div>
 
                 {/* Confidence Threshold */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">
+                  <label className="block text-sm text-[#8a8580] mb-1.5">
                     Sensitivity: {Math.round(config.speechCorrectionConfig.confidenceThreshold * 100)}%
                   </label>
                   <input
@@ -600,9 +600,9 @@ export default function ProcessingOptions({
                         confidenceThreshold: parseInt(e.target.value) / 100,
                       }
                     })}
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-600 accent-violet-500"
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer bg-[#e0dbd4] accent-[#e85d26]"
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <div className="flex justify-between text-xs text-[#8a8580] mt-1">
                     <span>More corrections</span>
                     <span>Fewer, safer</span>
                   </div>
@@ -617,20 +617,20 @@ export default function ProcessingOptions({
       {/* Captions Settings */}
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-white">Captions</h3>
+          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Captions</h3>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={config.generateCaptions}
               onChange={(e) => setConfig({ ...config, generateCaptions: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
+              className="w-5 h-5 rounded bg-[#e0dbd4] border-[#e0dbd4] text-[#e85d26] focus:ring-[#e85d26]"
             />
-            <span className="text-gray-400">Generate captions</span>
+            <span className="text-[#8a8580]">Generate captions</span>
           </label>
         </div>
 
         {config.generateCaptions && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-[#8a8580]">
             Clean white text on dark background - optimized for readability
           </p>
         )}
@@ -638,11 +638,11 @@ export default function ProcessingOptions({
 
       {/* Headline Settings */}
       <div className="space-y-3 sm:space-y-4">
-        <h3 className="text-base sm:text-lg font-medium text-white">Headline Overlay</h3>
+        <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Headline Overlay</h3>
 
         {/* Headline Mode Selection */}
         <div className="space-y-2">
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-2xl hover:bg-[#e0dbd4]/50 transition-colors">
             <input
               type="radio"
               name="headlineMode"
@@ -653,14 +653,14 @@ export default function ProcessingOptions({
                 generateAIHeadline: false,
                 headline: ''
               })}
-              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
+              className="w-4 h-4 text-[#e85d26] bg-[#e0dbd4] border-[#e0dbd4] focus:ring-[#e85d26]"
             />
             <div>
-              <span className="text-gray-300">No headline</span>
+              <span className="text-[#0a0a0a]">No headline</span>
             </div>
           </label>
 
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-2xl hover:bg-[#e0dbd4]/50 transition-colors">
             <input
               type="radio"
               name="headlineMode"
@@ -671,15 +671,15 @@ export default function ProcessingOptions({
                 generateAIHeadline: true,
                 headline: ''
               })}
-              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
+              className="w-4 h-4 text-[#e85d26] bg-[#e0dbd4] border-[#e0dbd4] focus:ring-[#e85d26]"
             />
             <div>
-              <span className="text-gray-300">AI-generated headline</span>
-              <p className="text-xs text-gray-500">Creates an engaging, scroll-stopping headline from your content</p>
+              <span className="text-[#0a0a0a]">AI-generated headline</span>
+              <p className="text-xs text-[#8a8580]">Creates an engaging, scroll-stopping headline from your content</p>
             </div>
           </label>
 
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-2xl hover:bg-[#e0dbd4]/50 transition-colors">
             <input
               type="radio"
               name="headlineMode"
@@ -690,15 +690,15 @@ export default function ProcessingOptions({
                 generateAIHeadline: false,
                 headline: ''
               })}
-              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
+              className="w-4 h-4 text-[#e85d26] bg-[#e0dbd4] border-[#e0dbd4] focus:ring-[#e85d26]"
             />
             <div>
-              <span className="text-gray-300">Use hook from video</span>
-              <p className="text-xs text-gray-500">Extracts the first sentence as the headline</p>
+              <span className="text-[#0a0a0a]">Use hook from video</span>
+              <p className="text-xs text-[#8a8580]">Extracts the first sentence as the headline</p>
             </div>
           </label>
 
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-2xl hover:bg-[#e0dbd4]/50 transition-colors">
             <input
               type="radio"
               name="headlineMode"
@@ -709,10 +709,10 @@ export default function ProcessingOptions({
                 generateAIHeadline: false,
                 headline: config.headline || ' '  // Set a space to trigger custom mode
               })}
-              className="w-4 h-4 text-violet-500 bg-gray-700 border-gray-600 focus:ring-violet-500"
+              className="w-4 h-4 text-[#e85d26] bg-[#e0dbd4] border-[#e0dbd4] focus:ring-[#e85d26]"
             />
             <div>
-              <span className="text-gray-300">Custom headline</span>
+              <span className="text-[#0a0a0a]">Custom headline</span>
             </div>
           </label>
         </div>
@@ -720,13 +720,13 @@ export default function ProcessingOptions({
         {/* Custom headline input */}
         {!config.useHookAsHeadline && !config.generateAIHeadline && config.headline !== '' && (
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Headline Text</label>
+            <label className="block text-sm text-[#8a8580] mb-2">Headline Text</label>
             <input
               type="text"
               value={config.headline === ' ' ? '' : config.headline}
               onChange={(e) => setConfig({ ...config, headline: e.target.value || ' ' })}
               placeholder="Enter your headline"
-              className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400"
+              className="w-full bg-white border border-gray-300 rounded-2xl px-4 py-3 text-gray-900 placeholder-gray-400"
             />
           </div>
         )}
@@ -734,17 +734,17 @@ export default function ProcessingOptions({
         {/* Position selector - show when any headline mode is active */}
         {(config.headline || config.useHookAsHeadline || config.generateAIHeadline) && (
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Position</label>
+            <label className="block text-sm text-[#8a8580] mb-2">Position</label>
             <div className="flex gap-2">
               {(['top', 'center', 'bottom'] as const).map((pos) => (
                 <button
                   key={pos}
                   type="button"
                   onClick={() => setConfig({ ...config, headlinePosition: pos })}
-                  className={`flex-1 py-2 px-4 rounded-lg capitalize transition-colors ${
+                  className={`flex-1 py-2 px-4 rounded-full capitalize transition-colors ${
                     config.headlinePosition === pos
-                      ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'
-                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      ? 'bg-[#e85d26] text-[#0a0a0a]'
+                      : 'bg-[#e0dbd4] text-[#8a8580] hover:bg-[#e0dbd4]'
                   }`}
                 >
                   {pos}
@@ -757,23 +757,23 @@ export default function ProcessingOptions({
         {/* Style selector - show when any headline mode is active */}
         {(config.headline || config.useHookAsHeadline || config.generateAIHeadline) && (
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Style</label>
+            <label className="block text-sm text-[#8a8580] mb-2">Style</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setConfig({ ...config, headlineStyle: 'speech-bubble' })}
-                className={`p-3 rounded-lg border-2 transition-colors ${
+                className={`p-3 rounded-2xl border-2 transition-colors ${
                   config.headlineStyle === 'speech-bubble'
-                    ? 'border-violet-500 bg-violet-500/10'
-                    : 'border-gray-600 hover:border-gray-500'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
+                    : 'border-[#e0dbd4] hover:border-[#8a8580]'
                 }`}
               >
                 <div className="flex flex-col items-center gap-2">
                   {/* Instagram style preview */}
-                  <div className="bg-white text-black text-xs font-bold px-4 py-2 rounded-xl">
+                  <div className="bg-white text-black text-xs font-bold px-4 py-2 rounded-2xl">
                     Headline
                   </div>
-                  <span className={`text-xs ${config.headlineStyle === 'speech-bubble' ? 'text-cyan-400' : 'text-gray-400'}`}>
+                  <span className={`text-xs ${config.headlineStyle === 'speech-bubble' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
                     Instagram
                   </span>
                 </div>
@@ -782,18 +782,18 @@ export default function ProcessingOptions({
               <button
                 type="button"
                 onClick={() => setConfig({ ...config, headlineStyle: 'classic' })}
-                className={`p-3 rounded-lg border-2 transition-colors ${
+                className={`p-3 rounded-2xl border-2 transition-colors ${
                   config.headlineStyle === 'classic'
-                    ? 'border-violet-500 bg-violet-500/10'
-                    : 'border-gray-600 hover:border-gray-500'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
+                    : 'border-[#e0dbd4] hover:border-[#8a8580]'
                 }`}
               >
                 <div className="flex flex-col items-center gap-2">
                   {/* Classic preview */}
-                  <div className="bg-black/60 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg">
+                  <div className="bg-black/60 text-white text-xs font-bold px-4 py-2 rounded-2xl shadow-lg">
                     Headline
                   </div>
-                  <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-cyan-400' : 'text-gray-400'}`}>
+                  <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
                     Classic
                   </span>
                 </div>
@@ -806,10 +806,10 @@ export default function ProcessingOptions({
       {/* B-Roll Animations Settings - TEMPORARILY DISABLED - Hidden on mobile */}
       <div className="hidden sm:block space-y-3 sm:space-y-4 opacity-50">
         <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-white">B-Roll Animations</h3>
-          <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">Coming Soon</span>
+          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">B-Roll Animations</h3>
+          <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">Coming Soon</span>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-[#8a8580]">
           AI-generated animations that appear during key moments to add visual context. This feature is currently being improved.
         </p>
       </div>
@@ -817,26 +817,26 @@ export default function ProcessingOptions({
       {/* Original B-Roll UI - Hidden while feature is disabled
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-white">B-Roll Animations</h3>
+          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">B-Roll Animations</h3>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={config.generateBRoll}
               onChange={(e) => setConfig({ ...config, generateBRoll: e.target.checked })}
-              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-violet-500 focus:ring-violet-500"
+              className="w-5 h-5 rounded bg-[#e0dbd4] border-[#e0dbd4] text-[#e85d26] focus:ring-[#e85d26]"
             />
-            <span className="text-gray-400">Enable B-Roll</span>
+            <span className="text-[#8a8580]">Enable B-Roll</span>
           </label>
         </div>
 
         {config.generateBRoll && (
-          <div className="space-y-4 p-4 bg-gray-700/50 rounded-lg">
-            <p className="text-xs text-gray-400">
+          <div className="space-y-4 p-4 bg-[#f5f0e8] rounded-2xl">
+            <p className="text-xs text-[#8a8580]">
               AI-generated animations that appear during key moments to add visual context
             </p>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Animation Style</label>
+              <label className="block text-sm text-[#8a8580] mb-2">Animation Style</label>
               <div className="grid grid-cols-3 gap-2">
                 {([
                   { value: 'minimal', label: 'Minimal', desc: 'Clean & subtle' },
@@ -850,18 +850,18 @@ export default function ProcessingOptions({
                       ...config,
                       bRollConfig: { ...config.bRollConfig, style: style.value }
                     })}
-                    className={`p-2 rounded-lg border-2 transition-colors text-center ${
+                    className={`p-2 rounded-2xl border-2 transition-colors text-center ${
                       config.bRollConfig.style === style.value
-                        ? 'border-violet-500 bg-violet-500/10'
-                        : 'border-gray-600 hover:border-gray-500'
+                        ? 'border-[#e85d26] bg-[#e85d26]/10'
+                        : 'border-[#e0dbd4] hover:border-[#8a8580]'
                     }`}
                   >
                     <span className={`text-xs font-medium ${
-                      config.bRollConfig.style === style.value ? 'text-cyan-400' : 'text-gray-300'
+                      config.bRollConfig.style === style.value ? 'text-[#e85d26]' : 'text-[#0a0a0a]'
                     }`}>
                       {style.label}
                     </span>
-                    <p className="text-xs text-gray-500 mt-0.5">{style.desc}</p>
+                    <p className="text-xs text-[#8a8580] mt-0.5">{style.desc}</p>
                   </button>
                 ))}
               </div>
@@ -869,8 +869,8 @@ export default function ProcessingOptions({
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="text-sm text-gray-400">Frequency</label>
-                <span className="text-sm text-white font-medium capitalize">{config.bRollConfig.intensity}</span>
+                <label className="text-sm text-[#8a8580]">Frequency</label>
+                <span className="text-sm text-[#0a0a0a] font-medium capitalize">{config.bRollConfig.intensity}</span>
               </div>
               <div className="flex gap-2">
                 {(['low', 'medium', 'high'] as const).map((intensity) => (
@@ -885,25 +885,25 @@ export default function ProcessingOptions({
                         maxMoments: intensity === 'low' ? 2 : intensity === 'medium' ? 3 : 5,
                       }
                     })}
-                    className={`flex-1 py-2 px-3 rounded-lg capitalize text-sm transition-colors ${
+                    className={`flex-1 py-2 px-3 rounded-full capitalize text-sm transition-colors ${
                       config.bRollConfig.intensity === intensity
-                        ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white'
-                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                        ? 'bg-[#e85d26] text-[#0a0a0a]'
+                        : 'bg-[#e0dbd4] text-[#8a8580] hover:bg-[#e0dbd4]'
                     }`}
                   >
                     {intensity}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-[#8a8580] mt-2">
                 {config.bRollConfig.intensity === 'low' && '2 animations - one at the start, one at a key point'}
                 {config.bRollConfig.intensity === 'medium' && '3 animations - balanced throughout the video'}
                 {config.bRollConfig.intensity === 'high' && '5 animations - frequent visual variety'}
               </p>
             </div>
 
-            <div className="pt-2 border-t border-gray-600">
-              <p className="text-xs text-gray-500">
+            <div className="pt-2 border-t border-[#e0dbd4]">
+              <p className="text-xs text-[#8a8580]">
                 Animations include: charts, graphs, progress bars, checkmarks, comparisons, countdowns, and more - automatically selected based on your content
               </p>
             </div>
@@ -918,14 +918,14 @@ export default function ProcessingOptions({
           type="button"
           onClick={handleSaveAsDefault}
           disabled={isSavingDefaults || isProcessing}
-          className={`w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+          className={`w-full py-2.5 px-4 rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
             isSavingDefaults || isProcessing
-              ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              ? 'bg-[#e0dbd4] text-[#8a8580] cursor-not-allowed'
               : saveDefaultsStatus === 'success'
               ? 'bg-green-500/20 text-green-400 border border-green-500/50'
               : saveDefaultsStatus === 'error'
               ? 'bg-red-500/20 text-red-400 border border-red-500/50'
-              : 'bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600'
+              : 'bg-[#e0dbd4] hover:bg-[#e0dbd4] text-[#0a0a0a] border border-[#e0dbd4]'
           }`}
         >
           {isSavingDefaults ? (
@@ -959,7 +959,7 @@ export default function ProcessingOptions({
             </>
           )}
         </button>
-        <p className="text-xs text-gray-500 text-center">
+        <p className="text-xs text-[#8a8580] text-center">
           Save these settings to use them automatically when auto-processing is enabled
         </p>
       </div>
@@ -967,10 +967,10 @@ export default function ProcessingOptions({
       <button
         type="submit"
         disabled={isProcessing}
-        className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
+        className={`w-full py-3 px-6 rounded-full font-medium transition-colors ${
           isProcessing
-            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-            : 'bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white'
+            ? 'bg-[#e0dbd4] text-[#8a8580] cursor-not-allowed'
+            : 'bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a]'
         }`}
       >
         {isProcessing ? (

@@ -60,29 +60,29 @@ export class ErrorBoundary extends Component<Props, State> {
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
               Something went wrong
             </h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-[#8a8580] mb-4">
               We encountered an unexpected error. Our team has been notified.
             </p>
             <div className="space-y-2">
               <button
                 onClick={this.handleRetry}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-[#e85d26] text-white rounded-full hover:bg-[#d14d1a] transition-colors"
               >
                 Try Again
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="block mx-auto text-sm text-gray-500 hover:text-gray-700"
+                className="block mx-auto text-sm text-[#8a8580] hover:text-[#0a0a0a]"
               >
                 Refresh Page
               </button>
             </div>
             {process.env.NODE_ENV === 'development' && this.state.error && (
               <details className="mt-6 text-left">
-                <summary className="cursor-pointer text-sm text-gray-500">
+                <summary className="cursor-pointer text-sm text-[#8a8580]">
                   Error Details (dev only)
                 </summary>
-                <pre className="mt-2 p-4 bg-gray-100 rounded text-xs overflow-auto max-h-64">
+                <pre className="mt-2 p-4 bg-[#faf7f2] rounded text-xs overflow-auto max-h-64">
                   {this.state.error.toString()}
                   {this.state.errorInfo?.componentStack}
                 </pre>

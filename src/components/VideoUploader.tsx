@@ -1064,7 +1064,7 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
     <div className="space-y-4">
       {/* Auto-Process Toggle - Shown BEFORE upload area so users can enable it first */}
       {showAutoProcessOption && !isUploading && !autoProcessLoading && (
-        <div className="bg-[#1A1A24] rounded-xl p-4">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-4">
           <label className="flex items-start gap-3 cursor-pointer">
             <div className="relative flex items-center pt-0.5">
               <input
@@ -1090,11 +1090,11 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                 }}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-violet-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-indigo-500 peer-checked:to-violet-500"></div>
+              <div className="w-11 h-6 bg-[#e0dbd4] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#e85d26] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#e85d26]"></div>
             </div>
             <div className="flex-1">
-              <span className="text-sm font-medium text-white">Auto-process after upload</span>
-              <p className="text-xs text-gray-400 mt-1">
+              <span className="text-sm font-medium text-[#0a0a0a]">Auto-process after upload</span>
+              <p className="text-xs text-[#8a8580] mt-1">
                 {autoProcessEnabled
                   ? 'Videos will be processed automatically using your saved settings. You can close this page after uploading.'
                   : 'Enable to automatically process videos with your saved settings.'}
@@ -1109,10 +1109,10 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`
-          border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all cursor-pointer
+          border-2 border-dashed rounded-2xl p-6 sm:p-12 text-center transition-all cursor-pointer
           ${isDragging
-            ? 'border-violet-500 bg-violet-500/10'
-            : 'border-gray-600 hover:border-gray-500 bg-[#1A1A24]/50'
+            ? 'border-[#e85d26] bg-[#e85d26]/10'
+            : 'border-[#e0dbd4] hover:border-[#8a8580] bg-white/50'
           }
           ${isUploading || disabled || isPreparing ? 'pointer-events-none opacity-75' : ''}
         `}
@@ -1130,14 +1130,14 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
           <div className="flex flex-col items-center gap-3 sm:gap-4">
             {isPreparing ? (
               <>
-                <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-lg sm:text-xl text-gray-300">Preparing videos...</p>
-                <p className="text-gray-500 text-sm sm:text-base">This may take a moment on mobile</p>
+                <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-[#e85d26] border-t-transparent rounded-full animate-spin" />
+                <p className="text-lg sm:text-xl text-[#0a0a0a]">Preparing videos...</p>
+                <p className="text-[#8a8580] text-sm sm:text-base">This may take a moment on mobile</p>
               </>
             ) : (
               <>
                 <svg
-                  className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-violet-500' : 'text-gray-500'}`}
+                  className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1150,11 +1150,11 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                   />
                 </svg>
 
-                <p className="text-lg sm:text-xl text-gray-300">
+                <p className="text-lg sm:text-xl text-[#0a0a0a]">
                   {isDragging ? 'Drop your videos here' : 'Tap to upload videos'}
                 </p>
-                <p className="text-gray-500 text-sm sm:text-base">or drag and drop</p>
-                <p className="text-xs sm:text-sm text-gray-600">MP4, MOV, WebM, AVI • Multiple files</p>
+                <p className="text-[#8a8580] text-sm sm:text-base">or drag and drop</p>
+                <p className="text-xs sm:text-sm text-[#8a8580]">MP4, MOV, WebM, AVI • Multiple files</p>
               </>
             )}
           </div>
@@ -1163,15 +1163,15 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
 
       {/* Upload Progress List */}
       {uploadingFiles.length > 0 && (
-        <div className="bg-[#1A1A24] rounded-xl p-4 space-y-3">
-          <div className="flex justify-between items-center text-sm text-gray-400">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-4 space-y-3">
+          <div className="flex justify-between items-center text-sm text-[#8a8580]">
             <span>Uploading files</span>
             <span>{completedCount} / {totalCount} complete</span>
           </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {uploadingFiles.map((item, index) => (
-              <div key={index} className="flex items-center gap-3 p-2 bg-gray-700/50 rounded-lg">
+              <div key={index} className="flex items-center gap-3 p-2 bg-[#f5f0e8] rounded-2xl">
                 {/* Status Icon */}
                 <div className="flex-shrink-0">
                   {item.status === 'complete' && (
@@ -1185,14 +1185,14 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                     </svg>
                   )}
                   {(item.status === 'uploading' || item.status === 'pending') && (
-                    <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-[#e85d26] border-t-transparent rounded-full animate-spin" />
                   )}
                 </div>
 
                 {/* File Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{item.file.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm text-[#0a0a0a] truncate">{item.file.name}</p>
+                  <p className="text-xs text-[#8a8580]">
                     {item.status === 'error' ? item.error : formatFileSize(item.file.size)}
                   </p>
                 </div>
@@ -1201,16 +1201,16 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                 {item.status === 'uploading' && (
                   <div className="flex items-center gap-2">
                     {item.progress === 100 ? (
-                      <span className="text-xs text-violet-400 animate-pulse">Finalizing...</span>
+                      <span className="text-xs text-[#e85d26] animate-pulse">Finalizing...</span>
                     ) : (
                       <>
-                        <div className="w-20 bg-gray-600 rounded-full h-1.5">
+                        <div className="w-20 bg-[#e0dbd4] rounded-full h-1.5">
                           <div
-                            className="bg-violet-500 h-1.5 rounded-full transition-all"
+                            className="bg-[#e85d26] h-1.5 rounded-full transition-all"
                             style={{ width: `${item.progress}%` }}
                           />
                         </div>
-                        <span className="text-xs text-gray-400 w-8">{item.progress}%</span>
+                        <span className="text-xs text-[#8a8580] w-8">{item.progress}%</span>
                       </>
                     )}
                   </div>
@@ -1222,7 +1222,7 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
       )}
 
       {error && (
-        <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400">
+        <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-2xl text-red-400">
           {error}
         </div>
       )}

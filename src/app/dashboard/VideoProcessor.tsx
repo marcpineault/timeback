@@ -941,17 +941,17 @@ export default function VideoProcessor({
   // Only show limit reached if no videos in queue at all
   if (!canProcess && videoQueue.length === 0) {
     return (
-      <div className="bg-gray-800 rounded-xl p-8 text-center">
+      <div className="bg-white border border-[#e0dbd4] rounded-2xl p-8 text-center">
         <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h3 className="text-xl font-semibold text-white mb-2">Monthly Limit Reached</h3>
-        <p className="text-gray-400 mb-6">Upgrade your plan to process more videos this month.</p>
+        <h3 className="text-xl font-semibold text-[#0a0a0a] mb-2">Monthly Limit Reached</h3>
+        <p className="text-[#8a8580] mb-6">Upgrade your plan to process more videos this month.</p>
         <a
           href="/pricing"
-          className="inline-flex px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+          className="inline-flex px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full font-medium transition-colors"
         >
           View Plans
         </a>
@@ -972,14 +972,14 @@ export default function VideoProcessor({
           {/* Empty-state guidance for new users */}
           {videoQueue.length === 0 && (
             <div className="text-center py-2">
-              <p className="text-gray-400 text-sm">
+              <p className="text-[#8a8580] text-sm">
                 Upload a video to get started — we&apos;ll remove the silence automatically.
               </p>
               <a
                 href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+                className="text-[#e85d26] hover:text-[#d14d1a] text-sm transition-colors"
               >
                 Need help? Watch tutorials
               </a>
@@ -988,7 +988,7 @@ export default function VideoProcessor({
 
           {/* Duplicate upload warning */}
           {uploadError && (
-            <div className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-400 text-sm flex items-center justify-between">
+            <div className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 text-sm flex items-center justify-between">
               <span>{uploadError}</span>
               <button
                 onClick={() => setUploadError(null)}
@@ -1003,9 +1003,9 @@ export default function VideoProcessor({
 
           {/* Google Drive Import Option */}
           <div className="flex items-center gap-4">
-            <div className="flex-1 h-px bg-gray-700" />
-            <span className="text-gray-500 text-sm">or</span>
-            <div className="flex-1 h-px bg-gray-700" />
+            <div className="flex-1 h-px bg-[#e0dbd4]" />
+            <span className="text-[#8a8580] text-sm">or</span>
+            <div className="flex-1 h-px bg-[#e0dbd4]" />
           </div>
 
           <GoogleDriveImport
@@ -1035,12 +1035,12 @@ export default function VideoProcessor({
       )}
 
       {isProcessing && (
-        <div className="bg-gray-800 rounded-xl p-4 sm:p-6">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-4 sm:p-6">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="animate-spin h-6 w-6 sm:h-8 sm:w-8 border-4 border-blue-500 border-t-transparent rounded-full flex-shrink-0" />
+            <div className="animate-spin h-6 w-6 sm:h-8 sm:w-8 border-4 border-[#e85d26] border-t-transparent rounded-full flex-shrink-0" />
             <div className="min-w-0">
-              <p className="text-white font-medium text-sm sm:text-base">Processing videos...</p>
-              <p className="text-gray-400 text-xs sm:text-sm truncate">{processingStatus || 'Starting...'}</p>
+              <p className="text-[#0a0a0a] font-medium text-sm sm:text-base">Processing videos...</p>
+              <p className="text-[#8a8580] text-xs sm:text-sm truncate">{processingStatus || 'Starting...'}</p>
             </div>
           </div>
           {/* Per-video progress indicators */}
@@ -1053,18 +1053,18 @@ export default function VideoProcessor({
                   <div key={v.file.fileId} className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-gray-400 truncate mr-2">{v.file.originalName}</span>
-                        <span className="text-blue-400 flex-shrink-0">
+                        <span className="text-[#8a8580] truncate mr-2">{v.file.originalName}</span>
+                        <span className="text-[#e85d26] flex-shrink-0">
                           {v.progress!.step}/{v.progress!.totalSteps}
                         </span>
                       </div>
-                      <div className="w-full bg-gray-700 rounded-full h-1.5">
+                      <div className="w-full bg-[#e0dbd4] rounded-full h-1.5">
                         <div
-                          className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                          className="bg-[#e85d26] h-1.5 rounded-full transition-all duration-500"
                           style={{ width: `${(v.progress!.step / v.progress!.totalSteps) * 100}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">{v.progress!.stepLabel}</p>
+                      <p className="text-xs text-[#8a8580] mt-0.5 truncate">{v.progress!.stepLabel}</p>
                     </div>
                   </div>
                 ))}
@@ -1075,7 +1075,7 @@ export default function VideoProcessor({
       )}
 
       {allComplete && hasCompletedVideos && (
-        <div className="bg-gray-800 rounded-xl p-4 sm:p-6">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-4 sm:p-6">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -1085,8 +1085,8 @@ export default function VideoProcessor({
                   </svg>
                 </div>
                 <div>
-                  <p className="text-white font-medium text-sm sm:text-base">All videos processed!</p>
-                  <p className="text-gray-400 text-xs sm:text-sm">{completedVideos.length} video(s) ready for review</p>
+                  <p className="text-[#0a0a0a] font-medium text-sm sm:text-base">All videos processed!</p>
+                  <p className="text-[#8a8580] text-xs sm:text-sm">{completedVideos.length} video(s) ready for review</p>
                 </div>
               </div>
               {(platform === 'ios' || platform === 'android') ? (
@@ -1094,7 +1094,7 @@ export default function VideoProcessor({
                   <button
                     onClick={handleSaveAll}
                     disabled={isSavingAll}
-                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e85d26]/50 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     {isSavingAll ? (
                       <>
@@ -1117,7 +1117,7 @@ export default function VideoProcessor({
                   </button>
                   {/* Progress and status display */}
                   {saveProgress && (
-                    <div className="text-xs text-gray-400 text-center">
+                    <div className="text-xs text-[#8a8580] text-center">
                       {isSavingAll ? (
                         <p>Tap &quot;Save Video&quot; in each share menu</p>
                       ) : saveProgress.failedIds.size > 0 || saveProgress.skippedIds.size > 0 ? (
@@ -1137,7 +1137,7 @@ export default function VideoProcessor({
                   {saveProgress && (saveProgress.failedIds.size > 0 || saveProgress.skippedIds.size > 0) && !isSavingAll && (
                     <button
                       onClick={handleSaveAll}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1151,7 +1151,7 @@ export default function VideoProcessor({
                   <button
                     onClick={handleDownloadAll}
                     disabled={isSavingAll}
-                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e85d26]/50 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     {isSavingAll ? (
                       <>
@@ -1173,7 +1173,7 @@ export default function VideoProcessor({
                     )}
                   </button>
                   {saveProgress && !isSavingAll && (
-                    <div className="text-xs text-gray-400 text-center">
+                    <div className="text-xs text-[#8a8580] text-center">
                       {saveProgress.failedIds.size > 0 ? (
                         <p className="text-amber-400">
                           {saveProgress.savedIds.size} downloaded, {saveProgress.failedIds.size} failed
@@ -1188,7 +1188,7 @@ export default function VideoProcessor({
                   {saveProgress && saveProgress.failedIds.size > 0 && !isSavingAll && (
                     <button
                       onClick={handleDownloadAll}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1200,20 +1200,20 @@ export default function VideoProcessor({
               )}
             </div>
             {/* Review tip - platform specific */}
-            <div className="flex items-start gap-2 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
-              <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start gap-2 p-3 bg-[#f5f0e8] border border-[#e0dbd4] rounded-full">
+              <svg className="w-5 h-5 text-[#8a8580] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div className="text-sm text-gray-300 space-y-2">
+              <div className="text-sm text-[#0a0a0a] space-y-2">
                 {(platform === 'ios' || platform === 'android') && (
                   <p>
                     <span className="font-medium">How to save:</span> Tap &quot;Save to Camera Roll&quot; above.
-                    For each video, tap <span className="text-blue-400">&quot;Save Video&quot;</span> in the share menu that appears.
+                    For each video, tap <span className="text-[#e85d26]">&quot;Save Video&quot;</span> in the share menu that appears.
                   </p>
                 )}
                 <p>
                   <span className="font-medium">Tip:</span> Use the{' '}
-                  <span className="inline-flex items-center gap-1 text-indigo-400">
+                  <span className="inline-flex items-center gap-1 text-[#e85d26]">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
@@ -1234,18 +1234,18 @@ export default function VideoProcessor({
 
           {/* Instagram Scheduling - only for beta users */}
           {enabledFeatures.instagramScheduling && completedVideos.filter(v => v.videoId).length > 0 && (
-            <div className="mt-4 p-4 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-xl">
+            <div className="mt-4 p-4 bg-[rgba(232,93,38,0.06)] border border-[#e85d26]/20 rounded-2xl">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <p className="text-white font-medium text-sm">Schedule to Instagram</p>
-                  <p className="text-gray-400 text-xs mt-0.5">
+                  <p className="text-[#0a0a0a] font-medium text-sm">Schedule to Instagram</p>
+                  <p className="text-[#8a8580] text-xs mt-0.5">
                     {completedVideos.filter(v => v.videoId).length} video(s) ready to schedule with AI captions
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setShowScheduleModal(true)}
-                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors flex items-center gap-2"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1254,7 +1254,7 @@ export default function VideoProcessor({
                   </button>
                   <Link
                     href="/dashboard/schedule"
-                    className="px-4 py-2 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-gray-300 rounded-lg text-sm font-medium transition-colors"
+                    className="px-4 py-2 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
                   >
                     View Schedule
                   </Link>

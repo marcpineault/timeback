@@ -188,13 +188,13 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
   }
 
   return (
-    <div className="border-t border-gray-700 pt-4 mt-4">
+    <div className="border-t border-[#e0dbd4] pt-4 mt-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-5 h-5 text-[#8a8580]" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.07 0 3.76-.02 3.76-.047 0-.02-1.692-3.001-3.76-6.574l-3.76-6.62h-3.79zm-4.76 0l-3.76 6.62c-2.068 3.573-3.76 6.554-3.76 6.574 0 .027 1.69.047 3.76.047h3.76l3.76-6.574c2.068-3.619 3.764-6.6 3.774-6.62.01-.027-1.66-.047-3.743-.047h-3.79zm4.76 13.194l-1.88 3.287-1.88 3.287h7.52l-1.88-3.287-1.88-3.287z" />
           </svg>
-          <span className="text-gray-300 text-sm font-medium">Google Drive</span>
+          <span className="text-[#0a0a0a] text-sm font-medium">Google Drive</span>
           {isConnected && (
             <span className="text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
               Connected
@@ -206,7 +206,7 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
           <button
             onClick={handleConnect}
             disabled={isConnecting}
-            className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-800 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-800 rounded-full text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             {isConnecting ? (
               <>
@@ -226,19 +226,19 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
           <div className="flex flex-wrap gap-2">
             {!uploadResult && (
               <>
-                <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                <label className="flex items-center gap-2 text-sm text-[#8a8580] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={createFolder}
                     onChange={(e) => setCreateFolder(e.target.checked)}
-                    className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                    className="rounded border-[#e0dbd4] bg-[#e0dbd4] text-[#e85d26] focus:ring-[#e85d26]"
                   />
                   Create folder
                 </label>
                 <button
                   onClick={handleUpload}
                   disabled={isUploading || files.length === 0}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e85d26] text-white rounded-full text-sm font-medium transition-colors flex items-center gap-2"
                 >
                   {isUploading ? (
                     <>
@@ -260,7 +260,7 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
             )}
             <button
               onClick={handleDisconnect}
-              className="px-3 py-2 text-gray-400 hover:text-white text-sm transition-colors"
+              className="px-3 py-2 text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
               title="Disconnect Google Drive"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -273,21 +273,21 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
 
       {/* Upload Progress */}
       {isUploading && uploadProgress && (
-        <div className="mt-3 text-sm text-gray-400">
+        <div className="mt-3 text-sm text-[#8a8580]">
           {uploadProgress}
         </div>
       )}
 
       {/* Error Message */}
       {error && (
-        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-2xl">
           <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
 
       {/* Upload Result */}
       {uploadResult && (
-        <div className={`mt-3 p-3 ${uploadResult.uploaded > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'} border rounded-lg`}>
+        <div className={`mt-3 p-3 ${uploadResult.uploaded > 0 ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'} border rounded-2xl`}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <p className={`${uploadResult.uploaded > 0 ? 'text-green-400' : 'text-red-400'} text-sm font-medium`}>
@@ -312,7 +312,7 @@ export default function GoogleDriveUpload({ files, onComplete }: GoogleDriveUplo
                 href={uploadResult.folderLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+                className="text-[#e85d26] hover:text-[#d14d1a] text-sm flex items-center gap-1"
               >
                 Open in Drive
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

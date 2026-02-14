@@ -96,12 +96,12 @@ export default function ScheduleDashboard() {
     <div>
       {/* Connection alerts */}
       {connected === 'true' && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-6">
+        <div className="bg-green-500/10 border border-green-500/30 rounded-full p-4 mb-6">
           <p className="text-green-400 text-sm">Instagram account connected successfully!</p>
         </div>
       )}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-full p-4 mb-6">
           <p className="text-red-400 text-sm font-medium mb-1">
             {error === 'missing_page_permissions'
               ? 'Page permissions not granted'
@@ -129,8 +129,8 @@ export default function ScheduleDashboard() {
 
       {/* Page Title */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Content Schedule</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-[#0a0a0a]">Content Schedule</h1>
+        <p className="text-[#8a8580] text-sm mt-1">
           Auto-schedule your edited videos to Instagram
         </p>
       </div>
@@ -141,15 +141,15 @@ export default function ScheduleDashboard() {
       ) : (
         <>
           {/* Tabs */}
-          <div className="flex gap-1 mb-6 bg-[#1A1A24] rounded-lg p-1 w-fit">
+          <div className="flex gap-1 mb-6 bg-white border border-[#e0dbd4] rounded-full p-1 w-fit">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-violet-500 text-white'
-                    : 'text-gray-400 hover:text-white'
+                    ? 'bg-[#e85d26] text-[#0a0a0a]'
+                    : 'text-[#8a8580] hover:text-[#0a0a0a]'
                 }`}
               >
                 {tab.label}
@@ -159,7 +159,7 @@ export default function ScheduleDashboard() {
 
           {/* Tab Content */}
           {isLoading ? (
-            <div className="text-gray-500 text-center py-12">Loading...</div>
+            <div className="text-[#8a8580] text-center py-12">Loading...</div>
           ) : (
             <>
               {activeTab === 'queue' && (
@@ -174,7 +174,7 @@ export default function ScheduleDashboard() {
               )}
 
               {activeTab === 'calendar' && (
-                <div className="bg-[#1A1A24] rounded-xl p-6">
+                <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6">
                   <CalendarView
                     onDayClick={() => {
                       setActiveTab('queue')

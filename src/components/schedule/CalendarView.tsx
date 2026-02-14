@@ -61,14 +61,14 @@ export default function CalendarView({ onDayClick }: CalendarViewProps) {
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => setCurrentMonth(new Date(year, month - 1, 1))}
-          className="text-gray-400 hover:text-white transition-colors px-2 py-1"
+          className="text-[#8a8580] hover:text-[#0a0a0a] transition-colors px-2 py-1"
         >
           &lt;
         </button>
-        <h4 className="text-white font-medium">{monthName}</h4>
+        <h4 className="text-[#0a0a0a] font-medium">{monthName}</h4>
         <button
           onClick={() => setCurrentMonth(new Date(year, month + 1, 1))}
-          className="text-gray-400 hover:text-white transition-colors px-2 py-1"
+          className="text-[#8a8580] hover:text-[#0a0a0a] transition-colors px-2 py-1"
         >
           &gt;
         </button>
@@ -77,7 +77,7 @@ export default function CalendarView({ onDayClick }: CalendarViewProps) {
       {/* Day Headers */}
       <div className="grid grid-cols-7 gap-1 mb-1">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-          <div key={d} className="text-center text-gray-500 text-xs py-1">
+          <div key={d} className="text-center text-[#8a8580] text-xs py-1">
             {d}
           </div>
         ))}
@@ -106,14 +106,14 @@ export default function CalendarView({ onDayClick }: CalendarViewProps) {
             <button
               key={day}
               onClick={() => onDayClick(new Date(year, month, day))}
-              className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-sm transition-colors
-                ${isToday ? 'bg-violet-500/20 text-violet-300' : 'hover:bg-[#2A2A3A] text-gray-400'}
+              className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-0.5 text-sm transition-colors
+                ${isToday ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]' : 'hover:bg-[#f5f0e8] text-[#8a8580]'}
                 ${dayPosts.length > 0 ? 'cursor-pointer' : ''}`}
             >
               <span className={isToday ? 'font-bold' : ''}>{day}</span>
               {dayPosts.length > 0 && (
                 <div className="flex gap-0.5">
-                  {hasScheduled && <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />}
+                  {hasScheduled && <span className="w-1.5 h-1.5 rounded-full bg-[#e85d26]" />}
                   {hasPublished && <span className="w-1.5 h-1.5 rounded-full bg-green-400" />}
                   {hasFailed && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
                 </div>
@@ -124,9 +124,9 @@ export default function CalendarView({ onDayClick }: CalendarViewProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-4 text-xs text-gray-500">
+      <div className="flex items-center gap-4 mt-4 text-xs text-[#8a8580]">
         <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-violet-400" /> Scheduled
+          <span className="w-2 h-2 rounded-full bg-[#e85d26]" /> Scheduled
         </div>
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-green-400" /> Published

@@ -30,7 +30,7 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
   };
 
   return (
-    <div className="bg-gray-800 rounded-xl p-8 text-center space-y-6">
+    <div className="bg-white border border-[#e0dbd4] rounded-2xl p-8 text-center space-y-6">
       <div className="flex justify-center">
         <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center">
           <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,12 +40,12 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-white mb-2">Processing Complete!</h2>
-        <p className="text-gray-400">Your video is ready to save</p>
+        <h2 className="text-2xl font-bold text-[#0a0a0a] mb-2">Processing Complete!</h2>
+        <p className="text-[#8a8580]">Your video is ready to save</p>
       </div>
 
-      <div className="bg-gray-700/50 rounded-lg p-4">
-        <p className="text-gray-300 font-mono text-sm truncate">{filename}</p>
+      <div className="bg-[#f5f0e8] rounded-2xl p-4">
+        <p className="text-[#0a0a0a] font-mono text-sm truncate">{filename}</p>
       </div>
 
       {error && (
@@ -68,7 +68,7 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
             <button
               onClick={handleSave}
               disabled={isDownloading}
-              className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e85d26]/50 text-white rounded-full font-medium transition-colors flex items-center justify-center gap-2"
             >
               {isDownloading ? (
                 <>
@@ -87,14 +87,14 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
                 </>
               )}
             </button>
-            <p className="text-xs text-gray-500">Opens share menu - tap &quot;Save Video&quot; to save</p>
+            <p className="text-xs text-[#8a8580]">Opens share menu - tap &quot;Save Video&quot; to save</p>
           </>
         ) : platform === 'android' ? (
           <>
             <button
               onClick={handleSave}
               disabled={isDownloading}
-              className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e85d26]/50 text-white rounded-full font-medium transition-colors flex items-center justify-center gap-2"
             >
               {isDownloading ? (
                 <>
@@ -113,13 +113,13 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
                 </>
               )}
             </button>
-            <p className="text-xs text-gray-500">Saves to your device</p>
+            <p className="text-xs text-[#8a8580]">Saves to your device</p>
           </>
         ) : (
           <button
             onClick={handleSave}
             disabled={isDownloading}
-            className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e85d26]/50 text-white rounded-full font-medium transition-colors flex items-center justify-center gap-2"
           >
             {isDownloading ? (
               <>
@@ -142,7 +142,7 @@ export default function DownloadResult({ downloadUrl, filename, onReset }: Downl
 
         <button
           onClick={handleReset}
-          className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+          className="w-full px-6 py-3 bg-[#e0dbd4] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full font-medium transition-colors"
         >
           Process Another
         </button>
