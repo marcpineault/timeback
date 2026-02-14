@@ -180,7 +180,7 @@ async function buildSilenceMap(
     const statsOutput = await new Promise<string>((resolve, reject) => {
       const proc = spawn('ffmpeg', [
         '-i', audioPath,
-        '-af', 'highpass=f=200,lowpass=f=3500,astats=metadata=1:reset=1',
+        '-af', 'highpass=f=200,lowpass=f=6000,astats=metadata=1:reset=1',
         '-f', 'null', '-',
       ], { stdio: ['pipe', 'pipe', 'pipe'] });
       let stderr = '';
@@ -221,7 +221,7 @@ async function buildSilenceMap(
     const silenceOutput = await new Promise<string>((resolve, reject) => {
       const proc = spawn('ffmpeg', [
         '-i', audioPath,
-        '-af', `highpass=f=200,lowpass=f=3500,silencedetect=noise=${silenceThreshold}dB:d=0.05`,
+        '-af', `highpass=f=200,lowpass=f=6000,silencedetect=noise=${silenceThreshold}dB:d=0.05`,
         '-f', 'null', '-',
       ], { stdio: ['pipe', 'pipe', 'pipe'] });
       let stderr = '';
@@ -315,7 +315,7 @@ async function analyzeRegionEnergy(
               '-i', audioPath,
               '-ss', String(region.start),
               '-t', String(duration),
-              '-af', 'highpass=f=200,lowpass=f=3500,astats=measure_perchannel=RMS_level:measure_overall=RMS_level',
+              '-af', 'highpass=f=200,lowpass=f=6000,astats=measure_perchannel=RMS_level:measure_overall=RMS_level',
               '-f', 'null', '-',
             ], { stdio: ['pipe', 'pipe', 'pipe'] });
             let stderr = '';
