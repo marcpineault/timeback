@@ -5,17 +5,8 @@ import { PLANS } from '@/lib/plans'
 import { getEnabledFeatures } from '@/lib/featureFlags'
 import VideoProcessor from './VideoProcessor'
 import WelcomeOverlay from '@/components/WelcomeOverlay'
-// Google Drive disabled - will be enabled later
-// import DriveSettings from '@/components/DriveSettings'
+import RecentVideosTable from '@/components/RecentVideosTable'
 import Link from 'next/link'
-
-interface Video {
-  id: string
-  originalName: string
-  status: string
-  createdAt: Date
-  processedUrl: string | null
-}
 
 export default async function DashboardPage() {
   let user
@@ -35,7 +26,6 @@ export default async function DashboardPage() {
     }
   } catch (error) {
     console.error('Dashboard error:', error)
-    // Show a helpful error page instead of crashing
     return (
       <div className="landing-page min-h-screen flex items-center justify-center">
         <div className="bg-white border border-[#e0dbd4] rounded-2xl p-8 max-w-md text-center">
@@ -59,6 +49,25 @@ export default async function DashboardPage() {
     : 0
 
   const isNewUser = !usage.hasCompletedOnboarding && usage.recentVideos.length === 0
+  const features = getEnabledFeatures(user.email)
+
+  // Format today's date
+  const today = new Date()
+  const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+  // Greeting based on time of day
+  const hour = today.getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const displayName = usage.userName?.split(' ')[0] || ''
+
+  // Serialize videos for client component
+  const serializedVideos = usage.recentVideos.map(v => ({
+    id: v.id,
+    originalName: v.originalName,
+    status: v.status,
+    createdAt: v.createdAt.toISOString(),
+    processedUrl: v.processedUrl,
+  }))
 
   return (
     <div className="landing-page min-h-screen">
@@ -67,12 +76,11 @@ export default async function DashboardPage() {
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
         <div className="nav-links">
-          {/* Google Drive disabled - will be enabled later */}
-          {/* <DriveSettings /> */}
-          {getEnabledFeatures(user.email).instagramScheduling && (
+          <Link href="/dashboard" style={{ color: '#0a0a0a', fontWeight: 600 }}>Editor</Link>
+          {features.instagramScheduling && (
             <Link href="/dashboard/schedule">Schedule</Link>
           )}
-          {getEnabledFeatures(user.email).ideate && (
+          {features.ideate && (
             <Link href="/dashboard/ideate">Ideate</Link>
           )}
           <a
@@ -88,8 +96,16 @@ export default async function DashboardPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8" style={{ paddingTop: '5rem' }}>
+        {/* Welcome Header */}
+        <div className="mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#0a0a0a]" style={{ fontFamily: "'Instrument Serif', serif" }}>
+            {greeting}{displayName ? `, ${displayName}` : ''}
+          </h1>
+          <p className="text-[#8a8580] text-sm mt-0.5">{dateStr}</p>
+        </div>
+
         {/* Usage Card */}
-        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-4 sm:p-6 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h2 className="text-base sm:text-lg font-semibold text-[#0a0a0a]" style={{ fontFamily: "'Instrument Serif', serif" }}>
@@ -130,98 +146,38 @@ export default async function DashboardPage() {
           )}
         </div>
 
+        {/* Quick Stats Cards */}
+        <div className="flex gap-3 mb-6 sm:mb-8">
+          <div className="stat-card">
+            <div className="stat-card-value">
+              {usage.planDetails.videosPerMonth
+                ? `${usage.videosUsed}/${usage.planDetails.videosPerMonth}`
+                : usage.videosUsed}
+            </div>
+            <div className="stat-card-label">Videos this month</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-card-value">{usage.scheduledCount}</div>
+            <div className="stat-card-label">Scheduled</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-card-value">{usage.processingCount}</div>
+            <div className="stat-card-label">Processing</div>
+          </div>
+        </div>
+
         {/* Video Processor */}
         <VideoProcessor
           userId={user.id}
           canProcess={usage.videosRemaining === null || usage.videosRemaining > 0}
           videosRemaining={usage.videosRemaining ?? Infinity}
           hasWatermark={usage.planDetails.watermark}
-          enabledFeatures={getEnabledFeatures(user.email)}
+          enabledFeatures={features}
         />
 
         {/* Recent Videos */}
-        {usage.recentVideos.length > 0 && (
-          <div className="mt-6 sm:mt-8">
-            <h3 className="text-base sm:text-lg font-semibold text-[#0a0a0a] mb-3 sm:mb-4">Recent Videos</h3>
-
-            {/* Mobile card view */}
-            <div className="sm:hidden space-y-3">
-              {usage.recentVideos.map((video: Video) => (
-                <div key={video.id} className="bg-white border border-[#e0dbd4] rounded-2xl p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-[#0a0a0a] text-sm font-medium truncate flex-1 mr-2">{video.originalName}</p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-                      video.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                      video.status === 'PROCESSING' ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]' :
-                      video.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
-                      'bg-gray-500/20 text-gray-400'
-                    }`}>
-                      {video.status}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#8a8580] text-xs">
-                      {new Date(video.createdAt).toLocaleDateString()}
-                    </span>
-                    {video.status === 'COMPLETED' && video.processedUrl && (
-                      <a
-                        href={video.processedUrl}
-                        className="text-[#e85d26] hover:text-[#d14d1a] text-sm font-medium"
-                        download
-                      >
-                        Download
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop table view */}
-            <div className="hidden sm:block bg-white border border-[#e0dbd4] rounded-2xl overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-[#f5f0e8]">
-                  <tr>
-                    <th className="text-left text-[#8a8580] text-sm font-medium px-4 py-3">Name</th>
-                    <th className="text-left text-[#8a8580] text-sm font-medium px-4 py-3">Status</th>
-                    <th className="text-left text-[#8a8580] text-sm font-medium px-4 py-3">Date</th>
-                    <th className="text-left text-[#8a8580] text-sm font-medium px-4 py-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#e0dbd4]">
-                  {usage.recentVideos.map((video: Video) => (
-                    <tr key={video.id}>
-                      <td className="px-4 py-3 text-[#0a0a0a]">{video.originalName}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          video.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                          video.status === 'PROCESSING' ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]' :
-                          video.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
-                          'bg-gray-500/20 text-gray-400'
-                        }`}>
-                          {video.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-[#8a8580] text-sm">
-                        {new Date(video.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        {video.status === 'COMPLETED' && video.processedUrl && (
-                          <a
-                            href={video.processedUrl}
-                            className="text-[#e85d26] hover:text-[#d14d1a] text-sm"
-                            download
-                          >
-                            Download
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        {serializedVideos.length > 0 && (
+          <RecentVideosTable videos={serializedVideos} />
         )}
       </div>
     </div>

@@ -1137,7 +1137,7 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
             ) : (
               <>
                 <svg
-                  className={`w-12 h-12 sm:w-16 sm:h-16 ${isDragging ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}
+                  className={`w-12 h-12 sm:w-16 sm:h-16 upload-icon-pulse ${isDragging ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1154,7 +1154,7 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                   {isDragging ? 'Drop your videos here' : 'Tap to upload videos'}
                 </p>
                 <p className="text-[#8a8580] text-sm sm:text-base">or drag and drop</p>
-                <p className="text-xs sm:text-sm text-[#8a8580]">MP4, MOV, WebM, AVI • Multiple files</p>
+                <p className="text-xs sm:text-sm text-[#8a8580]">Upload up to 50 videos at once &middot; MP4, MOV, WebM, AVI</p>
               </>
             )}
           </div>

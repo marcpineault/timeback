@@ -129,9 +129,8 @@ export async function getUserUsage(userId: string) {
     where: { id: userId },
     include: {
       videos: {
-        where: { status: 'COMPLETED' }, // Only show successfully processed videos
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: 50,
       },
     },
   })
@@ -146,6 +145,12 @@ export async function getUserUsage(userId: string) {
   const ideatePerMonth = plan.ideateGenerationsPerMonth
   const ideateRemaining = ideatePerMonth === null ? null : Math.max(0, ideatePerMonth - user.ideateGenerationsThisMonth)
 
+  // Count videos by status for stats
+  const processingCount = user.videos.filter(v => v.status === 'PROCESSING').length
+  const scheduledPostCount = await prisma.scheduledPost.count({
+    where: { video: { userId } , status: { in: ['QUEUED', 'SCHEDULED'] } },
+  }).catch(() => 0)
+
   return {
     plan: user.plan,
     planDetails: plan,
@@ -155,5 +160,8 @@ export async function getUserUsage(userId: string) {
     ideateRemaining,
     recentVideos: user.videos,
     hasCompletedOnboarding: user.hasCompletedOnboarding,
+    processingCount,
+    scheduledCount: scheduledPostCount,
+    userName: user.name,
   }
 }

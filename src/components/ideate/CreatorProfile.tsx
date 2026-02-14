@@ -23,6 +23,12 @@ const PLATFORM_OPTIONS = [
   { value: 'youtube', label: 'YouTube (long form)' },
 ]
 
+const FIELD_TOOLTIPS: Record<string, string> = {
+  niche: 'Your area of expertise — e.g. "fitness for busy moms", "SaaS marketing", "real estate investing"',
+  targetAudience: 'Who watches your content — e.g. "Entrepreneurs doing $1M-$10M/year", "College students"',
+  contentGoal: 'What you want to achieve — e.g. "Generate leads for my agency", "Build personal brand"',
+}
+
 export default function CreatorProfile({ profile, onSaved }: Props) {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
@@ -46,6 +52,9 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
   const [personalCatchphrases, setPersonalCatchphrases] = useState<string[]>(profile?.personalCatchphrases ?? [])
   const [avoidTopics, setAvoidTopics] = useState<string[]>(profile?.avoidTopics ?? [])
   const [exampleScripts, setExampleScripts] = useState<string[]>(profile?.exampleScripts ?? [])
+
+  // Tooltip state
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null)
 
   async function handleSave() {
     setSaving(true)
@@ -84,27 +93,49 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
     }
   }
 
+  async function handleSaveAndContinue() {
+    await handleSave()
+    if (step < 3) setStep(step + 1)
+  }
+
   const isStep1Valid = niche.trim() && targetAudience.trim()
+
+  // Calculate completion percentage
+  const step1Complete = niche.trim() && targetAudience.trim() ? 1 : 0
+  const step2Complete = (statusProof.length > 0 || powerExamples.length > 0 || credibilityMarkers.length > 0 || likenessTraits.length > 0) ? 1 : 0
+  const step3Complete = toneOfVoice ? 1 : 0
+  const completionPercent = Math.round(((step1Complete + step2Complete + step3Complete) / 3) * 100)
 
   return (
     <div className="max-w-2xl">
-      {/* Progress */}
-      <div className="flex items-center gap-2 mb-6">
-        {[1, 2, 3].map((s) => (
-          <button
-            key={s}
-            onClick={() => setStep(s)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              step === s
-                ? 'bg-[#e85d26] text-[#0a0a0a]'
-                : s < step || (s === 1 && isStep1Valid)
-                  ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]'
-                  : 'bg-[#f5f0e8] text-[#8a8580]'
-            }`}
-          >
-            {s}. {s === 1 ? 'Identity' : s === 2 ? 'SPCL Framework' : 'Voice & Style'}
-          </button>
-        ))}
+      {/* Progress indicator with percentage */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            {[1, 2, 3].map((s) => (
+              <button
+                key={s}
+                onClick={() => setStep(s)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  step === s
+                    ? 'bg-[#e85d26] text-[#0a0a0a]'
+                    : s < step || (s === 1 && isStep1Valid)
+                      ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]'
+                      : 'bg-[#f5f0e8] text-[#8a8580]'
+                }`}
+              >
+                {s}. {s === 1 ? 'Identity' : s === 2 ? 'SPCL Framework' : 'Voice & Style'}
+              </button>
+            ))}
+          </div>
+          <span className="text-sm font-medium text-[#8a8580]">{completionPercent}% complete</span>
+        </div>
+        <div className="w-full bg-[#e0dbd4] rounded-full h-1.5">
+          <div
+            className="bg-[#e85d26] h-1.5 rounded-full transition-all"
+            style={{ width: `${completionPercent}%` }}
+          />
+        </div>
       </div>
 
       {/* Step 1: Identity */}
@@ -114,9 +145,16 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
             <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Your Identity</h2>
             <p className="text-[#8a8580] text-sm mb-6">Tell us about you and your content goals.</p>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Niche *</label>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <label className="block text-sm font-medium text-[#0a0a0a]">Niche *</label>
+                  <TooltipIcon
+                    tooltip={FIELD_TOOLTIPS.niche}
+                    isActive={activeTooltip === 'niche'}
+                    onToggle={() => setActiveTooltip(activeTooltip === 'niche' ? null : 'niche')}
+                  />
+                </div>
                 <input
                   type="text"
                   value={niche}
@@ -127,7 +165,14 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Target Audience *</label>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <label className="block text-sm font-medium text-[#0a0a0a]">Target Audience *</label>
+                  <TooltipIcon
+                    tooltip={FIELD_TOOLTIPS.targetAudience}
+                    isActive={activeTooltip === 'targetAudience'}
+                    onToggle={() => setActiveTooltip(activeTooltip === 'targetAudience' ? null : 'targetAudience')}
+                  />
+                </div>
                 <input
                   type="text"
                   value={targetAudience}
@@ -138,7 +183,14 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Content Goal</label>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <label className="block text-sm font-medium text-[#0a0a0a]">Content Goal</label>
+                  <TooltipIcon
+                    tooltip={FIELD_TOOLTIPS.contentGoal}
+                    isActive={activeTooltip === 'contentGoal'}
+                    onToggle={() => setActiveTooltip(activeTooltip === 'contentGoal' ? null : 'contentGoal')}
+                  />
+                </div>
                 <input
                   type="text"
                   value={contentGoal}
@@ -176,13 +228,13 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
             <button
-              onClick={() => setStep(2)}
-              disabled={!isStep1Valid}
+              onClick={handleSaveAndContinue}
+              disabled={!isStep1Valid || saving}
               className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 disabled:cursor-not-allowed text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
             >
-              Next: SPCL Framework
+              {saving ? 'Saving...' : 'Save & Continue'}
             </button>
           </div>
         </div>
@@ -232,10 +284,11 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
               Back
             </button>
             <button
-              onClick={() => setStep(3)}
-              className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
+              onClick={handleSaveAndContinue}
+              disabled={saving}
+              className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
             >
-              Next: Voice & Style
+              {saving ? 'Saving...' : 'Save & Continue'}
             </button>
           </div>
         </div>
@@ -248,7 +301,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
             <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Voice & Style</h2>
             <p className="text-[#8a8580] text-sm mb-6">How you sound and what to include or avoid.</p>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">Tone of Voice</label>
                 <select
@@ -291,7 +344,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
                     }}
                     placeholder={`Example script ${i + 1} (optional)`}
                     rows={3}
-                    className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26] mb-2 resize-none"
+                    className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26] mb-2 resize-none"
                   />
                 ))}
               </div>
@@ -313,6 +366,30 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
               {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Profile'}
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tooltip Icon Component ──────────────────────────────────────────
+
+function TooltipIcon({ tooltip, isActive, onToggle }: { tooltip: string; isActive: boolean; onToggle: () => void }) {
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="text-[#8a8580] hover:text-[#e85d26] transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+      {isActive && (
+        <div className="absolute left-0 top-full mt-1 z-10 w-64 p-3 bg-[#0a0a0a] text-white text-xs rounded-xl shadow-lg">
+          {tooltip}
+          <div className="absolute -top-1 left-3 w-2 h-2 bg-[#0a0a0a] rotate-45" />
         </div>
       )}
     </div>
