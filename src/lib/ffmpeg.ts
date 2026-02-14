@@ -80,10 +80,10 @@ async function analyzeAudioChunk(
     let statsOutput = '';
 
     // Apply speech-band filter before volume detection
-    // This focuses analysis on voice frequencies (200Hz-3500Hz)
+    // This focuses analysis on voice frequencies (200Hz-6000Hz)
     const command = ffmpeg(inputPath)
       .inputOptions(['-ss', String(startTime), '-t', String(duration)])
-      .audioFilters('highpass=f=200,lowpass=f=3500,volumedetect')
+      .audioFilters('highpass=f=200,lowpass=f=6000,volumedetect')
       .format('null')
       .output('/dev/null');
 
@@ -194,10 +194,10 @@ async function analyzeAudioPercentiles(
     const inputOptions = sampleDuration ? ['-t', String(sampleDuration)] : [];
 
     // Apply speech-band filter before astats analysis
-    // This focuses on voice frequencies (200Hz-3500Hz) and rejects background noise
+    // This focuses on voice frequencies (200Hz-6000Hz) and rejects background noise
     const command = ffmpeg(inputPath)
       .inputOptions(inputOptions)
-      .audioFilters('highpass=f=200,lowpass=f=3500,astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level')
+      .audioFilters('highpass=f=200,lowpass=f=6000,astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level')
       .format('null')
       .output('/dev/null');
 
@@ -546,12 +546,13 @@ export async function detectSilence(
     let currentSilenceStart: number | null = null;
 
     // Build audio filter chain
-    // Speech band: 200Hz - 3500Hz covers fundamental frequencies and harmonics of human voice
+    // Speech band: 200Hz - 6000Hz covers fundamental frequencies, harmonics, and sibilants
     // This helps reject:
     // - Low frequency rumble (AC hum, traffic, HVAC) below 200Hz
-    // - High frequency hiss (electronics, wind) above 3500Hz
+    // - High frequency hiss (electronics, wind) above 6000Hz
+    // Raised from 3500Hz to 6000Hz so trailing consonants (s, sh, f, th) are detected as speech
     const speechBandFilter = useSpeechBandFilter
-      ? 'highpass=f=200,lowpass=f=3500,'
+      ? 'highpass=f=200,lowpass=f=6000,'
       : '';
     const audioFilter = `${speechBandFilter}silencedetect=noise=${threshold}dB:d=${minDuration}`;
 
