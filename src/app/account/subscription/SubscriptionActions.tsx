@@ -143,15 +143,15 @@ export default function SubscriptionActions({
       </div>
 
       {!isCanceling && isSubscriptionActive && (
-        <div className="pt-4 border-t border-[#e0dbd4]">
+        <div className="pt-6 mt-4">
           <button
             onClick={handleManageBilling}
             disabled={isLoading}
-            className="text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50"
+            className="text-[#8a8580] hover:text-red-400 text-xs transition-colors disabled:opacity-50"
           >
             Cancel Subscription
           </button>
-          <p className="text-[#8a8580] text-xs mt-1">
+          <p className="text-[#8a8580] text-xs mt-1 opacity-70">
             You can cancel anytime. Your access continues until the end of your billing period.
           </p>
         </div>

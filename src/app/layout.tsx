@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { GoogleAnalytics } from "@/components/Analytics";
 import { FacebookPixel } from "@/components/FacebookPixel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import ToastProvider from "@/components/ToastProvider";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -38,7 +39,9 @@ export default function RootLayout({
           <GoogleAnalytics />
           <FacebookPixel />
           <ErrorBoundary>
-            {children}
+            <ToastProvider>
+              {children}
+            </ToastProvider>
           </ErrorBoundary>
         </body>
       </html>
