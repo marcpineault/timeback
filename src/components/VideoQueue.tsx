@@ -209,11 +209,11 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
   const getStatusBadge = (video: QueuedVideo) => {
     switch (video.status) {
       case 'pending':
-        return <span className="px-2 py-0.5 text-xs rounded-full bg-gray-600 text-gray-300">Pending</span>;
+        return <span className="px-2 py-0.5 text-xs rounded-full bg-[#e0dbd4] text-[#0a0a0a]">Pending</span>;
       case 'processing':
         return (
-          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400 flex items-center gap-1">
-            <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+          <span className="px-2 py-0.5 text-xs rounded-full bg-[#e85d26]/20 text-[#e85d26] flex items-center gap-1">
+            <div className="w-3 h-3 border-2 border-[#e85d26] border-t-transparent rounded-full animate-spin" />
             {video.progress
               ? `Step ${video.progress.step}/${video.progress.totalSteps}`
               : 'Processing'}
@@ -227,21 +227,21 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
   };
 
   return (
-    <div className="bg-gray-800 rounded-xl overflow-hidden">
+    <div className="bg-white border border-[#e0dbd4] rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="px-3 sm:px-4 py-3 bg-gray-700/50 flex justify-between items-center">
+      <div className="px-3 sm:px-4 py-3 bg-[#f5f0e8] flex justify-between items-center">
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-          <h3 className="font-medium text-white text-sm sm:text-base">Video Queue ({videos.length})</h3>
-          <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400">
+          <h3 className="font-medium text-[#0a0a0a] text-sm sm:text-base">Video Queue ({videos.length})</h3>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-[#8a8580]">
             {completedCount > 0 && <span className="text-green-400">{completedCount} complete</span>}
-            {processingCount > 0 && <span className="text-blue-400">{processingCount} processing</span>}
+            {processingCount > 0 && <span className="text-[#e85d26]">{processingCount} processing</span>}
             {pendingCount > 0 && <span>{pendingCount} pending</span>}
             {errorCount > 0 && <span className="text-red-400">{errorCount} failed</span>}
           </div>
         </div>
         <button
           onClick={onClear}
-          className="text-xs sm:text-sm text-gray-400 hover:text-white transition-colors"
+          className="text-xs sm:text-sm text-[#8a8580] hover:text-[#0a0a0a] transition-colors"
         >
           Clear
         </button>
@@ -255,28 +255,28 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
       )}
 
       {/* Video List */}
-      <div className="divide-y divide-gray-700/50 max-h-80 overflow-y-auto">
+      <div className="divide-y divide-[#e0dbd4] max-h-80 overflow-y-auto">
         {videos.map((video) => (
           <div
             key={video.file.fileId}
             className={`px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-4 ${
-              video.status === 'processing' ? 'bg-blue-500/5' : ''
+              video.status === 'processing' ? 'bg-[#e85d26]/5' : ''
             }`}
           >
             {/* Thumbnail - hidden on mobile */}
             <button
               onClick={() => video.file.previewUrl && onPreview?.(video)}
               disabled={!video.file.previewUrl}
-              className={`hidden sm:flex w-12 h-12 bg-gray-700 rounded-lg items-center justify-center flex-shrink-0 relative group transition-all ${
-                video.file.previewUrl ? 'hover:bg-gray-600 cursor-pointer' : 'cursor-default'
+              className={`hidden sm:flex w-12 h-12 bg-[#e0dbd4] rounded-2xl items-center justify-center flex-shrink-0 relative group transition-all ${
+                video.file.previewUrl ? 'hover:bg-[#e0dbd4] cursor-pointer' : 'cursor-default'
               }`}
               title={video.file.previewUrl ? 'Click to preview' : 'Preview not available'}
             >
-              <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-[#8a8580]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               {video.file.previewUrl && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity">
                   <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z" />
                   </svg>
@@ -286,13 +286,13 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
 
             {/* File Info */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-white truncate">{video.file.originalName}</p>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
+              <p className="text-xs sm:text-sm text-[#0a0a0a] truncate">{video.file.originalName}</p>
+              <div className="flex items-center gap-2 text-xs text-[#8a8580]">
                 <span>{formatFileSize(video.file.size)}</span>
                 <span className="sm:hidden">{getStatusBadge(video)}</span>
               </div>
               {video.status === 'processing' && video.progress && (
-                <p className="text-xs text-blue-400 truncate">{video.progress.stepLabel}</p>
+                <p className="text-xs text-[#e85d26] truncate">{video.progress.stepLabel}</p>
               )}
               {video.error && <p className="text-xs text-red-400 truncate">{video.error}</p>}
             </div>
@@ -308,7 +308,7 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
               {video.status === 'complete' && video.downloadUrl && onPreview && (
                 <button
                   onClick={() => onPreview(video)}
-                  className="p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors"
+                  className="p-1.5 sm:p-2 text-[#8a8580] hover:text-[#0a0a0a] transition-colors"
                   title="Preview"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -323,7 +323,7 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
                 <button
                   onClick={() => saveToDevice(video)}
                   disabled={savingVideoId === video.file.fileId}
-                  className="p-1.5 sm:p-2 text-blue-400 hover:text-blue-300 disabled:text-blue-400/50 transition-colors"
+                  className="p-1.5 sm:p-2 text-[#e85d26] hover:text-[#d14d1a] disabled:text-[#e85d26]/50 transition-colors"
                   title={platform === 'ios' || platform === 'android' ? 'Save to Camera Roll' : 'Download'}
                 >
                   {savingVideoId === video.file.fileId ? (
@@ -360,7 +360,7 @@ export default function VideoQueue({ videos, onRemove, onClear, onPreview, onRet
               {video.status !== 'processing' && (
                 <button
                   onClick={() => onRemove(video.file.fileId)}
-                  className="p-1.5 sm:p-2 text-gray-500 hover:text-red-400 transition-colors"
+                  className="p-1.5 sm:p-2 text-[#8a8580] hover:text-red-400 transition-colors"
                   title="Remove"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

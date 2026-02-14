@@ -21,7 +21,7 @@ const EMOTION_COLORS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   SAVED: 'bg-gray-500/20 text-gray-400',
-  SCRIPTED: 'bg-violet-500/20 text-violet-400',
+  SCRIPTED: 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]',
   FILMED: 'bg-green-500/20 text-green-400',
   ARCHIVED: 'bg-gray-500/20 text-gray-500',
 }
@@ -43,29 +43,29 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
   const [showHookVariations, setShowHookVariations] = useState(false)
 
   return (
-    <div className="bg-[#2A2A3A] rounded-lg p-4 hover:bg-[#2F2F40] transition-colors">
+    <div className="bg-[#f5f0e8] rounded-full p-4 hover:bg-[#e0dbd4] transition-colors">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h3 className="text-white font-medium text-sm leading-tight">{idea.title}</h3>
+        <h3 className="text-[#0a0a0a] font-medium text-sm leading-tight">{idea.title}</h3>
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${STATUS_COLORS[idea.status] || STATUS_COLORS.SAVED}`}>
           {idea.status}
         </span>
       </div>
 
-      <p className="text-cyan-400 text-sm italic mb-2">&ldquo;{idea.hook}&rdquo;</p>
+      <p className="text-[#e85d26] text-sm italic mb-2">&ldquo;{idea.hook}&rdquo;</p>
 
       {/* Hook Variations */}
       {idea.hookVariations && idea.hookVariations.length > 0 && (
         <div className="mb-2">
           <button
             onClick={() => setShowHookVariations(!showHookVariations)}
-            className="text-gray-500 hover:text-gray-300 text-[10px] uppercase tracking-wider transition-colors"
+            className="text-[#8a8580] hover:text-[#0a0a0a] text-[10px] uppercase tracking-wider transition-colors"
           >
             {showHookVariations ? 'Hide' : 'Show'} hook variations ({idea.hookVariations.length})
           </button>
           {showHookVariations && (
             <div className="mt-1.5 space-y-1">
               {idea.hookVariations.map((variation, i) => (
-                <p key={i} className="text-gray-400 text-xs italic pl-2 border-l border-gray-700">
+                <p key={i} className="text-[#8a8580] text-xs italic pl-2 border-l border-[#e0dbd4]">
                   &ldquo;{variation}&rdquo;
                 </p>
               ))}
@@ -74,7 +74,7 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
         </div>
       )}
 
-      <p className="text-gray-400 text-xs mb-3 line-clamp-2">{idea.angle}</p>
+      <p className="text-[#8a8580] text-xs mb-3 line-clamp-2">{idea.angle}</p>
 
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         {/* Content Type Badge */}
@@ -88,11 +88,11 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
         </span>
         {/* Engagement Play */}
         {idea.engagementPlay && (
-          <span className="text-gray-500 text-xs">
+          <span className="text-[#8a8580] text-xs">
             {ENGAGEMENT_ICONS[idea.engagementPlay] || idea.engagementPlay}
           </span>
         )}
-        <span className="text-gray-500 text-xs">{idea.estimatedLength}s</span>
+        <span className="text-[#8a8580] text-xs">{idea.estimatedLength}s</span>
       </div>
 
       {/* SPCL indicators */}
@@ -101,7 +101,7 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
           <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold" title={`Status: ${idea.spclElements.status}`}>S</span>
         )}
         {idea.spclElements?.power && (
-          <span className="w-5 h-5 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center text-[10px] font-bold" title={`Power: ${idea.spclElements.power}`}>P</span>
+          <span className="w-5 h-5 rounded-full bg-[rgba(232,93,38,0.1)] text-[#e85d26] flex items-center justify-center text-[10px] font-bold" title={`Power: ${idea.spclElements.power}`}>P</span>
         )}
         {idea.spclElements?.credibility && (
           <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold" title={`Credibility: ${idea.spclElements.credibility}`}>C</span>
@@ -117,13 +117,13 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
             <button
               onClick={() => onWriteScript(idea)}
               disabled={isGenerating}
-              className="flex-1 px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 disabled:opacity-50 text-white rounded-md text-xs font-medium transition-colors"
+              className="flex-1 px-3 py-1.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-md text-xs font-medium transition-colors"
             >
               {isGenerating ? 'Writing...' : idea.status === 'SCRIPTED' ? 'Rewrite Script' : 'Write Script'}
             </button>
             <button
               onClick={() => onArchive(idea)}
-              className="px-3 py-1.5 text-gray-500 hover:text-gray-300 text-xs transition-colors"
+              className="px-3 py-1.5 text-[#8a8580] hover:text-[#0a0a0a] text-xs transition-colors"
             >
               Archive
             </button>

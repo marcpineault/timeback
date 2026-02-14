@@ -61,23 +61,23 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
       {/* Page Title + Usage */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Ideate</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-[#0a0a0a]">Ideate</h1>
+          <p className="text-[#8a8580] text-sm mt-1">
             Generate video ideas and scripts powered by the SPCL framework
           </p>
         </div>
         {ideateLimit !== null && (
-          <div className="flex items-center gap-3 bg-[#1A1A24] rounded-lg px-4 py-2.5 flex-shrink-0">
+          <div className="flex items-center gap-3 bg-white border border-[#e0dbd4] rounded-full px-4 py-2.5 flex-shrink-0">
             <div className="text-right">
-              <p className="text-white text-sm font-medium">
+              <p className="text-[#0a0a0a] text-sm font-medium">
                 {ideateUsed} / {ideateLimit}
               </p>
-              <p className="text-gray-500 text-xs">generations this month</p>
+              <p className="text-[#8a8580] text-xs">generations this month</p>
             </div>
             {ideateUsed >= ideateLimit && (
               <a
                 href="/pricing"
-                className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-md text-xs font-medium transition-colors"
+                className="px-3 py-1.5 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-xs font-medium transition-colors"
               >
                 Upgrade
               </a>
@@ -85,7 +85,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
             {ideateUsed < ideateLimit && plan === 'FREE' && (
               <a
                 href="/pricing"
-                className="text-violet-400 hover:text-violet-300 text-xs transition-colors"
+                className="text-[#e85d26] hover:text-[#d14d1a] text-xs transition-colors"
               >
                 Upgrade
               </a>
@@ -95,7 +95,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-[#1A1A24] rounded-lg p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-white border border-[#e0dbd4] rounded-full p-1 w-fit">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -103,10 +103,10 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
               setActiveTab(tab.id)
               if (tab.id !== 'scripts') setViewingScript(null)
             }}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-violet-500 text-white'
-                : 'text-gray-400 hover:text-white'
+                ? 'bg-[#e85d26] text-[#0a0a0a]'
+                : 'text-[#8a8580] hover:text-[#0a0a0a]'
             }`}
           >
             {tab.label}
@@ -116,7 +116,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
 
       {/* Tab Content */}
       {isLoading ? (
-        <div className="text-gray-500 text-center py-12">Loading...</div>
+        <div className="text-[#8a8580] text-center py-12">Loading...</div>
       ) : (
         <>
           {activeTab === 'ideas' && (
@@ -130,13 +130,13 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
               />
             ) : (
               <div className="text-center py-12">
-                <p className="text-gray-400 mb-2">Complete your creator profile first</p>
-                <p className="text-gray-500 text-sm mb-4">
+                <p className="text-[#8a8580] mb-2">Complete your creator profile first</p>
+                <p className="text-[#8a8580] text-sm mb-4">
                   We need to know about you to generate ideas tailored to your niche.
                 </p>
                 <button
                   onClick={() => setActiveTab('profile')}
-                  className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
                 >
                   Set Up Profile
                 </button>
@@ -172,13 +172,13 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
               />
             ) : (
               <div className="text-center py-12">
-                <p className="text-gray-400 mb-2">Complete your creator profile first</p>
-                <p className="text-gray-500 text-sm mb-4">
+                <p className="text-[#8a8580] mb-2">Complete your creator profile first</p>
+                <p className="text-[#8a8580] text-sm mb-4">
                   We need your niche and audience info to find relevant content patterns.
                 </p>
                 <button
                   onClick={() => setActiveTab('profile')}
-                  className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white rounded-lg text-sm font-medium transition-colors"
+                  className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
                 >
                   Set Up Profile
                 </button>
@@ -197,19 +197,19 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
               />
             ) : (
               <div className="text-center py-12">
-                <p className="text-gray-400 mb-2">No script selected</p>
-                <p className="text-gray-500 text-sm mb-4">
+                <p className="text-[#8a8580] mb-2">No script selected</p>
+                <p className="text-[#8a8580] text-sm mb-4">
                   Generate a script from the Ideas tab, then open it in the teleprompter.
                 </p>
                 {scripts.length > 0 && (
                   <div className="mt-6">
-                    <p className="text-gray-400 text-sm mb-3">Or pick a recent script:</p>
+                    <p className="text-[#8a8580] text-sm mb-3">Or pick a recent script:</p>
                     <div className="flex flex-col items-center gap-2">
                       {scripts.slice(0, 3).map((s) => (
                         <button
                           key={s.id}
                           onClick={() => handleOpenTeleprompter(s)}
-                          className="text-cyan-400 hover:text-cyan-300 text-sm"
+                          className="text-[#e85d26] hover:text-[#d14d1a] text-sm"
                         >
                           {s.title}
                         </button>

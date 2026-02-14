@@ -90,26 +90,26 @@ export default function ScheduleBuilder({ slots, instagramAccountId, onSlotsChan
   }
 
   return (
-    <div className="bg-[#1A1A24] rounded-xl p-6">
+    <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-white">Posting Schedule</h3>
-          <p className="text-gray-500 text-sm">{timezone}</p>
+          <h3 className="text-lg font-semibold text-[#0a0a0a]">Posting Schedule</h3>
+          <p className="text-[#8a8580] text-sm">{timezone}</p>
         </div>
-        <div className="text-gray-400 text-sm">
+        <div className="text-[#8a8580] text-sm">
           {slots.length} slot{slots.length !== 1 ? 's' : ''}/week
         </div>
       </div>
 
       {/* Quick Setup */}
       <div className="flex gap-2 mb-6">
-        <span className="text-gray-500 text-sm self-center">Quick:</span>
+        <span className="text-[#8a8580] text-sm self-center">Quick:</span>
         {['1x', '2x', '3x'].map((preset) => (
           <button
             key={preset}
             onClick={() => handleQuickSetup(preset)}
             disabled={quickSetting}
-            className="px-3 py-1.5 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-gray-300 rounded-lg text-sm transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full text-sm transition-colors disabled:opacity-50"
           >
             {preset}/day
           </button>
@@ -120,10 +120,10 @@ export default function ScheduleBuilder({ slots, instagramAccountId, onSlotsChan
       <div className="space-y-2 mb-6">
         {DAY_NAMES.map((dayName, dayIndex) => (
           <div key={dayIndex} className="flex items-center gap-3">
-            <span className="text-gray-400 text-sm w-12 flex-shrink-0 hidden sm:block">
+            <span className="text-[#8a8580] text-sm w-12 flex-shrink-0 hidden sm:block">
               {DAY_SHORT[dayIndex]}
             </span>
-            <span className="text-gray-400 text-sm w-8 flex-shrink-0 sm:hidden">
+            <span className="text-[#8a8580] text-sm w-8 flex-shrink-0 sm:hidden">
               {DAY_SHORT[dayIndex].slice(0, 2)}
             </span>
             <div className="flex flex-wrap gap-2 flex-1">
@@ -135,7 +135,7 @@ export default function ScheduleBuilder({ slots, instagramAccountId, onSlotsChan
                   .map((slot) => (
                     <span
                       key={slot.id}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-500/20 text-violet-300 rounded-full text-xs font-medium"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-[rgba(232,93,38,0.1)] text-[#e85d26] rounded-full text-xs font-medium"
                     >
                       {formatTime(slot.timeOfDay)}
                       <button
@@ -153,11 +153,11 @@ export default function ScheduleBuilder({ slots, instagramAccountId, onSlotsChan
       </div>
 
       {/* Add Slot Form */}
-      <div className="flex items-center gap-2 pt-4 border-t border-gray-800">
+      <div className="flex items-center gap-2 pt-4 border-t border-[#e0dbd4]">
         <select
           value={newDay}
           onChange={(e) => setNewDay(Number(e.target.value))}
-          className="bg-[#2A2A3A] text-white rounded-lg px-3 py-2 text-sm border border-gray-700 focus:border-violet-500 outline-none"
+          className="bg-[#f5f0e8] text-[#0a0a0a] rounded-2xl px-3 py-2 text-sm border border-[#e0dbd4] focus:border-[#e85d26] outline-none"
         >
           {DAY_NAMES.map((name, i) => (
             <option key={i} value={i}>{name}</option>
@@ -167,12 +167,12 @@ export default function ScheduleBuilder({ slots, instagramAccountId, onSlotsChan
           type="time"
           value={newTime}
           onChange={(e) => setNewTime(e.target.value)}
-          className="bg-[#2A2A3A] text-white rounded-lg px-3 py-2 text-sm border border-gray-700 focus:border-violet-500 outline-none"
+          className="bg-[#f5f0e8] text-[#0a0a0a] rounded-2xl px-3 py-2 text-sm border border-[#e0dbd4] focus:border-[#e85d26] outline-none"
         />
         <button
           onClick={handleAddSlot}
           disabled={adding}
-          className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors disabled:opacity-50"
         >
           {adding ? 'Adding...' : '+ Add Slot'}
         </button>

@@ -206,14 +206,14 @@ export default function VideoTrimmer({
     <div
       ref={modalRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
     >
       <div className="relative w-full max-w-5xl mx-4">
         {/* Close button */}
         <button
           onClick={onClose}
           disabled={isTrimming}
-          className="absolute -top-12 right-0 p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          className="absolute -top-12 right-0 p-2 text-[#8a8580] hover:text-[#0a0a0a] transition-colors disabled:opacity-50"
           aria-label="Close trimmer"
         >
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,17 +221,17 @@ export default function VideoTrimmer({
           </svg>
         </button>
 
-        <div className="bg-gray-900 rounded-xl overflow-hidden shadow-2xl">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl overflow-hidden shadow-2xl">
           {/* Header */}
-          <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+          <div className="px-4 py-3 bg-[#faf7f2] border-b border-[#e0dbd4] flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[#e85d26]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h3 className="text-white font-medium truncate">Review & Trim: {videoName}</h3>
+              <h3 className="text-[#0a0a0a] font-medium truncate">Review & Trim: {videoName}</h3>
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-[#8a8580]">
               Duration: {formatTime(trimmedDuration)}
             </div>
           </div>
@@ -265,11 +265,11 @@ export default function VideoTrimmer({
           </div>
 
           {/* Timeline Controls */}
-          <div className="px-4 py-4 bg-gray-800 border-t border-gray-700">
+          <div className="px-4 py-4 bg-[#faf7f2] border-t border-[#e0dbd4]">
             {/* Time display */}
-            <div className="flex justify-between text-sm text-gray-400 mb-3">
+            <div className="flex justify-between text-sm text-[#8a8580] mb-3">
               <span>{formatTime(currentTime)}</span>
-              <span className="text-blue-400">
+              <span className="text-[#e85d26]">
                 Trim: {formatTime(startTime)} - {formatTime(endTime)}
               </span>
               <span>{formatTime(duration)}</span>
@@ -278,7 +278,7 @@ export default function VideoTrimmer({
             {/* Timeline */}
             <div
               ref={timelineRef}
-              className="relative h-12 bg-gray-700 rounded-lg cursor-pointer overflow-hidden"
+              className="relative h-12 bg-[#e0dbd4] rounded-2xl cursor-pointer overflow-hidden"
               onClick={handleTimelineClick}
             >
               {/* Trim region overlay (dimmed areas outside selection) */}
@@ -293,7 +293,7 @@ export default function VideoTrimmer({
 
               {/* Selected trim region */}
               <div
-                className="absolute top-0 bottom-0 bg-blue-500/20 border-y-2 border-blue-500"
+                className="absolute top-0 bottom-0 bg-[#e85d26]/20 border-y-2 border-[#e85d26]"
                 style={{
                   left: `${startPercent}%`,
                   width: `${endPercent - startPercent}%`,
@@ -302,7 +302,7 @@ export default function VideoTrimmer({
 
               {/* Start handle */}
               <div
-                className="absolute top-0 bottom-0 w-4 bg-blue-500 cursor-ew-resize flex items-center justify-center hover:bg-blue-400 transition-colors z-10"
+                className="absolute top-0 bottom-0 w-4 bg-[#e85d26] cursor-ew-resize flex items-center justify-center hover:bg-[#d14d1a] transition-colors z-10"
                 style={{ left: `calc(${startPercent}% - 8px)` }}
                 onMouseDown={(e) => handleTimelineMouseDown(e, 'start')}
               >
@@ -311,7 +311,7 @@ export default function VideoTrimmer({
 
               {/* End handle */}
               <div
-                className="absolute top-0 bottom-0 w-4 bg-blue-500 cursor-ew-resize flex items-center justify-center hover:bg-blue-400 transition-colors z-10"
+                className="absolute top-0 bottom-0 w-4 bg-[#e85d26] cursor-ew-resize flex items-center justify-center hover:bg-[#d14d1a] transition-colors z-10"
                 style={{ left: `calc(${endPercent}% - 8px)` }}
                 onMouseDown={(e) => handleTimelineMouseDown(e, 'end')}
               >
@@ -329,18 +329,18 @@ export default function VideoTrimmer({
             </div>
 
             {/* Instructions */}
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              Drag the blue handles to set trim points. Click anywhere on the timeline to seek.
+            <p className="text-xs text-[#8a8580] mt-2 text-center">
+              Drag the handles to set trim points. Click anywhere on the timeline to seek.
             </p>
           </div>
 
           {/* Footer Actions */}
-          <div className="px-4 py-4 bg-gray-800 border-t border-gray-700 flex flex-wrap items-center justify-between gap-3">
+          <div className="px-4 py-4 bg-[#faf7f2] border-t border-[#e0dbd4] flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePreviewTrim}
                 disabled={isTrimming}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 bg-[#e0dbd4] hover:bg-[#e0dbd4] text-[#0a0a0a] text-sm rounded-full transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
@@ -353,14 +353,14 @@ export default function VideoTrimmer({
               <button
                 onClick={onClose}
                 disabled={isTrimming}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-[#e0dbd4] hover:bg-[#e0dbd4] text-[#0a0a0a] text-sm rounded-full transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApplyTrim}
                 disabled={isTrimming}
-                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="px-6 py-2 bg-[#e85d26] hover:bg-[#d14d1a] text-white text-sm rounded-full font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 {isTrimming ? (
                   <>

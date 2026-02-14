@@ -47,10 +47,10 @@ function renderScriptWithNotes(text: string) {
     }
     if (part === '[PAUSE]') {
       return (
-        <span key={i} className="text-gray-600 text-xs mx-0.5">||</span>
+        <span key={i} className="text-[#8a8580] text-xs mx-0.5">||</span>
       )
     }
-    return <span key={i} className="text-gray-200">{part}</span>
+    return <span key={i} className="text-[#0a0a0a]">{part}</span>
   })
 }
 
@@ -120,11 +120,11 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="text-gray-400 hover:text-white text-sm transition-colors"
+            className="text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
           >
             &larr; Back
           </button>
-          <h2 className="text-lg font-semibold text-white">{script.title}</h2>
+          <h2 className="text-lg font-semibold text-[#0a0a0a]">{script.title}</h2>
         </div>
 
         <div className="flex items-center gap-2">
@@ -134,7 +134,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
             className={`p-1.5 rounded-md transition-colors ${
               currentRating === 'up'
                 ? 'bg-green-500/20 text-green-400'
-                : 'text-gray-500 hover:text-green-400'
+                : 'text-[#8a8580] hover:text-green-400'
             }`}
             title="This script was great"
           >
@@ -147,7 +147,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
             className={`p-1.5 rounded-md transition-colors ${
               currentRating === 'down'
                 ? 'bg-red-500/20 text-red-400'
-                : 'text-gray-500 hover:text-red-400'
+                : 'text-[#8a8580] hover:text-red-400'
             }`}
             title="This script missed the mark"
           >
@@ -161,54 +161,54 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       {/* Stats */}
       <div className="flex items-center gap-6 mb-6">
         <div>
-          <span className="text-gray-500 text-xs">Words</span>
-          <p className="text-white font-medium">{wordCount}</p>
+          <span className="text-[#8a8580] text-xs">Words</span>
+          <p className="text-[#0a0a0a] font-medium">{wordCount}</p>
         </div>
         <div>
-          <span className="text-gray-500 text-xs">Duration</span>
-          <p className="text-white font-medium">~{estimatedDuration}s</p>
+          <span className="text-[#8a8580] text-xs">Duration</span>
+          <p className="text-[#0a0a0a] font-medium">~{estimatedDuration}s</p>
         </div>
         <div>
-          <span className="text-gray-500 text-xs">Version</span>
-          <p className="text-white font-medium">{script.version}</p>
+          <span className="text-[#8a8580] text-xs">Version</span>
+          <p className="text-[#0a0a0a] font-medium">{script.version}</p>
         </div>
         {script.idea && (
           <div>
-            <span className="text-gray-500 text-xs">From idea</span>
-            <p className="text-gray-400 text-sm">{script.idea.title}</p>
+            <span className="text-[#8a8580] text-xs">From idea</span>
+            <p className="text-[#8a8580] text-sm">{script.idea.title}</p>
           </div>
         )}
       </div>
 
       {/* Script Sections */}
       <div className="space-y-4 mb-6">
-        <div className="bg-[#1A1A24] rounded-xl p-5">
-          <label className="block text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-2">Hook</label>
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
+          <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Hook</label>
           <textarea
             value={hook}
             onChange={(e) => setHook(e.target.value)}
             rows={2}
-            className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 resize-none"
+            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
           />
         </div>
 
-        <div className="bg-[#1A1A24] rounded-xl p-5">
-          <label className="block text-violet-400 text-xs font-semibold uppercase tracking-wider mb-2">Body</label>
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
+          <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Body</label>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={10}
-            className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500 resize-none"
+            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
           />
         </div>
 
-        <div className="bg-[#1A1A24] rounded-xl p-5">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
           <label className="block text-green-400 text-xs font-semibold uppercase tracking-wider mb-2">Call to Action</label>
           <textarea
             value={cta}
             onChange={(e) => setCta(e.target.value)}
             rows={2}
-            className="w-full bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-green-500 resize-none"
+            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
           />
         </div>
       </div>
@@ -218,12 +218,12 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
         <div className="mb-6">
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className="text-gray-400 hover:text-white text-sm transition-colors flex items-center gap-1 mb-3"
+            className="text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors flex items-center gap-1 mb-3"
           >
             <span>{showPreview ? '▼' : '▶'}</span> Production Notes Preview
           </button>
           {showPreview && (
-            <div className="bg-[#1A1A24] rounded-xl p-5">
+            <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
               <div className="text-sm leading-relaxed whitespace-pre-wrap">
                 {renderScriptWithNotes(fullText)}
               </div>
@@ -237,34 +237,34 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
         <div className="mb-6">
           <button
             onClick={() => setShowSpcl(!showSpcl)}
-            className="text-gray-400 hover:text-white text-sm transition-colors flex items-center gap-1"
+            className="text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors flex items-center gap-1"
           >
             <span>{showSpcl ? '▼' : '▶'}</span> SPCL Breakdown
           </button>
           {showSpcl && (
-            <div className="mt-3 bg-[#1A1A24] rounded-xl p-5 space-y-3">
+            <div className="mt-3 bg-white border border-[#e0dbd4] rounded-2xl p-5 space-y-3">
               {spcl.status && (
                 <div>
                   <span className="text-cyan-400 text-xs font-semibold uppercase">Status: </span>
-                  <span className="text-gray-300 text-sm">{spcl.status}</span>
+                  <span className="text-[#0a0a0a] text-sm">{spcl.status}</span>
                 </div>
               )}
               {spcl.power && (
                 <div>
-                  <span className="text-violet-400 text-xs font-semibold uppercase">Power: </span>
-                  <span className="text-gray-300 text-sm">{spcl.power}</span>
+                  <span className="text-[#e85d26] text-xs font-semibold uppercase">Power: </span>
+                  <span className="text-[#0a0a0a] text-sm">{spcl.power}</span>
                 </div>
               )}
               {spcl.credibility && (
                 <div>
                   <span className="text-amber-400 text-xs font-semibold uppercase">Credibility: </span>
-                  <span className="text-gray-300 text-sm">{spcl.credibility}</span>
+                  <span className="text-[#0a0a0a] text-sm">{spcl.credibility}</span>
                 </div>
               )}
               {spcl.likeness && (
                 <div>
                   <span className="text-green-400 text-xs font-semibold uppercase">Likeness: </span>
-                  <span className="text-gray-300 text-sm">{spcl.likeness}</span>
+                  <span className="text-[#0a0a0a] text-sm">{spcl.likeness}</span>
                 </div>
               )}
             </div>
@@ -278,14 +278,14 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-5 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
           </button>
         )}
         <button
           onClick={() => onOpenTeleprompter({ ...script, hook, body, cta, fullScript: fullText })}
-          className="px-5 py-2.5 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-5 py-2.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
         >
           Open in Teleprompter
         </button>

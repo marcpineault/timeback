@@ -89,9 +89,9 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
   return (
     <div>
       {/* Generation Area */}
-      <div className="bg-[#1A1A24] rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-1">Generate Video Ideas</h2>
-        <p className="text-gray-500 text-sm mb-4">
+      <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6 mb-6">
+        <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Generate Video Ideas</h2>
+        <p className="text-[#8a8580] text-sm mb-4">
           AI creates ideas tailored to your profile. Pick a style, or let AI choose for you.
         </p>
 
@@ -101,13 +101,13 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="Optional: focus on a topic (e.g. cold outreach, pricing strategy)"
-            className="flex-1 bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500"
+            className="flex-1 bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26]"
             onKeyDown={(e) => e.key === 'Enter' && !generating && handleGenerate()}
           />
           <select
             value={count}
             onChange={(e) => setCount(parseInt(e.target.value))}
-            className="bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500 w-20"
+            className="bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:border-[#e85d26] w-20"
           >
             <option value={3}>3</option>
             <option value={5}>5</option>
@@ -116,7 +116,7 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
           <select
             value={contentStyle}
             onChange={(e) => setContentStyle(e.target.value)}
-            className="bg-[#2A2A3A] border border-gray-700 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-violet-500"
+            className="bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:border-[#e85d26]"
           >
             <option value="auto">Any Style</option>
             <option value="hook-story-lesson">Story + Lesson</option>
@@ -128,7 +128,7 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+            className="px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors whitespace-nowrap"
           >
             {generating ? (
               <span className="flex items-center gap-2">
@@ -151,15 +151,15 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
 
       {/* Filter + Ideas Grid */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-gray-500 text-sm">Filter:</span>
+        <span className="text-[#8a8580] text-sm">Filter:</span>
         {(['', 'SAVED', 'SCRIPTED', 'FILMED', 'ARCHIVED'] as StatusFilter[]).map((f) => (
           <button
             key={f}
             onClick={() => setStatusFilter(f)}
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
               statusFilter === f
-                ? 'bg-violet-500/20 text-violet-400'
-                : 'bg-[#2A2A3A] text-gray-400 hover:text-white'
+                ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]'
+                : 'bg-[#f5f0e8] text-[#8a8580] hover:text-[#0a0a0a]'
             }`}
           >
             {f || 'All'}
@@ -168,11 +168,11 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
       </div>
 
       {loading ? (
-        <div className="text-gray-500 text-center py-12">Loading ideas...</div>
+        <div className="text-[#8a8580] text-center py-12">Loading ideas...</div>
       ) : ideas.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-400 mb-2">No ideas yet</p>
-          <p className="text-gray-500 text-sm">Generate your first batch of video ideas above.</p>
+          <p className="text-[#8a8580] mb-2">No ideas yet</p>
+          <p className="text-[#8a8580] text-sm">Generate your first batch of video ideas above.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

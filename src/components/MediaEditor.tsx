@@ -461,23 +461,23 @@ export default function MediaEditor({
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-900/90 backdrop-blur-sm border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-900/90 backdrop-blur-sm border-b border-[#e0dbd4]">
         <button
           onClick={onClose}
           disabled={isProcessing}
-          className="p-2 -ml-2 text-gray-400 hover:text-white active:scale-95 transition-all disabled:opacity-50"
+          className="p-2 -ml-2 text-[#8a8580] hover:text-[#0a0a0a] active:scale-95 transition-all disabled:opacity-50"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
-        <h1 className="text-white font-medium text-sm truncate max-w-[50%]">{videoName}</h1>
+        <h1 className="text-[#0a0a0a] font-medium text-sm truncate max-w-[50%]">{videoName}</h1>
 
         <button
           onClick={handleExport}
           disabled={isProcessing}
-          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 active:scale-95 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-all"
+          className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] active:scale-95 disabled:bg-[#e0dbd4] disabled:text-[#8a8580] text-white text-sm font-medium rounded-full transition-all"
         >
           {isProcessing ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -518,29 +518,29 @@ export default function MediaEditor({
         {/* Current time badge */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/70 backdrop-blur-sm rounded-full">
           <span className="text-white text-sm font-mono">{formatTime(currentTime)}</span>
-          <span className="text-gray-400 text-sm font-mono"> / {formatTime(duration)}</span>
+          <span className="text-[#8a8580] text-sm font-mono"> / {formatTime(duration)}</span>
         </div>
       </div>
 
       {/* Timeline Section */}
-      <div className="bg-gray-900 border-t border-gray-800">
+      <div className="bg-gray-900 border-t border-[#e0dbd4]">
         {/* Playhead indicator above timeline */}
         <div className="px-4 py-2 flex justify-between items-center">
-          <span className="text-xs text-gray-500 font-mono">{formatTime(0)}</span>
-          <span className="text-xs text-white font-mono">{formatTime(currentTime)}</span>
-          <span className="text-xs text-gray-500 font-mono">{formatTime(duration)}</span>
+          <span className="text-xs text-[#8a8580] font-mono">{formatTime(0)}</span>
+          <span className="text-xs text-[#0a0a0a] font-mono">{formatTime(currentTime)}</span>
+          <span className="text-xs text-[#8a8580] font-mono">{formatTime(duration)}</span>
         </div>
 
         {/* Timeline with segments */}
         <div className="relative mx-4 mb-2 touch-none select-none">
           <div
             ref={timelineRef}
-            className="relative h-16 bg-gray-800 rounded-lg overflow-visible cursor-pointer"
+            className="relative h-16 bg-[#e0dbd4] rounded-2xl overflow-visible cursor-pointer"
             onMouseDown={handleTimelinePointerDown}
             onTouchStart={handleTimelinePointerDown}
           >
             {/* Thumbnail strip */}
-            <div className="absolute inset-0 flex rounded-lg overflow-hidden">
+            <div className="absolute inset-0 flex rounded-2xl overflow-hidden">
               {thumbnails.length > 0 ? (
                 thumbnails.map((thumb, i) => (
                   <div
@@ -550,7 +550,7 @@ export default function MediaEditor({
                   />
                 ))
               ) : (
-                <div className="flex-1 bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 animate-pulse" />
+                <div className="flex-1 bg-gradient-to-r from-[#e0dbd4] via-[#e0dbd4] to-[#e0dbd4] animate-pulse" />
               )}
             </div>
 
@@ -578,7 +578,7 @@ export default function MediaEditor({
                       segment.deleted
                         ? 'bg-red-500/70'
                         : isSelected
-                          ? 'ring-2 ring-cyan-400 ring-inset bg-cyan-500/20'
+                          ? 'ring-2 ring-[#e85d26] ring-inset bg-[#e85d26]/20'
                           : 'hover:bg-white/10'
                     }`}
                     onClick={(e) => {
@@ -606,7 +606,7 @@ export default function MediaEditor({
                       onMouseDown={(e) => handleTrimHandleDown(segment.id, 'left', e)}
                       onTouchStart={(e) => handleTrimHandleDown(segment.id, 'left', e)}
                     >
-                      <div className="w-1.5 h-10 bg-cyan-400 rounded-full shadow-lg" />
+                      <div className="w-1.5 h-10 bg-[#e85d26] rounded-full shadow-lg" />
                     </div>
                   )}
 
@@ -620,15 +620,15 @@ export default function MediaEditor({
                       onMouseDown={(e) => handleTrimHandleDown(segment.id, 'right', e)}
                       onTouchStart={(e) => handleTrimHandleDown(segment.id, 'right', e)}
                     >
-                      <div className="w-1.5 h-10 bg-cyan-400 rounded-full shadow-lg" />
+                      <div className="w-1.5 h-10 bg-[#e85d26] rounded-full shadow-lg" />
                     </div>
                   )}
 
                   {/* Segment border for selected state */}
                   {isSelected && !segment.deleted && (
                     <>
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-cyan-400" />
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-cyan-400" />
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-[#e85d26]" />
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#e85d26]" />
                     </>
                   )}
                 </div>
@@ -648,11 +648,11 @@ export default function MediaEditor({
         {/* Status bar */}
         <div className="px-4 py-2 text-center">
           {hasChanges ? (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-[#8a8580]">
               Removing <span className="text-red-400 font-medium">{formatTime(totalRemovedTime)}</span> - Final: <span className="text-green-400 font-medium">{formatTime(duration - totalRemovedTime)}</span>
             </p>
           ) : (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[#8a8580]">
               Tap a clip to select, then drag handles to trim or tap Delete
             </p>
           )}
@@ -660,7 +660,7 @@ export default function MediaEditor({
       </div>
 
       {/* Bottom Toolbar - CapCut style */}
-      <div className="bg-gray-900 border-t border-gray-800 pb-safe">
+      <div className="bg-gray-900 border-t border-[#e0dbd4] pb-safe">
         <div className="flex items-center justify-around px-4 py-3">
           {/* Split */}
           <button
@@ -668,10 +668,10 @@ export default function MediaEditor({
             disabled={currentTime < 0.5 || currentTime > duration - 0.5}
             className="flex flex-col items-center gap-1 px-4 py-2 disabled:opacity-30 transition-all active:scale-95"
           >
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-[#0a0a0a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16M4 12h2M18 12h2" />
             </svg>
-            <span className="text-white text-xs">Split</span>
+            <span className="text-[#0a0a0a] text-xs">Split</span>
           </button>
 
           {/* Delete - enabled when segment selected */}
@@ -679,7 +679,7 @@ export default function MediaEditor({
             onClick={() => selectedSegment && toggleSegmentDeleted(selectedSegment.id)}
             disabled={!selectedSegment}
             className={`flex flex-col items-center gap-1 px-4 py-2 transition-all active:scale-95 ${
-              !selectedSegment ? 'opacity-30' : selectedSegment.deleted ? 'text-green-400' : 'text-white'
+              !selectedSegment ? 'opacity-30' : selectedSegment.deleted ? 'text-green-400' : 'text-[#0a0a0a]'
             }`}
           >
             {selectedSegment?.deleted ? (

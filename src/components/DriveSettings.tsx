@@ -40,8 +40,8 @@ export default function DriveSettings() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-gray-400 text-sm">
-        <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center gap-2 text-[#8a8580] text-sm">
+        <div className="w-4 h-4 border-2 border-[#8a8580] border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -58,7 +58,7 @@ export default function DriveSettings() {
         <button
           onClick={handleDisconnect}
           disabled={isDisconnecting}
-          className="text-gray-500 hover:text-red-400 transition-colors text-xs"
+          className="text-[#8a8580] hover:text-red-400 transition-colors text-xs"
           title="Disconnect Google Drive"
         >
           {isDisconnecting ? '...' : '✕'}
@@ -70,7 +70,7 @@ export default function DriveSettings() {
   return (
     <a
       href="/api/auth/google"
-      className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors text-sm"
+      className="flex items-center gap-1.5 text-[#8a8580] hover:text-[#0a0a0a] transition-colors text-sm"
       title="Connect Google Drive"
     >
       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">

@@ -21,13 +21,13 @@ export default function WelcomeOverlay({ isNewUser }: WelcomeOverlayProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-      <div className="bg-[#1A1A24] rounded-2xl max-w-2xl w-full p-6 sm:p-10 text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+      <div className="bg-white border border-[#e0dbd4] rounded-2xl max-w-2xl w-full p-6 sm:p-10 text-center">
         {/* Heading */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#0a0a0a] mb-2">
           Welcome to TimeBack!
         </h1>
-        <p className="text-gray-400 text-sm sm:text-base mb-8 max-w-md mx-auto">
+        <p className="text-[#8a8580] text-sm sm:text-base mb-8 max-w-md mx-auto">
           Upload a video and we&apos;ll automatically remove the silence, filler words, and dead air. Ready in minutes.
         </p>
 
@@ -39,22 +39,22 @@ export default function WelcomeOverlay({ isNewUser }: WelcomeOverlayProps) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={dismiss}
-            className="flex-1 group border border-gray-700 hover:border-indigo-500 bg-[#12121A] rounded-xl p-6 transition-colors cursor-pointer"
+            className="flex-1 group border border-[#e0dbd4] hover:border-[#e85d26] bg-[#faf7f2] rounded-2xl p-6 transition-colors cursor-pointer"
           >
             {/* Play icon */}
-            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-indigo-500/20 flex items-center justify-center group-hover:bg-indigo-500/30 transition-colors">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[rgba(232,93,38,0.1)] flex items-center justify-center group-hover:bg-[rgba(232,93,38,0.15)] transition-colors">
               <svg
-                className="w-7 h-7 text-indigo-400"
+                className="w-7 h-7 text-[#e85d26]"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path d="M8 5v14l11-7z" />
               </svg>
             </div>
-            <h2 className="text-white font-semibold text-lg mb-1">
+            <h2 className="text-[#0a0a0a] font-semibold text-lg mb-1">
               Watch How It Works
             </h2>
-            <p className="text-gray-500 text-sm">
+            <p className="text-[#8a8580] text-sm">
               2-minute walkthrough
             </p>
           </a>
@@ -62,12 +62,12 @@ export default function WelcomeOverlay({ isNewUser }: WelcomeOverlayProps) {
           {/* Card B — Upload First Video */}
           <button
             onClick={dismiss}
-            className="flex-1 group border border-gray-700 hover:border-violet-500 bg-[#12121A] rounded-xl p-6 transition-colors cursor-pointer text-left"
+            className="flex-1 group border border-[#e0dbd4] hover:border-[#e85d26] bg-[#faf7f2] rounded-2xl p-6 transition-colors cursor-pointer text-left"
           >
             {/* Upload icon */}
-            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-violet-500/20 flex items-center justify-center group-hover:bg-violet-500/30 transition-colors">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[rgba(232,93,38,0.1)] flex items-center justify-center group-hover:bg-[rgba(232,93,38,0.15)] transition-colors">
               <svg
-                className="w-7 h-7 text-violet-400"
+                className="w-7 h-7 text-[#e85d26]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={2}
@@ -80,10 +80,10 @@ export default function WelcomeOverlay({ isNewUser }: WelcomeOverlayProps) {
                 />
               </svg>
             </div>
-            <h2 className="text-white font-semibold text-lg mb-1 text-center">
+            <h2 className="text-[#0a0a0a] font-semibold text-lg mb-1 text-center">
               Upload Your First Video
             </h2>
-            <p className="text-gray-500 text-sm text-center">
+            <p className="text-[#8a8580] text-sm text-center">
               Drag &amp; drop or click to upload
             </p>
           </button>
@@ -92,7 +92,7 @@ export default function WelcomeOverlay({ isNewUser }: WelcomeOverlayProps) {
         {/* Skip link */}
         <button
           onClick={dismiss}
-          className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
+          className="text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
         >
           Skip for now
         </button>

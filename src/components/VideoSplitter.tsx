@@ -219,26 +219,26 @@ export default function VideoSplitter({
 
   // Generate colors for segments
   const segmentColors = [
-    'bg-blue-500/30',
+    'bg-[#e85d26]/30',
     'bg-green-500/30',
     'bg-purple-500/30',
     'bg-amber-500/30',
     'bg-pink-500/30',
-    'bg-cyan-500/30',
+    'bg-[#e85d26]/30',
   ];
 
   return (
     <div
       ref={modalRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
     >
       <div className="relative w-full max-w-5xl mx-4">
         {/* Close button */}
         <button
           onClick={onClose}
           disabled={isSplitting}
-          className="absolute -top-12 right-0 p-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+          className="absolute -top-12 right-0 p-2 text-[#8a8580] hover:text-[#0a0a0a] transition-colors disabled:opacity-50"
           aria-label="Close splitter"
         >
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,16 +246,16 @@ export default function VideoSplitter({
           </svg>
         </button>
 
-        <div className="bg-gray-900 rounded-xl overflow-hidden shadow-2xl">
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl overflow-hidden shadow-2xl">
           {/* Header */}
-          <div className="px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+          <div className="px-4 py-3 bg-[#faf7f2] border-b border-[#e0dbd4] flex items-center justify-between">
             <div className="flex items-center gap-3">
               <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
               </svg>
-              <h3 className="text-white font-medium truncate">Split Video: {videoName}</h3>
+              <h3 className="text-[#0a0a0a] font-medium truncate">Split Video: {videoName}</h3>
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-[#8a8580]">
               {splitPoints.length > 0 ? `${splitPoints.length + 1} parts` : 'No splits yet'}
             </div>
           </div>
@@ -289,14 +289,14 @@ export default function VideoSplitter({
           </div>
 
           {/* Timeline Controls */}
-          <div className="px-4 py-4 bg-gray-800 border-t border-gray-700">
+          <div className="px-4 py-4 bg-[#faf7f2] border-t border-[#e0dbd4]">
             {/* Time display */}
-            <div className="flex justify-between text-sm text-gray-400 mb-3">
+            <div className="flex justify-between text-sm text-[#8a8580] mb-3">
               <span>{formatTime(currentTime)}</span>
               <button
                 onClick={handleAddSplitPoint}
                 disabled={currentTime <= 0.5 || currentTime >= duration - 0.5}
-                className="px-3 py-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded-lg transition-colors flex items-center gap-1"
+                className="px-3 py-1 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e0dbd4] disabled:cursor-not-allowed text-white text-xs rounded-full transition-colors flex items-center gap-1"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -309,14 +309,14 @@ export default function VideoSplitter({
             {/* Timeline */}
             <div
               ref={timelineRef}
-              className="relative h-14 bg-gray-700 rounded-lg cursor-pointer overflow-hidden"
+              className="relative h-14 bg-[#e0dbd4] rounded-2xl cursor-pointer overflow-hidden"
               onClick={handleTimelineClick}
             >
               {/* Segment colors */}
               {segments.map((seg, index) => (
                 <div
                   key={index}
-                  className={`absolute top-0 bottom-0 ${segmentColors[index % segmentColors.length]} border-r border-gray-600`}
+                  className={`absolute top-0 bottom-0 ${segmentColors[index % segmentColors.length]} border-r border-[#e0dbd4]`}
                   style={{
                     left: `${(seg.start / duration) * 100}%`,
                     width: `${(seg.duration / duration) * 100}%`,
@@ -337,15 +337,15 @@ export default function VideoSplitter({
                   onMouseDown={(e) => handleSplitPointMouseDown(e, index)}
                 >
                   {/* Split line */}
-                  <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-orange-500 -translate-x-1/2" />
+                  <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-[#e85d26] -translate-x-1/2" />
                   {/* Handle */}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-[#e85d26] rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                     <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                     </svg>
                   </div>
                   {/* Time label */}
-                  <div className="absolute left-1/2 -top-6 -translate-x-1/2 px-1.5 py-0.5 bg-orange-500 text-white text-[10px] rounded whitespace-nowrap">
+                  <div className="absolute left-1/2 -top-6 -translate-x-1/2 px-1.5 py-0.5 bg-[#e85d26] text-white text-[10px] rounded whitespace-nowrap">
                     {formatTime(point)}
                   </div>
                   {/* Remove button */}
@@ -373,20 +373,20 @@ export default function VideoSplitter({
             </div>
 
             {/* Instructions */}
-            <p className="text-xs text-gray-500 mt-2 text-center">
+            <p className="text-xs text-[#8a8580] mt-2 text-center">
               Seek to a position and click &quot;Add Split Here&quot; to mark split points. Drag markers to adjust.
             </p>
           </div>
 
           {/* Segments Preview */}
           {splitPoints.length > 0 && (
-            <div className="px-4 py-3 bg-gray-800/50 border-t border-gray-700">
-              <p className="text-xs text-gray-400 mb-2">Resulting segments:</p>
+            <div className="px-4 py-3 bg-[#faf7f2] border-t border-[#e0dbd4]">
+              <p className="text-xs text-[#8a8580] mb-2">Resulting segments:</p>
               <div className="flex flex-wrap gap-2">
                 {segments.map((seg, index) => (
                   <div
                     key={index}
-                    className={`px-3 py-1.5 rounded-lg text-xs text-white ${segmentColors[index % segmentColors.length].replace('/30', '/50')}`}
+                    className={`px-3 py-1.5 rounded-2xl text-xs text-white ${segmentColors[index % segmentColors.length].replace('/30', '/50')}`}
                   >
                     <span className="font-medium">Part {index + 1}:</span>{' '}
                     {formatTime(seg.start)} - {formatTime(seg.end)} ({formatTime(seg.duration)})
@@ -397,8 +397,8 @@ export default function VideoSplitter({
           )}
 
           {/* Footer Actions */}
-          <div className="px-4 py-4 bg-gray-800 border-t border-gray-700 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-gray-400">
+          <div className="px-4 py-4 bg-[#faf7f2] border-t border-[#e0dbd4] flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-[#8a8580]">
               {splitPoints.length === 0 ? (
                 <span>Add split points to divide this video</span>
               ) : (
@@ -410,14 +410,14 @@ export default function VideoSplitter({
               <button
                 onClick={onClose}
                 disabled={isSplitting}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-[#e0dbd4] hover:bg-[#e0dbd4] text-[#0a0a0a] text-sm rounded-full transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApplySplit}
                 disabled={isSplitting || splitPoints.length === 0}
-                className="px-6 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 text-white text-sm rounded-lg font-medium transition-colors flex items-center gap-2 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-[#e85d26] hover:bg-[#d14d1a] disabled:bg-[#e0dbd4] text-white text-sm rounded-full font-medium transition-colors flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {isSplitting ? (
                   <>

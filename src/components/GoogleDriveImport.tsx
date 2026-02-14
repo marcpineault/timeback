@@ -312,7 +312,7 @@ export default function GoogleDriveImport({ onImportComplete, disabled }: Google
         <button
           onClick={handleConnect}
           disabled={isDisabled}
-          className="w-full px-4 py-3 bg-white hover:bg-gray-100 text-gray-800 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full px-4 py-3 bg-white hover:bg-gray-100 text-gray-800 rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isConnecting ? (
             <>
@@ -332,7 +332,7 @@ export default function GoogleDriveImport({ onImportComplete, disabled }: Google
         <button
           onClick={openPicker}
           disabled={isDisabled || !pickerApiLoaded}
-          className="w-full px-4 py-3 bg-white hover:bg-gray-100 text-gray-800 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full px-4 py-3 bg-white hover:bg-gray-100 text-gray-800 rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isImporting ? (
             <>
@@ -362,14 +362,14 @@ export default function GoogleDriveImport({ onImportComplete, disabled }: Google
 
       {/* Import Progress */}
       {isImporting && importProgress && (
-        <div className="mt-2 text-sm text-gray-400 text-center">
+        <div className="mt-2 text-sm text-[#8a8580] text-center">
           {importProgress}
         </div>
       )}
 
       {/* Error Message */}
       {error && (
-        <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+        <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded-2xl">
           <p className="text-red-400 text-xs">{error}</p>
         </div>
       )}

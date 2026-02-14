@@ -38,14 +38,14 @@ export default function PublishedHistory() {
   }
 
   if (loading) {
-    return <div className="text-gray-500 text-center py-8">Loading history...</div>
+    return <div className="text-[#8a8580] text-center py-8">Loading history...</div>
   }
 
   if (posts.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-400 mb-2">No published posts yet</p>
-        <p className="text-gray-500 text-sm">
+        <p className="text-[#8a8580] mb-2">No published posts yet</p>
+        <p className="text-[#8a8580] text-sm">
           Posts will appear here after they are published to Instagram.
         </p>
       </div>
@@ -54,16 +54,16 @@ export default function PublishedHistory() {
 
   return (
     <div>
-      <p className="text-gray-500 text-sm mb-4">{total} total posts</p>
+      <p className="text-[#8a8580] text-sm mb-4">{total} total posts</p>
       <div className="space-y-3">
         {posts.map((post) => (
           <div
             key={post.id}
-            className="flex items-center gap-4 p-4 bg-[#2A2A3A] rounded-lg"
+            className="flex items-center gap-4 p-4 bg-[#f5f0e8] rounded-2xl"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-white text-sm font-medium truncate">
+                <span className="text-[#0a0a0a] text-sm font-medium truncate">
                   {post.video.originalName}
                 </span>
                 <span
@@ -76,7 +76,7 @@ export default function PublishedHistory() {
                   {post.status === 'PUBLISHED' ? 'Published' : 'Failed'}
                 </span>
               </div>
-              <p className="text-gray-500 text-xs">
+              <p className="text-[#8a8580] text-xs">
                 @{post.instagramAccount.instagramUsername}
                 {post.publishedAt && (
                   <> &middot; {new Date(post.publishedAt).toLocaleDateString([], {
@@ -96,7 +96,7 @@ export default function PublishedHistory() {
                 href={post.igPermalink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 text-cyan-400 hover:text-cyan-300 text-sm flex-shrink-0"
+                className="px-3 py-1.5 text-[#e85d26] hover:text-[#d14d1a] text-sm flex-shrink-0"
               >
                 View
               </a>

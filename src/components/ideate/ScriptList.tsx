@@ -12,7 +12,7 @@ interface Props {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   DRAFT: { bg: 'bg-gray-500/20', text: 'text-gray-400' },
-  READY: { bg: 'bg-violet-500/20', text: 'text-violet-400' },
+  READY: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]' },
   FILMED: { bg: 'bg-green-500/20', text: 'text-green-400' },
   ARCHIVED: { bg: 'bg-gray-500/20', text: 'text-gray-500' },
 }
@@ -37,14 +37,14 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
   }
 
   if (loading) {
-    return <div className="text-gray-500 text-center py-12">Loading scripts...</div>
+    return <div className="text-[#8a8580] text-center py-12">Loading scripts...</div>
   }
 
   if (scripts.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-400 mb-2">No scripts yet</p>
-        <p className="text-gray-500 text-sm">Generate a script from one of your ideas in the Ideas tab.</p>
+        <p className="text-[#8a8580] mb-2">No scripts yet</p>
+        <p className="text-[#8a8580] text-sm">Generate a script from one of your ideas in the Ideas tab.</p>
       </div>
     )
   }
@@ -58,17 +58,17 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
           <div
             key={script.id}
             onClick={() => onViewScript(script)}
-            className="bg-[#1A1A24] rounded-lg p-4 hover:bg-[#1F1F2E] transition-colors cursor-pointer"
+            className="bg-white border border-[#e0dbd4] rounded-full p-4 hover:bg-[#faf7f2] transition-colors cursor-pointer"
           >
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-white font-medium text-sm truncate">{script.title}</h3>
+                  <h3 className="text-[#0a0a0a] font-medium text-sm truncate">{script.title}</h3>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
                     {script.status}
                   </span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-gray-500">
+                <div className="flex items-center gap-4 text-xs text-[#8a8580]">
                   {script.idea && (
                     <span>From: {script.idea.title}</span>
                   )}
@@ -83,7 +83,7 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
                 <button
                   onClick={(e) => handleRate(e, script, 'up')}
                   className={`p-1 rounded transition-colors ${
-                    script.rating === 'up' ? 'text-green-400' : 'text-gray-600 hover:text-green-400'
+                    script.rating === 'up' ? 'text-green-400' : 'text-[#8a8580] hover:text-green-400'
                   }`}
                   title="Good script"
                 >
@@ -94,7 +94,7 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
                 <button
                   onClick={(e) => handleRate(e, script, 'down')}
                   className={`p-1 rounded transition-colors ${
-                    script.rating === 'down' ? 'text-red-400' : 'text-gray-600 hover:text-red-400'
+                    script.rating === 'down' ? 'text-red-400' : 'text-[#8a8580] hover:text-red-400'
                   }`}
                   title="Bad script"
                 >
@@ -109,13 +109,13 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
                     e.stopPropagation()
                     onOpenTeleprompter(script)
                   }}
-                  className="px-3 py-1.5 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-white rounded-md text-xs font-medium transition-colors"
+                  className="px-3 py-1.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-md text-xs font-medium transition-colors"
                 >
                   Teleprompter
                 </button>
                 <button
                   onClick={(e) => handleDelete(e, script)}
-                  className="p-1.5 text-gray-600 hover:text-red-400 transition-colors"
+                  className="p-1.5 text-[#8a8580] hover:text-red-400 transition-colors"
                   title="Delete script"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

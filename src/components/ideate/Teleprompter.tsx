@@ -113,7 +113,7 @@ export default function Teleprompter({ script, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#0F0F14]"
+      className="fixed inset-0 z-50 bg-[#faf7f2]"
       style={{ transform: isMirrored ? 'scaleX(-1)' : 'none' }}
       onMouseMove={resetControlsTimer}
       onTouchStart={resetControlsTimer}
@@ -130,14 +130,14 @@ export default function Teleprompter({ script, onClose }: Props) {
         {lines.map((line, i) => (
           <p
             key={i}
-            className="text-white mb-4 transition-opacity max-w-3xl mx-auto"
+            className="text-[#0a0a0a] mb-4 transition-opacity max-w-3xl mx-auto"
             style={{
               fontSize: `${fontSize}px`,
               lineHeight: 1.8,
             }}
           >
             {line === '[PAUSE]' ? (
-              <span className="block text-violet-400 italic text-center" style={{ fontSize: `${fontSize * 0.6}px` }}>
+              <span className="block text-[#e85d26] italic text-center" style={{ fontSize: `${fontSize * 0.6}px` }}>
                 — pause —
               </span>
             ) : (
@@ -161,16 +161,16 @@ export default function Teleprompter({ script, onClose }: Props) {
           <div className="max-w-2xl mx-auto">
             {/* Speed slider */}
             <div className="flex items-center gap-3 mb-4">
-              <span className="text-gray-400 text-xs w-16">Speed</span>
+              <span className="text-[#8a8580] text-xs w-16">Speed</span>
               <input
                 type="range"
                 min={60}
                 max={200}
                 value={speed}
                 onChange={(e) => setSpeed(parseInt(e.target.value))}
-                className="flex-1 accent-violet-500"
+                className="flex-1 accent-[#e85d26]"
               />
-              <span className="text-gray-300 text-xs w-16 text-right">{speed} WPM</span>
+              <span className="text-[#0a0a0a] text-xs w-16 text-right">{speed} WPM</span>
             </div>
 
             {/* Control buttons */}
@@ -178,7 +178,7 @@ export default function Teleprompter({ script, onClose }: Props) {
               {/* Reset */}
               <button
                 onClick={handleReset}
-                className="p-2.5 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-gray-300 rounded-lg transition-colors"
+                className="p-2.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full transition-colors"
                 title="Reset to start"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -189,7 +189,7 @@ export default function Teleprompter({ script, onClose }: Props) {
               {/* Play/Pause */}
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="p-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl transition-colors"
+                className="p-3 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-2xl transition-colors"
                 title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
               >
                 {isPlaying ? (
@@ -207,14 +207,14 @@ export default function Teleprompter({ script, onClose }: Props) {
               {/* Font size */}
               <button
                 onClick={() => setFontSize((s) => Math.max(s - 2, 18))}
-                className="p-2.5 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-gray-300 rounded-lg transition-colors"
+                className="p-2.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full transition-colors"
                 title="Smaller text (-)"
               >
                 <span className="text-sm font-bold">A-</span>
               </button>
               <button
                 onClick={() => setFontSize((s) => Math.min(s + 2, 48))}
-                className="p-2.5 bg-[#2A2A3A] hover:bg-[#3A3A4A] text-gray-300 rounded-lg transition-colors"
+                className="p-2.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full transition-colors"
                 title="Larger text (+)"
               >
                 <span className="text-sm font-bold">A+</span>
@@ -223,10 +223,10 @@ export default function Teleprompter({ script, onClose }: Props) {
               {/* Mirror */}
               <button
                 onClick={() => setIsMirrored(!isMirrored)}
-                className={`p-2.5 rounded-lg transition-colors ${
+                className={`p-2.5 rounded-full transition-colors ${
                   isMirrored
-                    ? 'bg-violet-500/20 text-violet-400'
-                    : 'bg-[#2A2A3A] hover:bg-[#3A3A4A] text-gray-300'
+                    ? 'bg-[rgba(232,93,38,0.1)] text-[#e85d26]'
+                    : 'bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a]'
                 }`}
                 title="Mirror mode (M)"
               >
@@ -238,7 +238,7 @@ export default function Teleprompter({ script, onClose }: Props) {
               {/* Close */}
               <button
                 onClick={onClose}
-                className="p-2.5 bg-[#2A2A3A] hover:bg-red-500/20 hover:text-red-400 text-gray-300 rounded-lg transition-colors"
+                className="p-2.5 bg-[#f5f0e8] hover:bg-red-500/20 hover:text-red-400 text-[#0a0a0a] rounded-full transition-colors"
                 title="Exit (Esc)"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -248,7 +248,7 @@ export default function Teleprompter({ script, onClose }: Props) {
             </div>
 
             {/* Keyboard shortcuts hint */}
-            <p className="text-gray-600 text-xs text-center mt-3">
+            <p className="text-[#8a8580] text-xs text-center mt-3">
               Space: play/pause &middot; Arrows: speed &middot; +/-: font &middot; M: mirror &middot; Esc: exit
             </p>
           </div>
