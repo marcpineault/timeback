@@ -62,8 +62,23 @@ export interface ProcessingOptions {
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
   headlineStyle?: HeadlineStyle;
-  captionStyle?: 'instagram';
+  captionStyle?: 'instagram' | 'minimal';
 }
+
+// Caption styles optimized for safe zones
+// FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
+// All margin values must be scaled to this coordinate system
+// For 1080x1920 (9:16): Target captions in lower third, avoiding buttons and engagement icons
+// Alignment=2 is bottom-center, MarginV is from bottom edge in PlayRes coordinates
+const CAPTION_STYLE_MAP: Record<string, string> = {
+  // Instagram style - white text on semi-transparent dark background box
+  // Clean, modern, refined look with better readability on busy backgrounds
+  // MarginV=70 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
+  instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+  // Minimal style - clean white text with thin black outline, no background box
+  // Subtle, modern look that lets the video show through
+  minimal: 'Fontname=Helvetica,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+};
 
 /**
  * Analyze a single chunk of audio and return volume statistics
@@ -827,18 +842,6 @@ export async function burnCaptions(
   // Check if this is an animated ASS file
   const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
 
-  // Caption styles optimized for safe zones
-  // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
-  // All margin values must be scaled to this coordinate system
-  // For 1080x1920 (9:16): Target captions in lower third, avoiding buttons and engagement icons
-  // Alignment=2 is bottom-center, MarginV is from bottom edge in PlayRes coordinates
-  const styleMap: Record<string, string> = {
-    // Instagram style - white text on semi-transparent dark background box
-    // Clean, modern, refined look with better readability on busy backgrounds
-    // MarginV=70 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
-    instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
-  };
-
   logger.debug(`[Captions] Burning captions from: ${srtPath}`);
   logger.debug(`[Captions] Style: ${style}, Animated: ${isAnimated}`);
 
@@ -861,7 +864,7 @@ export async function burnCaptions(
   if (isAnimated) {
     filterString = `ass='${escapedPath}'`;
   } else {
-    const subtitleStyle = styleMap[style] || styleMap.instagram;
+    const subtitleStyle = CAPTION_STYLE_MAP[style] || CAPTION_STYLE_MAP.instagram;
     filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
   }
   logger.debug(`[Captions] Filter: ${filterString}`);
@@ -1539,7 +1542,7 @@ export async function applyCombinedFilters(
     if (isAnimated) {
       captionFilter = `ass='${escapedPath}'`;
     } else {
-      const subtitleStyle = 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53';
+      const subtitleStyle = CAPTION_STYLE_MAP[options.captionStyle || 'instagram'] || CAPTION_STYLE_MAP.instagram;
       captionFilter = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
     }
 
