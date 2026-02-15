@@ -8,6 +8,8 @@ const isPublicRoute = createRouteMatcher([
   '/pricing',
   '/financial-advisors',
   '/mortgage-brokers',
+  '/real-estate-agents',
+  '/side-hustlers',
   '/privacy',
   '/terms',
   '/api/webhooks(.*)',
