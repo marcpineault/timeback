@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import ScrollReveal from '@/components/ScrollReveal'
+import IndustrySelector from '@/components/IndustrySelector'
 
 export default async function LandingPage() {
   const { userId } = await auth()
@@ -40,10 +41,13 @@ export default async function LandingPage() {
         </p>
         <div className="hero-ctas">
           <Link href="/sign-up" className="btn-primary">Start Creating Free →</Link>
-          <a href="#how-it-works" className="btn-secondary">See how it works</a>
+          <a href="#selector" className="btn-outline-hero">What&apos;s your industry? ↓</a>
         </div>
         <p className="hero-proof">No credit card required · <strong>5 free videos</strong> to start · Cancel anytime</p>
       </section>
+
+      {/* INDUSTRY SELECTOR */}
+      <IndustrySelector />
 
       {/* HOW IT WORKS */}
       <section className="lp-how reveal" id="how-it-works">
