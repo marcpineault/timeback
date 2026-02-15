@@ -41,6 +41,8 @@ interface VideoUploaderProps {
   onUploadComplete: (files: UploadedFile[], autoProcess?: boolean) => void;
   disabled?: boolean;
   showAutoProcessOption?: boolean;
+  /** Number of videos the user has processed (for showing contextual help) */
+  videosProcessed?: number;
 }
 
 // 5MB chunks to stay well under Railway's 10MB limit
@@ -89,7 +91,7 @@ const getContentType = (file: File): string => {
   return mimeTypes[ext || ''] || 'video/mp4';
 };
 
-export default function VideoUploader({ onUploadComplete, disabled, showAutoProcessOption = false }: VideoUploaderProps) {
+export default function VideoUploader({ onUploadComplete, disabled, showAutoProcessOption = false, videosProcessed = 999 }: VideoUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +100,8 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
   const [isMobile, setIsMobile] = useState(false);
   const [autoProcessEnabled, setAutoProcessEnabled] = useState(false);
   const [autoProcessLoading, setAutoProcessLoading] = useState(true);
+  const [hasSavedSettings, setHasSavedSettings] = useState(true);
+  const [showAutoProcessTooltip, setShowAutoProcessTooltip] = useState(false);
 
   // Ref to track upload status - avoids stale closure issues with useCallback
   // This ensures the guard check always sees current status, not stale state from old closures
@@ -166,6 +170,12 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
       .then(data => {
         if (data?.preferences) {
           setAutoProcessEnabled(data.preferences.autoProcessOnUpload);
+          // Check if user has saved any processing preferences beyond defaults
+          const prefs = data.preferences;
+          const hasCustomized = prefs.captionStyle || prefs.silenceThreshold !== undefined || prefs.aspectRatio;
+          setHasSavedSettings(!!hasCustomized);
+        } else {
+          setHasSavedSettings(false);
         }
       })
       .catch(() => {
@@ -1093,12 +1103,52 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
               <div className="w-11 h-6 bg-[#e0dbd4] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#e85d26] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#e85d26]"></div>
             </div>
             <div className="flex-1">
-              <span className="text-sm font-medium text-[#0a0a0a]">Auto-process after upload</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-[#0a0a0a]">Auto-process after upload</span>
+                {videosProcessed < 5 && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setShowAutoProcessTooltip(!showAutoProcessTooltip);
+                      }}
+                      className="text-[#8a8580] hover:text-[#0a0a0a] transition-colors"
+                      aria-label="More info about auto-process"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                    {showAutoProcessTooltip && (
+                      <div className="absolute left-0 top-6 z-10 w-64 p-3 bg-white border border-[#e0dbd4] rounded-xl shadow-lg text-xs text-[#0a0a0a]">
+                        <p>When enabled, uploaded videos are automatically edited using your saved settings. You can close this page after uploading.</p>
+                        {!hasSavedSettings && (
+                          <p className="mt-2 text-[#e85d26]">
+                            <a href="/api/user/preferences" onClick={(e) => { e.preventDefault(); }} className="underline">Set up your editing preferences first</a> — process a video manually to save your settings.
+                          </p>
+                        )}
+                        <button
+                          onClick={() => setShowAutoProcessTooltip(false)}
+                          className="mt-2 text-[#8a8580] hover:text-[#0a0a0a] text-xs"
+                        >
+                          Got it
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-[#8a8580] mt-1">
                 {autoProcessEnabled
                   ? 'Videos will be processed automatically using your saved settings. You can close this page after uploading.'
                   : 'Enable to automatically process videos with your saved settings.'}
               </p>
+              {videosProcessed < 5 && !hasSavedSettings && !showAutoProcessTooltip && (
+                <p className="text-xs text-[#e85d26] mt-1">
+                  Set up your editing preferences first &mdash; process a video manually to save your settings.
+                </p>
+              )}
             </div>
           </label>
         </div>
@@ -1151,10 +1201,10 @@ export default function VideoUploader({ onUploadComplete, disabled, showAutoProc
                 </svg>
 
                 <p className="text-lg sm:text-xl text-[#0a0a0a]">
-                  {isDragging ? 'Drop your videos here' : 'Tap to upload videos'}
+                  {isDragging ? 'Drop your videos here' : 'Upload your raw recordings'}
                 </p>
-                <p className="text-[#8a8580] text-sm sm:text-base">or drag and drop</p>
-                <p className="text-xs sm:text-sm text-[#8a8580]">Upload up to 50 videos at once &middot; MP4, MOV, WebM, AVI</p>
+                <p className="text-[#8a8580] text-sm sm:text-base">Drag and drop or tap to browse</p>
+                <p className="text-xs sm:text-sm text-[#8a8580]">We&apos;ll remove silences, add captions, and get them post-ready &middot; Up to 50 at once</p>
               </>
             )}
           </div>
