@@ -44,9 +44,14 @@ export default async function LandingPage() {
         </div>
         <p className="hero-proof">No credit card required · <strong>5 free videos</strong> to start · Cancel anytime</p>
 
-        {/* HERO SCREENSHOT PLACEHOLDER */}
-        <div className="hero-screenshot">
-          <p className="hero-screenshot-text">Product screenshot — replace with app.timebackvideo.com dashboard screenshot</p>
+        {/* HERO SCREENSHOTS */}
+        <div className="hero-screenshots-wrapper">
+          <div className="hero-screenshot hero-screenshot-main">
+            <img src="/screenshot-editor.png" alt="TimeBack video editor — upload, process, and download videos automatically" />
+          </div>
+          <div className="hero-screenshot hero-screenshot-secondary">
+            <img src="/screenshot-ideate.png" alt="TimeBack Ideate — AI-powered inspiration and swipe file for creators" />
+          </div>
         </div>
       </section>
 
