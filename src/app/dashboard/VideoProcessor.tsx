@@ -29,6 +29,8 @@ interface VideoProcessorProps {
   videosRemaining: number
   hasWatermark: boolean
   enabledFeatures?: EnabledFeatures
+  /** Total videos processed by this user (for onboarding UX) */
+  videosProcessed?: number
 }
 
 export default function VideoProcessor({
@@ -37,6 +39,7 @@ export default function VideoProcessor({
   videosRemaining: initialVideosRemaining,
   hasWatermark,
   enabledFeatures = { speechCorrection: false, instagramScheduling: false },
+  videosProcessed = 999,
 }: VideoProcessorProps) {
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
@@ -967,13 +970,14 @@ export default function VideoProcessor({
             onUploadComplete={handleUploadComplete}
             disabled={isProcessing}
             showAutoProcessOption={true}
+            videosProcessed={videosProcessed}
           />
 
           {/* Empty-state guidance for new users */}
           {videoQueue.length === 0 && (
             <div className="text-center py-2">
               <p className="text-[#8a8580] text-sm">
-                Upload a video to get started — we&apos;ll remove the silence automatically.
+                No editing needed — just upload your raw footage and we handle the rest.
               </p>
               <a
                 href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"

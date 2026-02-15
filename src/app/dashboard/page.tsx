@@ -6,6 +6,7 @@ import { getEnabledFeatures } from '@/lib/featureFlags'
 import VideoProcessor from './VideoProcessor'
 import WelcomeOverlay from '@/components/WelcomeOverlay'
 import RecentVideosTable from '@/components/RecentVideosTable'
+import OnboardingBanner from '@/components/OnboardingBanner'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -76,12 +77,21 @@ export default async function DashboardPage() {
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
         <div className="nav-links">
-          <Link href="/dashboard" style={{ color: '#0a0a0a', fontWeight: 600 }}>Editor</Link>
-          {features.instagramScheduling && (
-            <Link href="/dashboard/schedule">Schedule</Link>
-          )}
           {features.ideate && (
-            <Link href="/dashboard/ideate">Ideate</Link>
+            <Link href="/dashboard/ideate" className="nav-tab-link">
+              <span>Ideate</span>
+              <span className="nav-tab-subtitle">Scripts</span>
+            </Link>
+          )}
+          <Link href="/dashboard" style={{ color: '#0a0a0a', fontWeight: 600 }} className="nav-tab-link">
+            <span>Editor</span>
+            <span className="nav-tab-subtitle">Upload &amp; Edit</span>
+          </Link>
+          {features.instagramScheduling && (
+            <Link href="/dashboard/schedule" className="nav-tab-link">
+              <span>Schedule</span>
+              <span className="nav-tab-subtitle">Post to IG</span>
+            </Link>
           )}
           <a
             href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
@@ -96,6 +106,11 @@ export default async function DashboardPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8" style={{ paddingTop: '5rem' }}>
+        {/* Onboarding Banner for new users */}
+        {usage.videosUsed < 5 && (
+          <OnboardingBanner activeStep="editor" />
+        )}
+
         {/* Welcome Header */}
         <div className="mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-[#0a0a0a]" style={{ fontFamily: "'Instrument Serif', serif" }}>
@@ -173,6 +188,7 @@ export default async function DashboardPage() {
           videosRemaining={usage.videosRemaining ?? Infinity}
           hasWatermark={usage.planDetails.watermark}
           enabledFeatures={features}
+          videosProcessed={usage.videosUsed}
         />
 
         {/* Recent Videos */}

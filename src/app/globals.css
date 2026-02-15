@@ -105,6 +105,21 @@ body {
   color: var(--lp-black);
 }
 
+/* Nav tab links with subtitles */
+.nav-tab-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.nav-tab-subtitle {
+  font-size: 0.6875rem;
+  color: var(--lp-muted);
+  font-weight: 400;
+  margin-top: 1px;
+}
+
 .nav-cta {
   background: var(--lp-black) !important;
   color: var(--lp-white) !important;
