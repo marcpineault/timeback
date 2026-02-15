@@ -321,6 +321,123 @@ body {
   animation: fadeUp 0.8s ease 0.7s both;
 }
 
+/* ── REPLACES SECTION ── */
+.lp-replaces {
+  padding: 4rem 2rem 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.lp-replaces h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.8rem;
+}
+
+.lp-replaces > p {
+  color: var(--lp-muted);
+  font-size: 1.05rem;
+  margin-bottom: 2.5rem;
+}
+
+.replaces-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.replaces-card {
+  background: var(--lp-card-bg);
+  border: 1px solid var(--lp-border);
+  border-radius: 16px;
+  padding: 1.8rem 2rem;
+  min-width: 140px;
+  transition: transform 0.2s;
+}
+
+.replaces-card:hover {
+  transform: translateY(-2px);
+}
+
+.replaces-card.replaced {
+  opacity: 0.6;
+  position: relative;
+}
+
+.replaces-card.replaced::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--lp-muted);
+  opacity: 0.4;
+}
+
+.replaces-card.replaces-timeback {
+  background: var(--lp-black);
+  color: var(--lp-white);
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 1px var(--lp-accent), 0 8px 30px rgba(232, 93, 38, 0.15);
+}
+
+.replaces-card.replaces-timeback .replaces-name {
+  color: var(--lp-white);
+}
+
+.replaces-card.replaces-timeback .replaces-role {
+  color: var(--lp-accent);
+}
+
+.replaces-name {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.4rem;
+  margin-bottom: 0.3rem;
+  color: var(--lp-black);
+}
+
+.replaces-role {
+  font-size: 0.8rem;
+  color: var(--lp-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.replaces-plus,
+.replaces-arrow {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.5rem;
+  color: var(--lp-muted);
+  flex-shrink: 0;
+}
+
+.replaces-arrow {
+  font-size: 1.8rem;
+  color: var(--lp-accent);
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .replaces-grid {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .replaces-card {
+    width: 100%;
+    min-width: unset;
+  }
+  .replaces-plus,
+  .replaces-arrow {
+    font-size: 1.2rem;
+  }
+}
+
 /* ── NUMBERS BAR ── */
 .lp-numbers {
   display: grid;
