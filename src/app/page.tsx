@@ -43,59 +43,41 @@ export default async function LandingPage() {
           <a href="#how-it-works" className="btn-secondary">See how it works</a>
         </div>
         <p className="hero-proof">No credit card required · <strong>5 free videos</strong> to start · Cancel anytime</p>
+      </section>
 
-        {/* HERO SCREENSHOTS */}
-        <div className="hero-screenshots-wrapper">
-          <div className="hero-screenshot hero-screenshot-main">
-            <img src="/screenshot-editor.png" alt="TimeBack video editor — upload, process, and download videos automatically" />
+      {/* HOW IT WORKS */}
+      <section className="lp-how reveal" id="how-it-works">
+        <div className="section-label">How It Works</div>
+        <h2>From zero to a full feed in 3 steps</h2>
+        <div className="steps">
+          <div className="step">
+            <div className="step-number">01</div>
+            <h3>Pick your topics</h3>
+            <p>Tell TimeBack your industry and audience. AI generates a batch of scroll-stopping scripts you can customize or use as-is.</p>
+            <span className="time-tag">⚡ 5 minutes</span>
           </div>
-          <div className="hero-screenshot hero-screenshot-secondary">
-            <img src="/screenshot-ideate.png" alt="TimeBack Ideate — AI-powered inspiration and swipe file for creators" />
+          <div className="step">
+            <div className="step-number">02</div>
+            <h3>Batch record &amp; upload</h3>
+            <p>Film your videos back to back, then upload up to 50 at once. No teleprompter needed — just talk and AI handles the rest.</p>
+            <span className="time-tag">⚡ 1–2 hours</span>
+          </div>
+          <div className="step">
+            <div className="step-number">03</div>
+            <h3>Auto-edit &amp; auto-post</h3>
+            <p>TimeBack removes silences, adds captions, polishes your cuts, and auto-schedules everything to Instagram. You&apos;re done.</p>
+            <span className="time-tag">⚡ Automatic</span>
           </div>
         </div>
       </section>
 
-      {/* REPLACES */}
-      <section className="lp-replaces reveal">
-        <div className="section-label">One Tool, Not Three</div>
-        <h2>Replace your entire stack</h2>
-        <p>Stop juggling three apps. TimeBack does it all.</p>
-        <div className="replaces-grid">
-          <div className="replaces-card replaced">
-            <div className="replaces-name">ChatGPT</div>
-            <div className="replaces-role">Script writing</div>
-          </div>
-          <div className="replaces-plus">+</div>
-          <div className="replaces-card replaced">
-            <div className="replaces-name">CapCut</div>
-            <div className="replaces-role">Video editing</div>
-          </div>
-          <div className="replaces-plus">+</div>
-          <div className="replaces-card replaced">
-            <div className="replaces-name">Metricool</div>
-            <div className="replaces-role">Scheduling</div>
-          </div>
-          <div className="replaces-arrow">=</div>
-          <div className="replaces-card replaces-timeback">
-            <div className="replaces-name">TimeBack</div>
-            <div className="replaces-role">All-in-one</div>
-          </div>
+      {/* HERO SCREENSHOTS */}
+      <div className="hero-screenshots-wrapper">
+        <div className="hero-screenshot hero-screenshot-main">
+          <img src="/screenshot-editor.svg" alt="TimeBack video editor — upload, process, and download videos automatically" />
         </div>
-      </section>
-
-      {/* NUMBERS */}
-      <div className="lp-numbers">
-        <div className="number-item">
-          <div className="big">50</div>
-          <div className="label">Videos per batch upload</div>
-        </div>
-        <div className="number-item">
-          <div className="big">0</div>
-          <div className="label">Editing skills needed</div>
-        </div>
-        <div className="number-item">
-          <div className="big">1</div>
-          <div className="label">Afternoon to a month of content</div>
+        <div className="hero-screenshot hero-screenshot-secondary">
+          <img src="/screenshot-ideate.svg" alt="TimeBack Ideate — AI-powered inspiration and swipe file for creators" />
         </div>
       </div>
 
@@ -128,100 +110,46 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section className="lp-how reveal" id="how-it-works">
-        <div className="section-label">How It Works</div>
-        <h2>From zero to a full feed in 3 steps</h2>
-        <div className="steps">
-          <div className="step">
-            <div className="step-number">01</div>
-            <h3>Pick your topics</h3>
-            <p>Tell TimeBack your industry and audience. AI generates a batch of scroll-stopping scripts you can customize or use as-is.</p>
-            <span className="time-tag">⚡ 5 minutes</span>
-          </div>
-          <div className="step">
-            <div className="step-number">02</div>
-            <h3>Batch record &amp; upload</h3>
-            <p>Film your videos back to back, then upload up to 50 at once. No teleprompter needed — just talk and AI handles the rest.</p>
-            <span className="time-tag">⚡ 1–2 hours</span>
-          </div>
-          <div className="step">
-            <div className="step-number">03</div>
-            <h3>Auto-edit &amp; auto-post</h3>
-            <p>TimeBack removes silences, adds captions, polishes your cuts, and auto-schedules everything to Instagram. You&apos;re done.</p>
-            <span className="time-tag">⚡ Automatic</span>
-          </div>
+      {/* NUMBERS */}
+      <div className="lp-numbers">
+        <div className="number-item">
+          <div className="big">50</div>
+          <div className="label">Videos per batch upload</div>
         </div>
-      </section>
-
-      {/* FEATURES */}
-      <section className="lp-features reveal">
-        <div className="section-label">Features</div>
-        <h2>Everything between &ldquo;record&rdquo; and &ldquo;posted&rdquo;</h2>
-        <div className="feature-grid">
-          <div className="feature-card highlight">
-            <span className="feature-tag">Core Feature</span>
-            <h3>Bulk upload. Bulk edit. Bulk schedule.</h3>
-            <p>Upload up to 50 raw videos at once. TimeBack edits every single one — removing dead air, adding captions, tightening pacing — then queues them all to post. One session, one month of content.</p>
-          </div>
-          <div className="feature-card">
-            <span className="feature-tag">AI Scripts</span>
-            <h3>Never run out of things to say</h3>
-            <p>AI generates video scripts tailored to your industry and audience. Pick the ones you like, hit record, and read.</p>
-          </div>
-          <div className="feature-card">
-            <span className="feature-tag">Smart Editing</span>
-            <h3>Silence removal that just works</h3>
-            <p>Awkward pauses, ums, dead air — all cut automatically. Your videos sound crisp and confident without touching an editor.</p>
-          </div>
-          <div className="feature-card">
-            <span className="feature-tag">Captions</span>
-            <h3>Auto-captions on every video</h3>
-            <p>Captions added automatically so your content works in the feed with sound off — where most people scroll.</p>
-          </div>
-          <div className="feature-card">
-            <span className="feature-tag">Scheduling</span>
-            <h3>Auto-post to Instagram</h3>
-            <p>Set it and forget it. TimeBack publishes your finished videos on a schedule so you stay consistent without thinking about it.</p>
-          </div>
+        <div className="number-item">
+          <div className="big">0</div>
+          <div className="label">Editing skills needed</div>
         </div>
-      </section>
+        <div className="number-item">
+          <div className="big">1</div>
+          <div className="label">Afternoon to a month of content</div>
+        </div>
+      </div>
 
-      {/* WHO IT'S FOR */}
-      <section className="lp-audience reveal">
-        <div className="section-label">Who It&apos;s For</div>
-        <h2>Built for experts, not influencers</h2>
-        <p>You don&apos;t need to be a content creator. You just need something worth saying.</p>
-        <div className="audience-grid">
-          <div className="audience-card">
-            <div className="emoji">🏡</div>
-            <h4>Real Estate Agents</h4>
-            <p>Become the local expert people call first</p>
+      {/* REPLACES */}
+      <section className="lp-replaces reveal">
+        <div className="section-label">One Tool, Not Three</div>
+        <h2>Replace your entire stack</h2>
+        <p>Stop juggling three apps. TimeBack does it all.</p>
+        <div className="replaces-grid">
+          <div className="replaces-card replaced">
+            <div className="replaces-name">ChatGPT</div>
+            <div className="replaces-role">Script writing</div>
           </div>
-          <div className="audience-card">
-            <div className="emoji">💼</div>
-            <h4>Financial Advisors</h4>
-            <p>Build trust before the first meeting</p>
+          <div className="replaces-plus">+</div>
+          <div className="replaces-card replaced">
+            <div className="replaces-name">CapCut</div>
+            <div className="replaces-role">Video editing</div>
           </div>
-          <div className="audience-card">
-            <div className="emoji">🎯</div>
-            <h4>Coaches &amp; Consultants</h4>
-            <p>Establish authority and attract inbound leads</p>
+          <div className="replaces-plus">+</div>
+          <div className="replaces-card replaced">
+            <div className="replaces-name">Metricool</div>
+            <div className="replaces-role">Scheduling</div>
           </div>
-          <div className="audience-card">
-            <div className="emoji">⚖️</div>
-            <h4>Lawyers</h4>
-            <p>Demystify your expertise and get referrals</p>
-          </div>
-          <div className="audience-card">
-            <div className="emoji">💪</div>
-            <h4>Personal Trainers</h4>
-            <p>Fill your client roster from your feed</p>
-          </div>
-          <div className="audience-card">
-            <div className="emoji">🚀</div>
-            <h4>Founders &amp; CEOs</h4>
-            <p>Build a personal brand while running your company</p>
+          <div className="replaces-arrow">=</div>
+          <div className="replaces-card replaces-timeback">
+            <div className="replaces-name">TimeBack</div>
+            <div className="replaces-role">All-in-one</div>
           </div>
         </div>
       </section>
@@ -289,6 +217,78 @@ export default async function LandingPage() {
                 <div className="role">Content Creator</div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* WHO IT'S FOR */}
+      <section className="lp-audience reveal">
+        <div className="section-label">Who It&apos;s For</div>
+        <h2>Built for experts, not influencers</h2>
+        <p>You don&apos;t need to be a content creator. You just need something worth saying.</p>
+        <div className="audience-grid">
+          <div className="audience-card">
+            <div className="emoji">🏡</div>
+            <h4>Real Estate Agents</h4>
+            <p>Become the local expert people call first</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">💼</div>
+            <h4>Financial Advisors</h4>
+            <p>Build trust before the first meeting</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">🎯</div>
+            <h4>Coaches &amp; Consultants</h4>
+            <p>Establish authority and attract inbound leads</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">⚖️</div>
+            <h4>Lawyers</h4>
+            <p>Demystify your expertise and get referrals</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">💪</div>
+            <h4>Personal Trainers</h4>
+            <p>Fill your client roster from your feed</p>
+          </div>
+          <div className="audience-card">
+            <div className="emoji">🚀</div>
+            <h4>Founders &amp; CEOs</h4>
+            <p>Build a personal brand while running your company</p>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section className="lp-features reveal">
+        <div className="section-label">Features</div>
+        <h2>Everything between &ldquo;record&rdquo; and &ldquo;posted&rdquo;</h2>
+        <div className="feature-grid">
+          <div className="feature-card highlight">
+            <span className="feature-tag">Core Feature</span>
+            <h3>Bulk upload. Bulk edit. Bulk schedule.</h3>
+            <p>Upload up to 50 raw videos at once. TimeBack edits every single one — removing dead air, adding captions, tightening pacing — then queues them all to post. One session, one month of content.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">AI Scripts</span>
+            <h3>Never run out of things to say</h3>
+            <p>AI generates video scripts tailored to your industry and audience. Pick the ones you like, hit record, and read.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">Smart Editing</span>
+            <h3>Silence removal that just works</h3>
+            <p>Awkward pauses, ums, dead air — all cut automatically. Your videos sound crisp and confident without touching an editor.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">Captions</span>
+            <h3>Auto-captions on every video</h3>
+            <p>Captions added automatically so your content works in the feed with sound off — where most people scroll.</p>
+          </div>
+          <div className="feature-card">
+            <span className="feature-tag">Scheduling</span>
+            <h3>Auto-post to Instagram</h3>
+            <p>Set it and forget it. TimeBack publishes your finished videos on a schedule so you stay consistent without thinking about it.</p>
           </div>
         </div>
       </section>

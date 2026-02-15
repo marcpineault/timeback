@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" fill="none">
+  <rect width="960" height="600" rx="8" fill="#faf9f7"/>
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="220" height="600" fill="#f5f3f0"/>
+  <rect x="20" y="24" width="120" height="20" rx="4" fill="#1a1a1a" opacity="0.8"/>
+  <rect x="20" y="64" width="180" height="14" rx="3" fill="#d4d0cc"/>
+  <rect x="20" y="92" width="160" height="14" rx="3" fill="#d4d0cc"/>
+  <rect x="20" y="120" width="140" height="14" rx="3" fill="#d4d0cc"/>
+  <rect x="20" y="148" width="170" height="14" rx="3" fill="#d4d0cc"/>
+  <rect x="20" y="176" width="150" height="14" rx="3" fill="#d4d0cc"/>
+  <!-- Main content area -->
+  <rect x="240" y="20" width="700" height="40" rx="6" fill="#f0eeeb"/>
+  <!-- Video cards grid -->
+  <rect x="240" y="80" width="220" height="140" rx="8" fill="#e8e5e0"/>
+  <rect x="240" y="180" width="220" height="16" rx="3" fill="#c5c0ba"/>
+  <rect x="240" y="200" width="160" height="12" rx="3" fill="#d4d0cc"/>
+  <rect x="475" y="80" width="220" height="140" rx="8" fill="#e8e5e0"/>
+  <rect x="475" y="180" width="220" height="16" rx="3" fill="#c5c0ba"/>
+  <rect x="475" y="200" width="160" height="12" rx="3" fill="#d4d0cc"/>
+  <rect x="710" y="80" width="220" height="140" rx="8" fill="#e8e5e0"/>
+  <rect x="710" y="180" width="220" height="16" rx="3" fill="#c5c0ba"/>
+  <rect x="710" y="200" width="160" height="12" rx="3" fill="#d4d0cc"/>
+  <!-- Second row -->
+  <rect x="240" y="240" width="220" height="140" rx="8" fill="#e8e5e0"/>
+  <rect x="240" y="340" width="220" height="16" rx="3" fill="#c5c0ba"/>
+  <rect x="240" y="360" width="160" height="12" rx="3" fill="#d4d0cc"/>
+  <rect x="475" y="240" width="220" height="140" rx="8" fill="#e8e5e0"/>
+  <rect x="475" y="340" width="220" height="16" rx="3" fill="#c5c0ba"/>
+  <rect x="475" y="360" width="160" height="12" rx="3" fill="#d4d0cc"/>
+  <rect x="710" y="240" width="220" height="140" rx="8" fill="#e8e5e0"/>
+  <rect x="710" y="340" width="220" height="16" rx="3" fill="#c5c0ba"/>
+  <rect x="710" y="360" width="160" height="12" rx="3" fill="#d4d0cc"/>
+  <!-- Play icons on video cards -->
+  <polygon points="330,140 330,160 350,150" fill="#c5c0ba"/>
+  <polygon points="565,140 565,160 585,150" fill="#c5c0ba"/>
+  <polygon points="800,140 800,160 820,150" fill="#c5c0ba"/>
+  <polygon points="330,300 330,320 350,310" fill="#c5c0ba"/>
+  <polygon points="565,300 565,320 585,310" fill="#c5c0ba"/>
+  <polygon points="800,300 800,320 820,310" fill="#c5c0ba"/>
+  <!-- Bottom bar -->
+  <rect x="240" y="560" width="700" height="28" rx="4" fill="#f0eeeb"/>
+</svg>
