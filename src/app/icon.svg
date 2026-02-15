@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Dark rounded background -->
+  <rect width="512" height="512" rx="108" fill="#111119"/>
+
+  <!-- Circular arrow arc (clockwise from ~1 o'clock to ~11 o'clock) -->
+  <path d="M 326 136 A 140 140 0 1 1 186 136"
+        stroke="#F97316" stroke-width="34" stroke-linecap="round" fill="none"/>
+
+  <!-- Arrowhead at 11 o'clock pointing clockwise -->
+  <polygon points="218,106 186,136 212,162" fill="#F97316"/>
+
+  <!-- Play button triangle -->
+  <path d="M 220 182 L 220 330 L 340 256 Z" fill="#F97316"/>
+</svg>
