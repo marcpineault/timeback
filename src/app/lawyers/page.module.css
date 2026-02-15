@@ -1,0 +1,608 @@
+/* Lawyers Landing Page */
+
+.page {
+  --bg: #FAF6F1;
+  --bg-dark: #1A1A1A;
+  --surface: #FFFFFF;
+  --orange: #D4622B;
+  --orange-hover: #B8511F;
+  --orange-light: rgba(212,98,43,0.08);
+  --text: #2D2D2D;
+  --text-muted: #6B6B6B;
+  --text-light: #9A9A9A;
+  --border: #E5E0D8;
+  --green: #2E7D5B;
+  --green-light: rgba(46,125,91,0.08);
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page *,
+.page *::before,
+.page *::after {
+  box-sizing: border-box;
+}
+
+.page a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* NAV */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 18px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(250,246,241,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  font-style: italic;
+  color: var(--text);
+}
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.navRight a {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.3s;
+}
+
+.navRight a:hover {
+  color: var(--text);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--orange);
+  color: #fff;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 100px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+}
+
+.btn:hover {
+  background: var(--orange-hover);
+  transform: translateY(-1px);
+}
+
+.btnOutline {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+}
+
+.btnOutline:hover {
+  border-color: var(--text);
+}
+
+/* HERO */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  padding: 120px 32px 80px;
+}
+
+.heroInner {
+  max-width: 740px;
+  margin: 0 auto;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 32px;
+  animation: fadeUp .6s ease-out;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.hero h1 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 400;
+  line-height: 1.08;
+  margin-bottom: 24px;
+  animation: fadeUp .7s ease-out .05s both;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--orange);
+}
+
+.heroInner > p {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  max-width: 540px;
+  margin: 0 auto 40px;
+  animation: fadeUp .7s ease-out .1s both;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  animation: fadeUp .7s ease-out .15s both;
+}
+
+.heroProof {
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--text-light);
+  animation: fadeUp .7s ease-out .2s both;
+}
+
+/* PAIN POINTS */
+.pain {
+  padding: 100px 0;
+  border-top: 1px solid var(--border);
+}
+
+.sectionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 16px;
+}
+
+.pain h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(30px, 4vw, 46px);
+  max-width: 620px;
+  margin-bottom: 20px;
+}
+
+.pain > div > p {
+  font-size: 17px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 560px;
+  margin-bottom: 48px;
+}
+
+.painGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.painCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 28px;
+}
+
+.painCard .icon {
+  font-size: 28px;
+  margin-bottom: 16px;
+}
+
+.painCard h4 {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.painCard p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* SOLUTION */
+.solution {
+  padding: 100px 0;
+  background: var(--bg-dark);
+  color: #fff;
+  border-radius: 24px;
+  margin: 0 20px;
+}
+
+.solution .container {
+  text-align: center;
+}
+
+.solution h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(30px, 4vw, 46px);
+  margin-bottom: 20px;
+}
+
+.solutionSubtext {
+  font-size: 18px;
+  color: rgba(255,255,255,0.55);
+  max-width: 560px;
+  margin: 0 auto 56px;
+}
+
+.solGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  text-align: left;
+}
+
+.solCard {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 36px 28px;
+  transition: background 0.3s;
+}
+
+.solCard:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.solTag {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 14px;
+}
+
+.solCard h3 {
+  font-size: 19px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.solCard p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.5);
+}
+
+/* SCRIPTS */
+.scripts {
+  padding: 100px 0;
+}
+
+.scripts h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(30px, 4vw, 46px);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.scriptsSubtext {
+  text-align: center;
+  font-size: 17px;
+  color: var(--text-muted);
+  margin-bottom: 48px;
+}
+
+.scriptExamples {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.scriptCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  transition: transform 0.3s;
+}
+
+.scriptCard:hover {
+  transform: translateY(-4px);
+}
+
+.scriptCat {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 12px;
+}
+
+.scriptCard h4 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.scriptCard p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* HOW IT WORKS */
+.how {
+  padding: 100px 0;
+  border-top: 1px solid var(--border);
+}
+
+.how h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(30px, 4vw, 46px);
+  margin-bottom: 48px;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+.step {
+  position: relative;
+}
+
+.stepNum {
+  font-family: 'Instrument Serif', serif;
+  font-size: 56px;
+  color: var(--orange);
+  opacity: 0.2;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.step h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.step p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.timeTag {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  background: var(--green-light);
+  padding: 4px 12px;
+  border-radius: 100px;
+}
+
+/* TESTIMONIAL */
+.testimonialSection {
+  padding: 80px 0;
+  border-top: 1px solid var(--border);
+}
+
+.testimonialCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px;
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.stars {
+  font-size: 18px;
+  color: #F59E0B;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+}
+
+.testimonialCard blockquote {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  line-height: 1.6;
+  font-style: italic;
+  margin-bottom: 24px;
+  color: var(--text);
+}
+
+.author {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  background: var(--orange-light);
+  color: var(--orange);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.authorName {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.authorRole {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* CTA */
+.finalCta {
+  padding: 100px 0;
+  text-align: center;
+}
+
+.ctaBox {
+  background: var(--bg-dark);
+  border-radius: 24px;
+  padding: 80px 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ctaBox::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -15%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(212,98,43,0.15) 0%, transparent 60%);
+  border-radius: 50%;
+}
+
+.ctaBox h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(30px, 4.5vw, 52px);
+  color: #fff;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.ctaBox h2 em {
+  color: var(--orange);
+}
+
+.ctaBox p {
+  font-size: 18px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 40px;
+  position: relative;
+}
+
+.ctaBox .btn {
+  font-size: 17px;
+  padding: 16px 40px;
+  position: relative;
+}
+
+.ctaFooter {
+  margin-top: 20px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.35);
+  position: relative;
+}
+
+/* FOOTER */
+.footer {
+  padding: 48px 0;
+  border-top: 1px solid var(--border);
+}
+
+.footerInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.footer p {
+  font-size: 13px;
+  color: var(--text-light);
+  margin: 0;
+}
+
+/* ANIMATIONS */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .painGrid,
+  .solGrid,
+  .scriptExamples,
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
+  .navRight a:not(.btn) {
+    display: none;
+  }
+
+  .heroCtas {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .solution {
+    margin: 0;
+    border-radius: 0;
+  }
+}
