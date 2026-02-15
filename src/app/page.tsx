@@ -33,7 +33,7 @@ export default async function LandingPage() {
 
       {/* HERO */}
       <section className="lp-hero">
-        <div className="hero-badge"><span></span> AI-powered content creation</div>
+        <div className="hero-badge"><span></span> Content creation software</div>
         <h1>Create one month of content. <em>In one hour.</em></h1>
         <p className="hero-sub">
           TimeBack writes your scripts, edits your videos, and posts to Instagram — all on autopilot. No content experience needed.
@@ -51,6 +51,34 @@ export default async function LandingPage() {
           </div>
           <div className="hero-screenshot hero-screenshot-secondary">
             <img src="/screenshot-ideate.png" alt="TimeBack Ideate — AI-powered inspiration and swipe file for creators" />
+          </div>
+        </div>
+      </section>
+
+      {/* REPLACES */}
+      <section className="lp-replaces reveal">
+        <div className="section-label">One Tool, Not Three</div>
+        <h2>Replace your entire stack</h2>
+        <p>Stop juggling three apps. TimeBack does it all.</p>
+        <div className="replaces-grid">
+          <div className="replaces-card replaced">
+            <div className="replaces-name">ChatGPT</div>
+            <div className="replaces-role">Script writing</div>
+          </div>
+          <div className="replaces-plus">+</div>
+          <div className="replaces-card replaced">
+            <div className="replaces-name">CapCut</div>
+            <div className="replaces-role">Video editing</div>
+          </div>
+          <div className="replaces-plus">+</div>
+          <div className="replaces-card replaced">
+            <div className="replaces-name">Metricool</div>
+            <div className="replaces-role">Scheduling</div>
+          </div>
+          <div className="replaces-arrow">=</div>
+          <div className="replaces-card replaces-timeback">
+            <div className="replaces-name">TimeBack</div>
+            <div className="replaces-role">All-in-one</div>
           </div>
         </div>
       </section>
