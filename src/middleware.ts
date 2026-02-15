@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   '/real-estate-agents',
   '/side-hustlers',
   '/lawyers',
+  '/health-practitioners',
   '/privacy',
   '/terms',
   '/api/webhooks(.*)',

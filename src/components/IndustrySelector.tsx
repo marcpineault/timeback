@@ -126,6 +126,24 @@ const INDUSTRY_DATA: Record<string, { emoji: string; title: string; hook: string
       ],
     },
   },
+  'health-practitioners': {
+    emoji: '🩺',
+    title: 'Health Practitioner',
+    hook: 'Fill your schedule with patients who trust you',
+    info: {
+      eyebrow: 'TimeBack for Health Practitioners',
+      headline: 'Patients pick the provider they already trust.',
+      body: 'Build patient trust through educational content — quick tips, myth busters, and first-visit explainers that make people book you before they compare options.',
+      link: '/health-practitioners',
+      painChips: ['Back-to-back patients', 'Referrals drying up', 'Invisible online'],
+      scripts: [
+        { cat: 'Patient Education', title: 'Why your back pain keeps coming back (and what to do about it)' },
+        { cat: 'Myth Busting', title: "No, cracking your knuckles doesn't cause arthritis" },
+        { cat: 'First Visit', title: 'What to expect at your first appointment' },
+        { cat: 'Quick Tips', title: 'Do this one stretch before bed tonight' },
+      ],
+    },
+  },
 }
 
 const INDUSTRY_KEYS = Object.keys(INDUSTRY_DATA)
