@@ -33,7 +33,7 @@ export default async function LandingPage() {
 
       {/* HERO */}
       <section className="lp-hero">
-        <div className="hero-badge"><span></span> Content creation software</div>
+        <div className="hero-badge"><span></span> The editing/Content agency killer</div>
         <h1>Create one month of content. <em>In one hour.</em></h1>
         <p className="hero-sub">
           TimeBack writes your scripts, edits your videos, and posts to Instagram — all on autopilot. No content experience needed.
