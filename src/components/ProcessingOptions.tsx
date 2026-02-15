@@ -22,6 +22,8 @@ export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
 
 export type HeadlineStyle = 'classic' | 'speech-bubble';
 
+export type CaptionStyle = 'instagram' | 'minimal';
+
 export type BRollStyle = 'minimal' | 'dynamic' | 'data-focused';
 
 export interface BRollConfig {
@@ -35,7 +37,7 @@ export interface ProcessingConfig {
   headline: string;
   headlinePosition: 'top' | 'center' | 'bottom';
   headlineStyle: HeadlineStyle;
-  captionStyle: 'instagram';
+  captionStyle: CaptionStyle;
   silenceThreshold: number;
   silenceDuration: number;
   autoSilenceThreshold: boolean;
@@ -630,9 +632,55 @@ export default function ProcessingOptions({
         </div>
 
         {config.generateCaptions && (
-          <p className="text-xs text-[#8a8580]">
-            Clean white text on dark background - optimized for readability
-          </p>
+          <div>
+            <label className="block text-sm text-[#8a8580] mb-2">Style</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, captionStyle: 'instagram' })}
+                className={`p-3 rounded-2xl border-2 transition-colors ${
+                  config.captionStyle === 'instagram'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
+                    : 'border-[#e0dbd4] hover:border-[#8a8580]'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <div className="bg-black/50 text-white text-xs font-bold px-3 py-1.5 rounded">
+                    Caption
+                  </div>
+                  <span className={`text-xs ${config.captionStyle === 'instagram' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
+                    Boxed
+                  </span>
+                  <p className="text-xs text-[#8a8580] text-center">
+                    White text on dark background
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, captionStyle: 'minimal' })}
+                className={`p-3 rounded-2xl border-2 transition-colors ${
+                  config.captionStyle === 'minimal'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
+                    : 'border-[#e0dbd4] hover:border-[#8a8580]'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-white text-xs font-bold px-3 py-1.5"
+                       style={{ WebkitTextStroke: '0.5px black', textShadow: '1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8)' }}>
+                    Caption
+                  </div>
+                  <span className={`text-xs ${config.captionStyle === 'minimal' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
+                    Minimal
+                  </span>
+                  <p className="text-xs text-[#8a8580] text-center">
+                    Clean outline, no background
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
