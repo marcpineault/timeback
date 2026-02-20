@@ -116,18 +116,18 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBack}
-            className="text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
+            className="text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors flex-shrink-0"
           >
             &larr; Back
           </button>
-          <h2 className="text-lg font-semibold text-[#0a0a0a]">{script.title}</h2>
+          <h2 className="text-lg font-semibold text-[#0a0a0a] truncate">{script.title}</h2>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* Rating */}
           <button
             onClick={() => handleRate('up')}
@@ -159,7 +159,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       </div>
 
       {/* Stats */}
-      <div className="flex items-center gap-6 mb-6">
+      <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-6">
         <div>
           <span className="text-[#8a8580] text-xs">Words</span>
           <p className="text-[#0a0a0a] font-medium">{wordCount}</p>
@@ -173,9 +173,9 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
           <p className="text-[#0a0a0a] font-medium">{script.version}</p>
         </div>
         {script.idea && (
-          <div>
+          <div className="min-w-0">
             <span className="text-[#8a8580] text-xs">From idea</span>
-            <p className="text-[#8a8580] text-sm">{script.idea.title}</p>
+            <p className="text-[#8a8580] text-sm truncate">{script.idea.title}</p>
           </div>
         )}
       </div>
@@ -188,7 +188,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
             value={hook}
             onChange={(e) => setHook(e.target.value)}
             rows={2}
-            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
           />
         </div>
 
@@ -198,7 +198,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={10}
-            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
           />
         </div>
 
@@ -208,7 +208,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
             value={cta}
             onChange={(e) => setCta(e.target.value)}
             rows={2}
-            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
           />
         </div>
       </div>
@@ -273,7 +273,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {hasChanges && (
           <button
             onClick={handleSave}
