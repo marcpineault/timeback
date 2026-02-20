@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import s from './page.module.css'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export const metadata: Metadata = {
   title: 'TimeBack for Real Estate Agents — Become the Agent Everyone Calls First',
@@ -14,6 +15,7 @@ export default function RealEstateAgentsPage() {
       {/* NAV */}
       <nav className={s.nav}>
         <Link href="/" className={s.logo}>TimeBack</Link>
+        <MobileMenuToggle />
         <div className={s.navRight}>
           <a href="#how">How It Works</a>
           <a href="/pricing">Pricing</a>

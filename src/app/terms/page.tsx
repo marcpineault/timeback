@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export default async function TermsPage() {
   const { userId } = await auth()
@@ -9,6 +10,7 @@ export default async function TermsPage() {
       {/* Header */}
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
+        <MobileMenuToggle />
         <div className="nav-links">
           <Link href="/pricing">Pricing</Link>
           <a href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7" target="_blank" rel="noopener noreferrer">Tutorials</a>

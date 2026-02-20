@@ -8,6 +8,7 @@ import WelcomeOverlay from '@/components/WelcomeOverlay'
 import RecentVideosTable from '@/components/RecentVideosTable'
 import OnboardingBanner from '@/components/OnboardingBanner'
 import Link from 'next/link'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export default async function DashboardPage() {
   let user
@@ -76,6 +77,7 @@ export default async function DashboardPage() {
       {/* Header */}
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
+        <MobileMenuToggle />
         <div className="nav-links">
           {features.ideate && (
             <Link href="/dashboard/ideate" className="nav-tab-link">

@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import ScrollReveal from '@/components/ScrollReveal'
 import IndustrySelector from '@/components/IndustrySelector'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export default async function LandingPage() {
   const { userId } = await auth()
@@ -18,6 +19,7 @@ export default async function LandingPage() {
       {/* NAV */}
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
+        <MobileMenuToggle />
         <div className="nav-links">
           <a href="#how-it-works">How It Works</a>
           <a href="#pricing">Pricing</a>

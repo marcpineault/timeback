@@ -6,6 +6,7 @@ import { PLANS, PlanType } from '@/lib/plans'
 import { stripe } from '@/lib/stripe'
 import { getEnabledFeatures } from '@/lib/featureFlags'
 import SubscriptionActions from './SubscriptionActions'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 async function getSubscriptionDetails(stripeSubscriptionId: string | null) {
   if (!stripeSubscriptionId || !stripe) {
@@ -102,6 +103,7 @@ export default async function SubscriptionPage() {
       {/* Header */}
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
+        <MobileMenuToggle />
         <div className="nav-links">
           <Link href="/dashboard">Editor</Link>
           {features.instagramScheduling && (

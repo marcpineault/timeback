@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
 import ScheduleDashboard from './ScheduleDashboard'
 import OnboardingBanner from '@/components/OnboardingBanner'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export default async function SchedulePage() {
   const user = await getOrCreateUser()
@@ -25,6 +26,7 @@ export default async function SchedulePage() {
     <div className="landing-page min-h-screen">
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
+        <MobileMenuToggle />
         <div className="nav-links">
           {features.ideate && (
             <Link href="/dashboard/ideate" className="nav-tab-link">
