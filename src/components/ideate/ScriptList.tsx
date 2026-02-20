@@ -58,19 +58,19 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
           <div
             key={script.id}
             onClick={() => onViewScript(script)}
-            className="bg-white border border-[#e0dbd4] rounded-full p-4 hover:bg-[#faf7f2] transition-colors cursor-pointer"
+            className="bg-white border border-[#e0dbd4] rounded-2xl p-4 hover:bg-[#faf7f2] transition-colors cursor-pointer"
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-[#0a0a0a] font-medium text-sm truncate">{script.title}</h3>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${status.bg} ${status.text}`}>
                     {script.status}
                   </span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-[#8a8580]">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#8a8580]">
                   {script.idea && (
-                    <span>From: {script.idea.title}</span>
+                    <span className="truncate max-w-[200px]">From: {script.idea.title}</span>
                   )}
                   <span>{script.wordCount} words</span>
                   <span>~{script.estimatedDuration}s</span>
@@ -109,7 +109,7 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
                     e.stopPropagation()
                     onOpenTeleprompter(script)
                   }}
-                  className="px-3 py-1.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-md text-xs font-medium transition-colors"
+                  className="px-3 py-1.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full text-xs font-medium transition-colors"
                 >
                   Teleprompter
                 </button>

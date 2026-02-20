@@ -150,7 +150,7 @@ export default function IdeaGenerator({ onScriptGenerated }: Props) {
       </div>
 
       {/* Filter + Ideas Grid */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="text-[#8a8580] text-sm">Filter:</span>
         {(['', 'SAVED', 'SCRIPTED', 'FILMED', 'ARCHIVED'] as StatusFilter[]).map((f) => (
           <button

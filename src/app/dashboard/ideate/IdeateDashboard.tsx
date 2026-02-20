@@ -141,23 +141,25 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-white border border-[#e0dbd4] rounded-full p-1 w-fit">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id)
-              if (tab.id !== 'scripts') setViewingScript(null)
-            }}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-[#e85d26] text-[#0a0a0a]'
-                : 'text-[#8a8580] hover:text-[#0a0a0a]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-6">
+        <div className="flex gap-1 bg-white border border-[#e0dbd4] rounded-full p-1 w-fit">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id)
+                if (tab.id !== 'scripts') setViewingScript(null)
+              }}
+              className={`px-3 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-[#e85d26] text-[#0a0a0a]'
+                  : 'text-[#8a8580] hover:text-[#0a0a0a]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab Content */}

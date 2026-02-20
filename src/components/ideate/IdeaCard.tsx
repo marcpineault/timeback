@@ -43,7 +43,7 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
   const [showHookVariations, setShowHookVariations] = useState(false)
 
   return (
-    <div className="bg-[#f5f0e8] rounded-full p-4 hover:bg-[#e0dbd4] transition-colors">
+    <div className="bg-[#f5f0e8] rounded-2xl p-4 hover:bg-[#e0dbd4] transition-colors">
       <div className="flex items-start justify-between gap-2 mb-2">
         <h3 className="text-[#0a0a0a] font-medium text-sm leading-tight">{idea.title}</h3>
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${STATUS_COLORS[idea.status] || STATUS_COLORS.SAVED}`}>
@@ -117,7 +117,7 @@ export default function IdeaCard({ idea, onWriteScript, onArchive, isGenerating 
             <button
               onClick={() => onWriteScript(idea)}
               disabled={isGenerating}
-              className="flex-1 px-3 py-1.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-md text-xs font-medium transition-colors"
+              className="flex-1 px-3 py-1.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-full text-xs font-medium transition-colors"
             >
               {isGenerating ? 'Writing...' : idea.status === 'SCRIPTED' ? 'Rewrite Script' : 'Write Script'}
             </button>
