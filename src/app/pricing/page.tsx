@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { PLANS } from '@/lib/plans'
 import { getOrCreateUser } from '@/lib/user'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export default async function PricingPage() {
   const { userId } = await auth()
@@ -19,6 +20,7 @@ export default async function PricingPage() {
       {/* Header */}
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
+        <MobileMenuToggle />
         <div className="nav-links">
           <a href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7" target="_blank" rel="noopener noreferrer">Tutorials</a>
           {userId ? (

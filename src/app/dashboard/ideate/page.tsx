@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
 import IdeateDashboard from './IdeateDashboard'
 import OnboardingBanner from '@/components/OnboardingBanner'
+import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export default async function IdeatePage() {
   const user = await getOrCreateUser()
@@ -26,6 +27,7 @@ export default async function IdeatePage() {
       {/* Header */}
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>
+        <MobileMenuToggle />
         <div className="nav-links">
           <Link href="/dashboard/ideate" style={{ color: '#0a0a0a', fontWeight: 600 }} className="nav-tab-link">
             <span>Ideate</span>
