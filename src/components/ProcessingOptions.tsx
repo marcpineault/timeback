@@ -851,18 +851,7 @@ export default function ProcessingOptions({
         )}
       </div>
 
-      {/* B-Roll Animations Settings - TEMPORARILY DISABLED - Hidden on mobile */}
-      <div className="hidden sm:block space-y-3 sm:space-y-4 opacity-50">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">B-Roll Animations</h3>
-          <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">Coming Soon</span>
-        </div>
-        <p className="text-xs text-[#8a8580]">
-          AI-generated animations that appear during key moments to add visual context. This feature is currently being improved.
-        </p>
-      </div>
-
-      {/* Original B-Roll UI - Hidden while feature is disabled
+      {/* B-Roll Animations Settings */}
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">B-Roll Animations</h3>
@@ -958,7 +947,6 @@ export default function ProcessingOptions({
           </div>
         )}
       </div>
-      */}
 
       {/* Save as Default & Submit Buttons */}
       <div className="space-y-3">
