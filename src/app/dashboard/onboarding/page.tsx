@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { analytics } from '@/components/Analytics'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -38,12 +39,55 @@ export default function VerticalOnboardingPage() {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [initialLoading, setInitialLoading] = useState(true)
+  const trackedStart = useRef(false)
 
   const [form, setForm] = useState<FormData>({
     vertical: null,
     market: '',
     specialization: '',
   })
+
+  // Resume: fetch existing onboarding state so user picks up where they left off
+  useEffect(() => {
+    async function fetchExistingState() {
+      try {
+        const res = await fetch('/api/onboarding/vertical')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.verticalProfile) {
+            const vp = data.verticalProfile
+            setForm({
+              vertical: vp.vertical as Vertical,
+              market: vp.market || '',
+              specialization: vp.specialization || '',
+            })
+            // If they have vertical + market + specialization, jump to confirmation (step 3)
+            if (vp.vertical && vp.vertical !== 'OTHER' && vp.market && vp.specialization) {
+              setStep(3)
+            } else if (vp.vertical && vp.vertical !== 'OTHER') {
+              setStep(2)
+            }
+          } else if (data.vertical && data.vertical !== 'OTHER') {
+            // User has a vertical on their User record but no profile yet
+            setForm(prev => ({ ...prev, vertical: data.vertical as Vertical }))
+            setStep(2)
+          } else if (!data.verticalProfile) {
+            // Fresh start — track onboarding started
+            if (!trackedStart.current) {
+              analytics.trackVerticalOnboardingStarted()
+              trackedStart.current = true
+            }
+          }
+        }
+      } catch {
+        // Silently continue — start fresh
+      } finally {
+        setInitialLoading(false)
+      }
+    }
+    fetchExistingState()
+  }, [])
 
   const totalSteps = form.vertical === 'OTHER' ? 1 : 3
 
@@ -84,6 +128,7 @@ export default function VerticalOnboardingPage() {
 
   const handleVerticalSelect = async (vertical: Vertical) => {
     setForm(prev => ({ ...prev, vertical }))
+    analytics.trackVerticalSelected(vertical)
 
     if (vertical === 'OTHER') {
       // Save immediately and redirect
@@ -96,6 +141,7 @@ export default function VerticalOnboardingPage() {
           body: JSON.stringify({ vertical: 'OTHER', market: '', specialization: '' }),
         })
         if (!res.ok) throw new Error('Failed to save')
+        analytics.trackVerticalOnboardingCompleted('OTHER')
         router.push('/dashboard/ideate')
       } catch {
         setError('Something went wrong. Please try again.')
@@ -114,6 +160,11 @@ export default function VerticalOnboardingPage() {
   const handleFinish = async () => {
     const success = await saveOnboarding()
     if (success) {
+      analytics.trackVerticalOnboardingCompleted(
+        form.vertical || '',
+        form.market,
+        form.specialization
+      )
       router.push('/dashboard/ideate')
     }
   }
@@ -145,6 +196,14 @@ export default function VerticalOnboardingPage() {
       {/* Content */}
       <div className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
         <div className="w-full max-w-2xl">
+          {/* Loading state */}
+          {initialLoading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-2 border-[#e85d26] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!initialLoading && <>
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-2 mb-8">
             {Array.from({ length: totalSteps }).map((_, i) => (
@@ -358,6 +417,7 @@ export default function VerticalOnboardingPage() {
               </button>
             </div>
           )}
+          </>}
         </div>
       </div>
     </div>

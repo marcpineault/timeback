@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { analytics } from '@/components/Analytics'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -85,13 +86,14 @@ export default function ContentCalendar({ onNavigateToTemplates, onNavigateToIde
         setAllEntries(data.entries)
         setVertical(data.vertical)
         setAvailableCategories(data.availableTemplateCategories || [])
+        analytics.trackCalendarViewed(selectedMonth)
       }
     } catch (err) {
       console.error('Failed to fetch calendar:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedMonth])
 
   useEffect(() => {
     fetchCalendar()
@@ -150,6 +152,7 @@ export default function ContentCalendar({ onNavigateToTemplates, onNavigateToIde
   }
 
   const handleGetScript = (entry: CalendarEntry) => {
+    analytics.trackCalendarScriptClicked(entry.id, entry.category)
     if (availableCategories.includes(entry.category)) {
       onNavigateToTemplates(entry.category)
     } else {

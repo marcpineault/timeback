@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import type { ScriptData } from '@/hooks/useIdeate'
+import { analytics } from '@/components/Analytics'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
     const text = applyMarketReplace(selectedTemplate.scriptBody, market)
     await navigator.clipboard.writeText(text)
     setCopied(true)
+    analytics.trackTemplateCopied(selectedTemplate.id)
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -123,6 +125,7 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
       })
       if (res.ok) {
         setSavedMessage(true)
+        analytics.trackTemplateSavedToScripts(selectedTemplate.id)
         onScriptSaved()
         setTimeout(() => setSavedMessage(false), 2000)
       }
@@ -135,6 +138,7 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
 
   const handleOpenInTeleprompter = () => {
     if (!selectedTemplate) return
+    analytics.trackTemplateOpenedInTeleprompter(selectedTemplate.id)
     const text = applyMarketReplace(selectedTemplate.scriptBody, market)
     // Create a temporary ScriptData-compatible object for the teleprompter
     const tempScript: ScriptData = {
@@ -409,7 +413,10 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
             return (
               <button
                 key={template.id}
-                onClick={() => setSelectedTemplate(template)}
+                onClick={() => {
+                  setSelectedTemplate(template)
+                  analytics.trackTemplateViewed(template.id)
+                }}
                 className="text-left bg-white border border-[#e0dbd4] rounded-2xl p-4 hover:border-[#8a8580] hover:shadow-sm transition-all group"
               >
                 {/* Title */}
@@ -432,7 +439,7 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
                   <span className="text-xs text-[#8a8580]">
                     {template.wordCount} words &middot; ~{estSeconds}s
                   </span>
-                  <span className="text-xs text-[#e85d26] font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                  <span className="text-xs text-[#e85d26] font-medium sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                     Use Script
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
