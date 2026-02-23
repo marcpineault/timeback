@@ -17,20 +17,8 @@ export default async function DashboardPage() {
 
   try {
     user = await getOrCreateUser()
-
-    if (!user) {
-      redirect('/sign-in')
-    }
-
-    // Redirect to vertical onboarding if not completed
-    if (!user.vertical) {
-      redirect('/dashboard/onboarding')
-    }
-
-    usage = await getUserUsage(user.id)
-
-    if (!usage) {
-      redirect('/sign-in')
+    if (user) {
+      usage = await getUserUsage(user.id)
     }
   } catch (error) {
     console.error('Dashboard error:', error)
@@ -50,6 +38,20 @@ export default async function DashboardPage() {
         </div>
       </div>
     )
+  }
+
+  // Redirects MUST be outside try-catch — redirect() works by throwing
+  // a special error, and catching it prevents the redirect from happening.
+  if (!user) {
+    redirect('/sign-in')
+  }
+
+  if (!user.vertical) {
+    redirect('/dashboard/onboarding')
+  }
+
+  if (!usage) {
+    redirect('/sign-in')
   }
 
   const usagePercentage = usage.planDetails.videosPerMonth
