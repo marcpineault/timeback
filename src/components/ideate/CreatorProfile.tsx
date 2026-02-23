@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type KeyboardEvent } from 'react'
+import Link from 'next/link'
 import type { CreatorProfile as CreatorProfileType } from '@/hooks/useIdeate'
 
 interface Props {
@@ -142,7 +143,18 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
       {step === 1 && (
         <div className="space-y-4">
           <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Your Identity</h2>
+            <div className="flex items-start justify-between mb-1">
+              <h2 className="text-lg font-semibold text-[#0a0a0a]">Your Identity</h2>
+              <Link
+                href="/dashboard/onboarding"
+                className="text-xs text-[#8a8580] hover:text-[#e85d26] transition-colors flex items-center gap-1"
+              >
+                Change Profession
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
             <p className="text-[#8a8580] text-sm mb-6">Tell us about you and your content goals.</p>
 
             <div className="space-y-5">

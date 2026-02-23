@@ -14,6 +14,11 @@ export default async function IdeatePage() {
     redirect('/sign-in')
   }
 
+  // Redirect to vertical onboarding if not completed
+  if (!user.vertical) {
+    redirect('/dashboard/onboarding')
+  }
+
   const features = getEnabledFeatures(user.email)
 
   if (!features.ideate) {
