@@ -5,11 +5,12 @@ import CreatorProfile from '@/components/ideate/CreatorProfile'
 import IdeaGenerator from '@/components/ideate/IdeaGenerator'
 import ScriptList from '@/components/ideate/ScriptList'
 import ScriptView from '@/components/ideate/ScriptView'
+import ScriptTemplates from '@/components/ideate/ScriptTemplates'
 import Teleprompter from '@/components/ideate/Teleprompter'
 import SwipeFile from '@/components/ideate/SwipeFile'
 import { useCreatorProfile, useScripts, useScript, type ScriptData } from '@/hooks/useIdeate'
 
-type Tab = 'ideas' | 'scripts' | 'swipefile' | 'teleprompter' | 'profile'
+type Tab = 'ideas' | 'templates' | 'scripts' | 'swipefile' | 'teleprompter' | 'profile'
 
 interface DashboardProps {
   ideateUsed: number
@@ -32,8 +33,18 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
     }
   }, [profile, profileLoading])
 
+  // Track a direct script object for teleprompter (used by templates)
+  const [directTeleprompterScript, setDirectTeleprompterScript] = useState<ScriptData | null>(null)
+
   function handleOpenTeleprompter(script: ScriptData) {
-    setActiveScriptId(script.id)
+    // Templates pass a synthetic script object with template- prefix
+    if (script.id.startsWith('template-')) {
+      setDirectTeleprompterScript(script)
+      setActiveScriptId(null)
+    } else {
+      setDirectTeleprompterScript(null)
+      setActiveScriptId(script.id)
+    }
     setActiveTab('teleprompter')
   }
 
@@ -48,6 +59,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'ideas', label: 'Ideas' },
+    { id: 'templates', label: 'Templates' },
     { id: 'scripts', label: 'Scripts' },
     { id: 'swipefile', label: 'Inspiration' },
     { id: 'teleprompter', label: 'Teleprompter' },
@@ -241,6 +253,13 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
             )
           )}
 
+          {activeTab === 'templates' && (
+            <ScriptTemplates
+              onOpenTeleprompter={handleOpenTeleprompter}
+              onScriptSaved={refetchScripts}
+            />
+          )}
+
           {activeTab === 'scripts' && (
             viewingScript ? (
               <ScriptView
@@ -291,11 +310,12 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
           )}
 
           {activeTab === 'teleprompter' && (
-            teleprompterScript ? (
+            (teleprompterScript || directTeleprompterScript) ? (
               <Teleprompter
-                script={teleprompterScript}
+                script={(directTeleprompterScript || teleprompterScript)!}
                 onClose={() => {
                   setActiveScriptId(null)
+                  setDirectTeleprompterScript(null)
                   setActiveTab('scripts')
                 }}
               />
