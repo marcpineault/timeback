@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { analytics } from '@/components/Analytics'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -169,6 +170,10 @@ export default function DashboardSuggestions() {
             {weeklySuggestion.template && (
               <Link
                 href="/dashboard/ideate"
+                onClick={() => analytics.trackDashboardSuggestionClicked(
+                  weeklySuggestion.type === 'dated' ? 'weekly_suggestion' : 'rotating_suggestion',
+                  weeklySuggestion.calendarEntry?.category || weeklySuggestion.template?.category
+                )}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1 ${
                   weeklySuggestion.type === 'dated'
                     ? 'bg-[#e85d26] hover:bg-[#d14d1a] text-white'
@@ -207,6 +212,7 @@ export default function DashboardSuggestions() {
                 <Link
                   key={template.id}
                   href="/dashboard/ideate"
+                  onClick={() => analytics.trackDashboardSuggestionClicked('template_card', template.category)}
                   className="bg-white border border-[#e0dbd4] rounded-xl p-3 hover:border-[#8a8580] hover:shadow-sm transition-all group"
                 >
                   <h4 className="text-sm font-medium text-[#0a0a0a] mb-1.5 line-clamp-1 group-hover:text-[#e85d26] transition-colors">
@@ -216,7 +222,7 @@ export default function DashboardSuggestions() {
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${colors.bg} ${colors.text}`}>
                       {getCategoryLabel(template.category)}
                     </span>
-                    <span className="text-xs text-[#e85d26] font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                    <span className="text-xs text-[#e85d26] font-medium sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
                       Use
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

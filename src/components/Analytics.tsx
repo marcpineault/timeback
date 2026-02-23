@@ -60,6 +60,24 @@ type AnalyticsEventParams = {
 
   // Errors
   error_occurred: { error_type: string; error_message: string; page: string };
+
+  // Vertical onboarding events
+  vertical_onboarding_started: Record<string, never>;
+  vertical_selected: { vertical: string };
+  vertical_onboarding_completed: { vertical: string; market?: string; specialization?: string };
+
+  // Script template events
+  script_template_viewed: { template_id: string };
+  script_template_copied: { template_id: string };
+  script_template_saved_to_scripts: { template_id: string };
+  script_template_opened_in_teleprompter: { template_id: string };
+
+  // Content calendar events
+  content_calendar_viewed: { month: number };
+  content_calendar_script_clicked: { entry_id: string; category: string };
+
+  // Dashboard suggestion events
+  dashboard_suggestion_clicked: { suggestion_type: string; category?: string };
 };
 
 type AnalyticsEvent = keyof AnalyticsEventParams;
@@ -137,4 +155,32 @@ export const analytics = {
   // Errors
   trackError: (errorType: string, errorMessage: string, page: string) =>
     trackEvent('error_occurred', { error_type: errorType, error_message: errorMessage, page }),
+
+  // Vertical onboarding
+  trackVerticalOnboardingStarted: () =>
+    trackEvent('vertical_onboarding_started', {}),
+  trackVerticalSelected: (vertical: string) =>
+    trackEvent('vertical_selected', { vertical }),
+  trackVerticalOnboardingCompleted: (vertical: string, market?: string, specialization?: string) =>
+    trackEvent('vertical_onboarding_completed', { vertical, market, specialization }),
+
+  // Script templates
+  trackTemplateViewed: (templateId: string) =>
+    trackEvent('script_template_viewed', { template_id: templateId }),
+  trackTemplateCopied: (templateId: string) =>
+    trackEvent('script_template_copied', { template_id: templateId }),
+  trackTemplateSavedToScripts: (templateId: string) =>
+    trackEvent('script_template_saved_to_scripts', { template_id: templateId }),
+  trackTemplateOpenedInTeleprompter: (templateId: string) =>
+    trackEvent('script_template_opened_in_teleprompter', { template_id: templateId }),
+
+  // Content calendar
+  trackCalendarViewed: (month: number) =>
+    trackEvent('content_calendar_viewed', { month }),
+  trackCalendarScriptClicked: (entryId: string, category: string) =>
+    trackEvent('content_calendar_script_clicked', { entry_id: entryId, category }),
+
+  // Dashboard suggestions
+  trackDashboardSuggestionClicked: (suggestionType: string, category?: string) =>
+    trackEvent('dashboard_suggestion_clicked', { suggestion_type: suggestionType, category }),
 };
