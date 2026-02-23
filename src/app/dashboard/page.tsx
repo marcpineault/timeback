@@ -21,6 +21,11 @@ export default async function DashboardPage() {
       redirect('/sign-in')
     }
 
+    // Redirect to vertical onboarding if not completed
+    if (!user.vertical) {
+      redirect('/dashboard/onboarding')
+    }
+
     usage = await getUserUsage(user.id)
 
     if (!usage) {
