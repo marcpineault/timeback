@@ -19,10 +19,16 @@ model User {
   ideateGenerationsThisMonth Int @default(0)
   resetDate       DateTime  @default(now())
   hasCompletedOnboarding Boolean @default(false)
+
+  // Vertical onboarding
+  vertical              Vertical?
+  verticalCompletedAt   DateTime?
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   videos          Video[]
   processingPreferences UserProcessingPreferences?
+  verticalProfile       VerticalProfile?
 
   // Instagram scheduling
   instagramAccounts   InstagramAccount[]
@@ -420,4 +426,64 @@ enum SwipeCategory {
   MEAT
   CTA
   FULL
+}
+
+// ─── Vertical Onboarding ────────────────────────────────────────────
+
+enum Vertical {
+  MORTGAGE_BROKER
+  FINANCIAL_ADVISOR
+  REAL_ESTATE_AGENT
+  OTHER
+}
+
+model VerticalProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  vertical         String
+  market           String
+  specialization   String
+  tone             String
+  postingFrequency String
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ScriptTemplate {
+  id          String   @id @default(cuid())
+  vertical    String
+  category    String
+  title       String
+  scriptBody  String
+  wordCount   Int
+  tags        String[]
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([vertical])
+  @@index([vertical, category])
+}
+
+model ContentCalendar {
+  id            String   @id @default(cuid())
+  vertical      String
+  month         Int
+  title         String
+  description   String
+  contentAngle  String
+  category      String
+  isRecurring   Boolean  @default(false)
+  specificDate  DateTime? @db.Date
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([vertical])
+  @@index([vertical, month])
 }
