@@ -34,6 +34,10 @@ export interface CreatorContext {
   exampleScripts: string[];
   primaryPlatform: string;
   typicalVideoLength: number;
+  // Vertical context (optional — only populated when user has a vertical profile)
+  vertical?: string;
+  market?: string;
+  specialization?: string;
 }
 
 export interface GeneratedIdea {
@@ -133,6 +137,37 @@ Each idea MUST follow this structure:
 - BODY: Explain WHY the myth exists (shows depth), then present what actually works with proof
 - CLOSE: Give the corrected approach in one clear sentence + CTA
 This triggers the "I need to know what I'm doing wrong" response. It positions the creator as someone who sees what others miss — driving FOLLOWS and SHARES.`,
+  },
+  // ── Mortgage-specific styles ──
+  'rate-reaction': {
+    label: 'Rate Reaction',
+    description: 'React to a rate change, BoC announcement, or market shift',
+    promptInstructions: `CONTENT FORMAT: Rate Reaction / Market Update
+Each idea MUST follow this structure:
+- HOOK: Lead with the news or data point — make it feel URGENT and time-sensitive ("The Bank of Canada just did X. Here's what it means for you.")
+- BODY: Break down what happened in plain language (no jargon), then explain the REAL impact on buyers/homeowners/renewals. Use a specific scenario ("If you have a $500K mortgage, this means..."). Add your professional take — what should people actually DO about this?
+- CLOSE: Give one clear action step + CTA to reach out or save for later
+This format works because rate changes create URGENCY and FEAR — viewers are actively searching for answers. Position yourself as the calm, knowledgeable voice in a sea of panic. Drives SHARES ("everyone needs to see this") and COMMENTS (people sharing their own situations).`,
+  },
+  'client-education': {
+    label: 'Client Education',
+    description: 'Teach a mortgage concept in plain, jargon-free language',
+    promptInstructions: `CONTENT FORMAT: Client Education / Jargon Buster
+Each idea MUST follow this structure:
+- HOOK: Start with the confusing term or concept, then promise clarity ("Everyone talks about the stress test but nobody explains it like this.")
+- BODY: Explain the concept as if talking to a friend over coffee. Use a real-world example with actual numbers ("On a $600K home with 10% down, here's exactly what happens..."). Break it into 2-3 bite-sized pieces. Each piece should have an "aha moment."
+- CLOSE: Summarize in one sentence + "Save this for when you need it"
+Mortgage jargon scares people away from asking questions. This format makes you the approachable expert who explains things simply. Maximizes SAVES (people bookmark for future reference) and FOLLOWS (they want more plain-language explanations).`,
+  },
+  'personal-story': {
+    label: 'Personal Story',
+    description: 'Share a real client story or personal experience from the industry',
+    promptInstructions: `CONTENT FORMAT: Personal / Client Story
+Each idea MUST follow this structure:
+- HOOK: Open with the dramatic moment or surprising outcome ("My client was about to lose their dream home. Then I made one phone call.")
+- BODY: Tell the story with specific (anonymized) details — what was the situation, what was the obstacle, what did you do differently? Show your expertise through ACTION, not by stating credentials. Include the emotional journey — the stress, the relief, the celebration.
+- CLOSE: Extract the universal lesson ("If you're in a similar situation, here's what you need to know") + soft CTA
+Personal stories are the HIGHEST engagement format because they're impossible to replicate. They build TRUST faster than any educational content. Drives COMMENTS (people sharing similar experiences) and FOLLOWS (they want to see more stories).`,
   },
 } as const;
 
@@ -259,6 +294,77 @@ export function buildCreatorPrompt(ctx: CreatorContext): string {
   if (ctx.avoidTopics.length > 0) {
     parts.push(`\nTOPICS TO AVOID: ${ctx.avoidTopics.join(', ')}`);
   }
+
+  // ── Vertical-specific context injection ──
+  if (ctx.vertical) {
+    parts.push(buildVerticalPrompt(ctx.vertical, ctx.market, ctx.specialization));
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Build vertical-specific prompt context based on the creator's industry.
+ */
+function buildVerticalPrompt(vertical: string, market?: string, specialization?: string): string {
+  if (vertical === 'MORTGAGE_BROKER') {
+    return buildMortgageBrokerPrompt(market, specialization);
+  }
+
+  // Future verticals can be added here
+  return '';
+}
+
+function buildMortgageBrokerPrompt(market?: string, specialization?: string): string {
+  const parts: string[] = [
+    `\nINDUSTRY CONTEXT — MORTGAGE BROKER:`,
+    `This creator is a licensed mortgage broker/agent. All content must reflect this professional context:`,
+  ];
+
+  // Market-specific context
+  if (market) {
+    parts.push(`\nMARKET: ${market}`);
+    parts.push(`- Reference the local market naturally (e.g. "here in ${market}")`);
+    parts.push(`- Use local housing market conditions and price ranges relevant to ${market}`);
+
+    // Canadian market detection
+    const canadianMarkers = [
+      'Toronto', 'Vancouver', 'Calgary', 'Edmonton', 'Ottawa', 'Montreal',
+      'Winnipeg', 'Halifax', 'Victoria', 'Kitchener', 'Hamilton', 'London',
+      'GTA', 'Greater Toronto', 'Lower Mainland', 'Ontario', 'BC', 'British Columbia',
+      'Alberta', 'Quebec', 'Manitoba', 'Saskatchewan', 'Nova Scotia', 'Canada',
+    ];
+    const isCanadian = canadianMarkers.some(m => market.toLowerCase().includes(m.toLowerCase()));
+
+    if (isCanadian) {
+      parts.push(`\nCANADIAN MORTGAGE CONTEXT (MUST reference these where relevant):`);
+      parts.push(`- Bank of Canada (BoC) rate decisions and their impact on variable-rate mortgages`);
+      parts.push(`- CMHC mortgage insurance (required for down payments under 20%)`);
+      parts.push(`- The mortgage stress test (qualifying rate is typically contract rate + 2%, or 5.25%, whichever is higher)`);
+      parts.push(`- Fixed vs variable rate considerations in the Canadian context`);
+      parts.push(`- 5-year mortgage terms (standard in Canada) and renewal strategies`);
+      parts.push(`- Canadian first-time home buyer incentives (FHSA, HBP/RRSP withdrawal)`);
+      parts.push(`- Pre-approval vs pre-qualification process`);
+      parts.push(`- Mortgage portability and blend-and-extend options`);
+      parts.push(`- Penalties for breaking a mortgage early (IRD vs 3 months' interest)`);
+      parts.push(`- NEVER reference US-specific terms like "30-year fixed", "FHA loans", "Fannie Mae/Freddie Mac", or "closing costs" in a US sense`);
+    }
+  }
+
+  // Specialization context
+  if (specialization) {
+    parts.push(`\nSPECIALIZATION: ${specialization}`);
+    parts.push(`- Lean into this specialty when generating ideas — it's what differentiates this creator`);
+  }
+
+  parts.push(`\nMORTGAGE CONTENT GUIDELINES:`);
+  parts.push(`- Explain concepts in plain language — viewers are often confused, not stupid`);
+  parts.push(`- Use real-number scenarios (e.g. "On a $600K home with 10% down...")`);
+  parts.push(`- Address common fears: rejection, affordability, rate changes, hidden fees`);
+  parts.push(`- Position the creator as the trusted advisor who simplifies the complex`);
+  parts.push(`- Content should educate AND build trust — every video should make the viewer think "I want this person handling my mortgage"`);
+  parts.push(`- Timely content around rate announcements and market shifts performs extremely well`);
+  parts.push(`- NEVER give specific financial advice — frame as educational ("here's how it generally works" not "you should do X")`);
 
   return parts.join('\n');
 }
