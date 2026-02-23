@@ -17,9 +17,10 @@ interface DashboardProps {
   ideateUsed: number
   ideateLimit: number | null
   plan: string
+  vertical?: string | null
 }
 
-export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: DashboardProps) {
+export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertical }: DashboardProps) {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useCreatorProfile()
   const { scripts, loading: scriptsLoading, refetch: refetchScripts } = useScripts()
   const [activeTab, setActiveTab] = useState<Tab>('ideas')
@@ -201,6 +202,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
                   refetchScripts()
                 }}
                 initialTopic={initialIdeaTopic}
+                vertical={vertical}
               />
             ) : (
               <div className="bg-white border border-[#e0dbd4] rounded-2xl p-8 sm:p-12 text-center">

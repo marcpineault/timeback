@@ -70,6 +70,7 @@ export default async function IdeatePage() {
           ideateUsed={usage?.ideateUsed ?? 0}
           ideateLimit={usage?.planDetails.ideateGenerationsPerMonth ?? null}
           plan={usage?.plan ?? 'FREE'}
+          vertical={user.vertical}
         />
       </div>
     </div>

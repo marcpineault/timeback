@@ -67,10 +67,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { topic, count = 5, contentStyle } = body;
 
-    // Fetch creator profile
-    const profile = await prisma.creatorProfile.findUnique({
-      where: { userId: user.id },
-    });
+    // Fetch creator profile and vertical profile in parallel
+    const [profile, verticalProfile] = await Promise.all([
+      prisma.creatorProfile.findUnique({
+        where: { userId: user.id },
+      }),
+      prisma.verticalProfile.findUnique({
+        where: { userId: user.id },
+      }),
+    ]);
 
     if (!profile || !profile.isComplete) {
       return NextResponse.json(
@@ -93,6 +98,10 @@ export async function POST(request: NextRequest) {
       exampleScripts: profile.exampleScripts,
       primaryPlatform: profile.primaryPlatform,
       typicalVideoLength: profile.typicalVideoLength,
+      // Vertical context
+      vertical: verticalProfile?.vertical,
+      market: verticalProfile?.market,
+      specialization: verticalProfile?.specialization,
     };
 
     // Generate ideas via Claude

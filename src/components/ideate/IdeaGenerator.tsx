@@ -7,11 +7,17 @@ import { useIdeas, type IdeaData, type ScriptData } from '@/hooks/useIdeate'
 interface Props {
   onScriptGenerated: (script: ScriptData) => void
   initialTopic?: string | null
+  vertical?: string | null
 }
 
 type StatusFilter = '' | 'SAVED' | 'SCRIPTED' | 'FILMED' | 'ARCHIVED'
 
-export default function IdeaGenerator({ onScriptGenerated, initialTopic }: Props) {
+// Per-vertical placeholder text for the topic input
+const VERTICAL_PLACEHOLDERS: Record<string, string> = {
+  MORTGAGE_BROKER: 'Optional: focus on a topic (e.g. stress test changes, first-time buyers, BoC rate impact)',
+}
+
+export default function IdeaGenerator({ onScriptGenerated, initialTopic, vertical }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
   const { ideas, loading, refetch } = useIdeas(statusFilter || undefined)
   const [topic, setTopic] = useState(initialTopic || '')
@@ -106,7 +112,7 @@ export default function IdeaGenerator({ onScriptGenerated, initialTopic }: Props
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="Optional: focus on a topic (e.g. cold outreach, pricing strategy)"
+            placeholder={(vertical && VERTICAL_PLACEHOLDERS[vertical]) || "Optional: focus on a topic (e.g. cold outreach, pricing strategy)"}
             className="flex-1 bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-full px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26]"
             onKeyDown={(e) => e.key === 'Enter' && !generating && handleGenerate()}
           />
@@ -128,8 +134,15 @@ export default function IdeaGenerator({ onScriptGenerated, initialTopic }: Props
             <option value="hook-story-lesson">Story + Lesson</option>
             <option value="contrarian-take">Contrarian Take</option>
             <option value="step-by-step">How-To / Steps</option>
-            <option value="before-after">Before & After</option>
+            <option value="before-after">Before &amp; After</option>
             <option value="myth-buster">Myth Buster</option>
+            {vertical === 'MORTGAGE_BROKER' && (
+              <>
+                <option value="rate-reaction">Rate Reaction</option>
+                <option value="client-education">Client Education</option>
+                <option value="personal-story">Personal Story</option>
+              </>
+            )}
           </select>
           <button
             onClick={handleGenerate}

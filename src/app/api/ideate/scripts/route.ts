@@ -65,10 +65,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { ideaId, customInstructions } = body;
 
-    // Fetch creator profile
-    const profile = await prisma.creatorProfile.findUnique({
-      where: { userId: user.id },
-    });
+    // Fetch creator profile, vertical profile, and idea in parallel
+    const [profile, verticalProfile, idea] = await Promise.all([
+      prisma.creatorProfile.findUnique({
+        where: { userId: user.id },
+      }),
+      prisma.verticalProfile.findUnique({
+        where: { userId: user.id },
+      }),
+      prisma.idea.findFirst({
+        where: { id: ideaId, userId: user.id },
+      }),
+    ]);
 
     if (!profile || !profile.isComplete) {
       return NextResponse.json(
@@ -76,11 +84,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Fetch the idea
-    const idea = await prisma.idea.findFirst({
-      where: { id: ideaId, userId: user.id },
-    });
 
     if (!idea) {
       return NextResponse.json({ error: 'Idea not found' }, { status: 404 });
@@ -100,6 +103,10 @@ export async function POST(request: NextRequest) {
       exampleScripts: profile.exampleScripts,
       primaryPlatform: profile.primaryPlatform,
       typicalVideoLength: profile.typicalVideoLength,
+      // Vertical context
+      vertical: verticalProfile?.vertical,
+      market: verticalProfile?.market,
+      specialization: verticalProfile?.specialization,
     };
 
     // Generate script via Claude
