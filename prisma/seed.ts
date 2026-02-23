@@ -101,15 +101,234 @@ const mortgageBrokerScripts = [
   },
 ];
 
+const mortgageBrokerCalendar: {
+  vertical: string;
+  month: number;
+  title: string;
+  description: string;
+  contentAngle: string;
+  category: string;
+  isRecurring: boolean;
+  specificDate?: Date;
+}[] = [
+  // January
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 1,
+    title: "New Year Financial Reset",
+    description: "Pre-approval basics, credit score improvement, new year home buying goals",
+    contentAngle: "New year, new home? Start here",
+    category: "first_time_buyers",
+    isRecurring: true,
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 1,
+    title: "Rate Outlook for the Year",
+    description: "Predictions for where rates are heading, what it means for buyers",
+    contentAngle: "My rate prediction for 2026",
+    category: "rate_reactions",
+    isRecurring: true,
+  },
+  // February
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 2,
+    title: "Fixed vs Variable Deep-Dive",
+    description: "With spring market approaching, help buyers choose the right structure",
+    contentAngle: "Fixed or variable right now? Here's my honest take",
+    category: "rate_reactions",
+    isRecurring: true,
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 2,
+    title: "Spring Buying Prep",
+    description: "Pre-approval checklist, document prep, getting mortgage-ready",
+    contentAngle: "Spring market is coming — get pre-approved NOW",
+    category: "first_time_buyers",
+    isRecurring: true,
+  },
+  // March
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 3,
+    title: "BoC Rate Decision Reaction",
+    description: "React to the latest Bank of Canada rate announcement",
+    contentAngle: "The BoC just announced — here's what it means for your mortgage",
+    category: "rate_reactions",
+    isRecurring: true,
+    specificDate: new Date("2026-03-12"),
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 3,
+    title: "First-Time Buyer Season Kickoff",
+    description: "Spring is peak first-time buyer season, address common questions",
+    contentAngle: "Buying your first home this spring? Start here",
+    category: "first_time_buyers",
+    isRecurring: true,
+  },
+  // April
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 4,
+    title: "BoC Rate Decision Reaction",
+    description: "April rate decision reaction and analysis",
+    contentAngle: "Rate decision day — here's my breakdown",
+    category: "rate_reactions",
+    isRecurring: true,
+    specificDate: new Date("2026-04-16"),
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 4,
+    title: "Stress Test Explainer",
+    description: "Most buyers don't understand the stress test — explain it simply",
+    contentAngle: "How much can you ACTUALLY afford? The stress test explained",
+    category: "first_time_buyers",
+    isRecurring: true,
+  },
+  // May
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 5,
+    title: "Refinancing Check-In",
+    description: "With spring in full swing, many homeowners should consider refinancing",
+    contentAngle: "Should you refinance right now? 3 questions to ask yourself",
+    category: "renewals",
+    isRecurring: true,
+  },
+  // June
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 6,
+    title: "BoC Rate Decision Reaction",
+    description: "Mid-year rate decision",
+    contentAngle: "June rate decision — what it means for summer buyers",
+    category: "rate_reactions",
+    isRecurring: true,
+    specificDate: new Date("2026-06-04"),
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 6,
+    title: "HELOC Strategies",
+    description: "Home equity lines of credit for renovations, investing, or debt consolidation",
+    contentAngle: "Your home equity is a financial tool — here's how to use it",
+    category: "myths",
+    isRecurring: true,
+  },
+  // July
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 7,
+    title: "BoC Rate Decision Reaction",
+    description: "Summer rate decision",
+    contentAngle: "Mid-summer rate check — here's where we stand",
+    category: "rate_reactions",
+    isRecurring: true,
+    specificDate: new Date("2026-07-16"),
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 7,
+    title: "Renewal Season Alert",
+    description: "Many 5-year terms from 2021 are coming up for renewal",
+    contentAngle: "Your renewal is coming — DON'T just sign what they send",
+    category: "renewals",
+    isRecurring: true,
+  },
+  // August
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 8,
+    title: "Self-Employed Mortgage Guide",
+    description: "Summer slowdown content — educational deep-dive for self-employed",
+    contentAngle: "Self-employed? Here's how to get approved for a mortgage",
+    category: "myths",
+    isRecurring: true,
+  },
+  // September
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 9,
+    title: "BoC Rate Decision Reaction",
+    description: "Fall rate decision",
+    contentAngle: "September rate decision — fall market outlook",
+    category: "rate_reactions",
+    isRecurring: true,
+    specificDate: new Date("2026-09-10"),
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 9,
+    title: "Fall Market Mortgage Prep",
+    description: "Fall buying season prep for buyers",
+    contentAngle: "Fall market is heating up — are you mortgage-ready?",
+    category: "first_time_buyers",
+    isRecurring: true,
+  },
+  // October
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 10,
+    title: "BoC Rate Decision Reaction",
+    description: "October rate decision",
+    contentAngle: "Rate decision day — closing before year-end?",
+    category: "rate_reactions",
+    isRecurring: true,
+    specificDate: new Date("2026-10-29"),
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 10,
+    title: "Year-End Tax Planning & Mortgages",
+    description: "How mortgage interest, HBP repayments, and year-end moves affect taxes",
+    contentAngle: "Smart mortgage moves to make before December 31",
+    category: "myths",
+    isRecurring: true,
+  },
+  // November
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 11,
+    title: "Renewal Negotiation Tips",
+    description: "Year-end renewal push — many terms expiring",
+    contentAngle: "How I saved a client $14,000 on their renewal",
+    category: "renewals",
+    isRecurring: true,
+  },
+  // December
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 12,
+    title: "Year in Review & Predictions",
+    description: "Recap the mortgage year and predict next year",
+    contentAngle: "2026 mortgage year in review — and what's coming in 2027",
+    category: "rate_reactions",
+    isRecurring: true,
+  },
+  {
+    vertical: "MORTGAGE_BROKER",
+    month: 12,
+    title: "Holiday Gratitude & Client Wins",
+    description: "Personal content — thank clients, share wins from the year",
+    contentAngle: "Thank you to everyone who trusted me with their biggest financial decision this year",
+    category: "personal",
+    isRecurring: true,
+  },
+];
+
 async function main() {
+  // --- Script Templates ---
   console.log("Seeding script templates...");
 
-  // Delete existing mortgage broker templates and re-insert (idempotent)
   await prisma.scriptTemplate.deleteMany({
     where: { vertical: "MORTGAGE_BROKER" },
   });
 
-  const records = mortgageBrokerScripts.map((script) => ({
+  const scriptRecords = mortgageBrokerScripts.map((script) => ({
     vertical: script.vertical,
     category: script.category,
     title: script.title,
@@ -120,8 +339,20 @@ async function main() {
     isActive: true,
   }));
 
-  const result = await prisma.scriptTemplate.createMany({ data: records });
-  console.log(`Seeded ${result.count} mortgage broker script templates.`);
+  const scriptResult = await prisma.scriptTemplate.createMany({ data: scriptRecords });
+  console.log(`Seeded ${scriptResult.count} mortgage broker script templates.`);
+
+  // --- Content Calendar ---
+  console.log("Seeding content calendar...");
+
+  await prisma.contentCalendar.deleteMany({
+    where: { vertical: "MORTGAGE_BROKER" },
+  });
+
+  const calendarResult = await prisma.contentCalendar.createMany({
+    data: mortgageBrokerCalendar,
+  });
+  console.log(`Seeded ${calendarResult.count} mortgage broker content calendar entries.`);
 }
 
 main()
