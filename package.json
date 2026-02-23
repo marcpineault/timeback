@@ -8,7 +8,11 @@
     "db:push": "prisma db push --schema=./prisma/schema.prisma",
     "start": "next start",
     "lint": "eslint",
-    "upgrade:enterprise": "npx tsx scripts/upgrade-to-enterprise.ts"
+    "upgrade:enterprise": "npx tsx scripts/upgrade-to-enterprise.ts",
+    "db:seed": "npx prisma db seed"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
@@ -46,6 +50,7 @@
     "eslint-config-next": "16.1.4",
     "prisma": "^6.19.2",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3"
   },
   "overrides": {
