@@ -7,6 +7,7 @@ import VideoProcessor from './VideoProcessor'
 import WelcomeOverlay from '@/components/WelcomeOverlay'
 import RecentVideosTable from '@/components/RecentVideosTable'
 import OnboardingBanner from '@/components/OnboardingBanner'
+import DashboardSuggestions from '@/components/DashboardSuggestions'
 import Link from 'next/link'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 
@@ -187,6 +188,11 @@ export default async function DashboardPage() {
             <div className="stat-card-label">Processing</div>
           </div>
         </div>
+
+        {/* Content Suggestions — only for specific verticals */}
+        {user.vertical && user.vertical !== 'OTHER' && (
+          <DashboardSuggestions />
+        )}
 
         {/* Video Processor */}
         <VideoProcessor
