@@ -6,11 +6,12 @@ import IdeaGenerator from '@/components/ideate/IdeaGenerator'
 import ScriptList from '@/components/ideate/ScriptList'
 import ScriptView from '@/components/ideate/ScriptView'
 import ScriptTemplates from '@/components/ideate/ScriptTemplates'
+import ContentCalendar from '@/components/ideate/ContentCalendar'
 import Teleprompter from '@/components/ideate/Teleprompter'
 import SwipeFile from '@/components/ideate/SwipeFile'
 import { useCreatorProfile, useScripts, useScript, type ScriptData } from '@/hooks/useIdeate'
 
-type Tab = 'ideas' | 'templates' | 'scripts' | 'swipefile' | 'teleprompter' | 'profile'
+type Tab = 'ideas' | 'templates' | 'scripts' | 'calendar' | 'swipefile' | 'teleprompter' | 'profile'
 
 interface DashboardProps {
   ideateUsed: number
@@ -35,6 +36,10 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
 
   // Track a direct script object for teleprompter (used by templates)
   const [directTeleprompterScript, setDirectTeleprompterScript] = useState<ScriptData | null>(null)
+
+  // Cross-tab navigation state (calendar → templates with category, calendar → ideas with topic)
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState<string | null>(null)
+  const [initialIdeaTopic, setInitialIdeaTopic] = useState<string | null>(null)
 
   function handleOpenTeleprompter(script: ScriptData) {
     // Templates pass a synthetic script object with template- prefix
@@ -61,6 +66,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
     { id: 'ideas', label: 'Ideas' },
     { id: 'templates', label: 'Templates' },
     { id: 'scripts', label: 'Scripts' },
+    { id: 'calendar', label: 'Calendar' },
     { id: 'swipefile', label: 'Inspiration' },
     { id: 'teleprompter', label: 'Teleprompter' },
     { id: 'profile', label: 'Profile' },
@@ -194,6 +200,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
                   setActiveTab('scripts')
                   refetchScripts()
                 }}
+                initialTopic={initialIdeaTopic}
               />
             ) : (
               <div className="bg-white border border-[#e0dbd4] rounded-2xl p-8 sm:p-12 text-center">
@@ -257,6 +264,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
             <ScriptTemplates
               onOpenTeleprompter={handleOpenTeleprompter}
               onScriptSaved={refetchScripts}
+              initialCategory={templateCategoryFilter}
             />
           )}
 
@@ -277,6 +285,19 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan }: Dashb
                 onRefresh={refetchScripts}
               />
             )
+          )}
+
+          {activeTab === 'calendar' && (
+            <ContentCalendar
+              onNavigateToTemplates={(category) => {
+                setTemplateCategoryFilter(category)
+                setActiveTab('templates')
+              }}
+              onNavigateToIdeas={(topic) => {
+                setInitialIdeaTopic(topic)
+                setActiveTab('ideas')
+              }}
+            />
           )}
 
           {activeTab === 'swipefile' && (

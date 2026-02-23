@@ -1,24 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import IdeaCard from './IdeaCard'
 import { useIdeas, type IdeaData, type ScriptData } from '@/hooks/useIdeate'
 
 interface Props {
   onScriptGenerated: (script: ScriptData) => void
+  initialTopic?: string | null
 }
 
 type StatusFilter = '' | 'SAVED' | 'SCRIPTED' | 'FILMED' | 'ARCHIVED'
 
-export default function IdeaGenerator({ onScriptGenerated }: Props) {
+export default function IdeaGenerator({ onScriptGenerated, initialTopic }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
   const { ideas, loading, refetch } = useIdeas(statusFilter || undefined)
-  const [topic, setTopic] = useState('')
+  const [topic, setTopic] = useState(initialTopic || '')
   const [count, setCount] = useState(5)
   const [contentStyle, setContentStyle] = useState('auto')
   const [generating, setGenerating] = useState(false)
   const [generatingScriptId, setGeneratingScriptId] = useState<string | null>(null)
   const [error, setError] = useState('')
+
+  // Update topic when navigating from calendar
+  useEffect(() => {
+    if (initialTopic) setTopic(initialTopic)
+  }, [initialTopic])
 
   async function handleGenerate() {
     setGenerating(true)

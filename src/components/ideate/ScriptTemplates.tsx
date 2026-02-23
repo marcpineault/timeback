@@ -20,6 +20,7 @@ interface ScriptTemplate {
 interface Props {
   onOpenTeleprompter: (script: ScriptData) => void
   onScriptSaved: () => void
+  initialCategory?: string | null
 }
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -61,16 +62,21 @@ function applyMarketReplace(text: string, market: string | null): string {
 
 // ─── Component ──────────────────────────────────────────────────────
 
-export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved }: Props) {
+export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, initialCategory }: Props) {
   const [templates, setTemplates] = useState<ScriptTemplate[]>([])
   const [vertical, setVertical] = useState<string | null>(null)
   const [market, setMarket] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState(initialCategory || 'all')
   const [selectedTemplate, setSelectedTemplate] = useState<ScriptTemplate | null>(null)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
   const [savedMessage, setSavedMessage] = useState(false)
+
+  // Update category filter when navigating from calendar
+  useEffect(() => {
+    if (initialCategory) setCategoryFilter(initialCategory)
+  }, [initialCategory])
 
   const fetchTemplates = useCallback(async () => {
     try {
