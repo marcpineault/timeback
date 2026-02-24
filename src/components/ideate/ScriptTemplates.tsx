@@ -26,25 +26,66 @@ interface Props {
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const CATEGORIES = [
-  { value: 'all', label: 'All' },
-  { value: 'rate_reactions', label: 'Rate Reactions' },
-  { value: 'first_time_buyers', label: 'First-Time Buyers' },
-  { value: 'renewals', label: 'Renewals' },
-  { value: 'myths', label: 'Myths & Education' },
-  { value: 'personal', label: 'Personal' },
-]
+const CATEGORIES_BY_VERTICAL: Record<string, { value: string; label: string }[]> = {
+  MORTGAGE_BROKER: [
+    { value: 'all', label: 'All' },
+    { value: 'rate_reactions', label: 'Rate Reactions' },
+    { value: 'first_time_buyers', label: 'First-Time Buyers' },
+    { value: 'renewals', label: 'Renewals' },
+    { value: 'myths', label: 'Myths & Education' },
+    { value: 'personal', label: 'Personal' },
+  ],
+  REAL_ESTATE_AGENT: [
+    { value: 'all', label: 'All' },
+    { value: 'market_updates', label: 'Market Updates' },
+    { value: 'buyer_tips', label: 'Buyer Tips' },
+    { value: 'seller_strategies', label: 'Seller Strategies' },
+    { value: 'neighborhood_guides', label: 'Neighborhood Guides' },
+    { value: 'behind_the_scenes', label: 'Behind the Scenes' },
+    { value: 'personal', label: 'Personal' },
+  ],
+  FINANCIAL_ADVISOR: [
+    { value: 'all', label: 'All' },
+    { value: 'education', label: 'Education' },
+    { value: 'myth_busting', label: 'Myth Busting' },
+    { value: 'trust_building', label: 'Trust Building' },
+    { value: 'seasonal', label: 'Seasonal' },
+    { value: 'social_proof', label: 'Social Proof' },
+    { value: 'personal_brand', label: 'Personal Brand' },
+  ],
+}
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  // Mortgage Broker
   rate_reactions: { bg: 'bg-blue-500/15', text: 'text-blue-500' },
   first_time_buyers: { bg: 'bg-green-500/15', text: 'text-green-500' },
   renewals: { bg: 'bg-amber-500/15', text: 'text-amber-500' },
   myths: { bg: 'bg-purple-500/15', text: 'text-purple-500' },
   personal: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]' },
+  // Real Estate Agent
+  market_updates: { bg: 'bg-blue-500/15', text: 'text-blue-500' },
+  buyer_tips: { bg: 'bg-green-500/15', text: 'text-green-500' },
+  seller_strategies: { bg: 'bg-amber-500/15', text: 'text-amber-500' },
+  neighborhood_guides: { bg: 'bg-teal-500/15', text: 'text-teal-500' },
+  behind_the_scenes: { bg: 'bg-purple-500/15', text: 'text-purple-500' },
+  // Financial Advisor
+  education: { bg: 'bg-blue-500/15', text: 'text-blue-500' },
+  myth_busting: { bg: 'bg-purple-500/15', text: 'text-purple-500' },
+  trust_building: { bg: 'bg-green-500/15', text: 'text-green-500' },
+  seasonal: { bg: 'bg-amber-500/15', text: 'text-amber-500' },
+  social_proof: { bg: 'bg-teal-500/15', text: 'text-teal-500' },
+  personal_brand: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]' },
 }
 
-function getCategoryLabel(category: string): string {
-  return CATEGORIES.find(c => c.value === category)?.label || category
+const VERTICAL_DESCRIPTIONS: Record<string, string> = {
+  MORTGAGE_BROKER: 'Ready-to-use scripts for mortgage brokers. Pick one, customize it, and record.',
+  REAL_ESTATE_AGENT: 'Ready-to-use scripts for real estate agents. Pick one, customize it, and record.',
+  FINANCIAL_ADVISOR: 'Ready-to-use scripts for financial advisors. Pick one, customize it, and record.',
+}
+
+function getCategoryLabel(category: string, vertical: string | null): string {
+  const categories = vertical ? (CATEGORIES_BY_VERTICAL[vertical] || []) : []
+  return categories.find(c => c.value === category)?.label || category
 }
 
 function getCategoryColors(category: string) {
@@ -216,7 +257,7 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
           Templates coming for your vertical
         </h2>
         <p className="text-[#8a8580] text-sm mb-6 max-w-md mx-auto">
-          Script templates are available for Mortgage Brokers (more verticals coming soon).
+          Script templates are available for Mortgage Brokers, Real Estate Agents, and Financial Advisors.
           Switch your profession in Profile to unlock them.
         </p>
         <Link
@@ -278,7 +319,7 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
               <h2 className="text-lg font-semibold text-[#0a0a0a] mb-2">{selectedTemplate.title}</h2>
               <div className="flex items-center gap-2">
                 <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
-                  {getCategoryLabel(selectedTemplate.category)}
+                  {getCategoryLabel(selectedTemplate.category, vertical)}
                 </span>
                 <span className="text-xs text-[#8a8580]">
                   {selectedTemplate.wordCount} words &middot; ~{estSeconds}s
@@ -376,14 +417,14 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Script Templates</h2>
         <p className="text-[#8a8580] text-sm">
-          Ready-to-use scripts for mortgage brokers. Pick one, customize it, and record.
+          {vertical ? (VERTICAL_DESCRIPTIONS[vertical] || 'Ready-to-use scripts. Pick one, customize it, and record.') : 'Ready-to-use scripts. Pick one, customize it, and record.'}
         </p>
       </div>
 
       {/* Category filter pills */}
       <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-5">
         <div className="flex gap-1.5 w-fit">
-          {CATEGORIES.map(cat => (
+          {(vertical ? (CATEGORIES_BY_VERTICAL[vertical] || [{ value: 'all', label: 'All' }]) : [{ value: 'all', label: 'All' }]).map(cat => (
             <button
               key={cat.value}
               onClick={() => setCategoryFilter(cat.value)}
@@ -426,7 +467,7 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
 
                 {/* Category badge */}
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text} mb-3`}>
-                  {getCategoryLabel(template.category)}
+                  {getCategoryLabel(template.category, vertical)}
                 </span>
 
                 {/* Preview text */}

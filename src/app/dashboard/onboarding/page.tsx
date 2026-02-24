@@ -19,18 +19,40 @@ interface FormData {
 
 const VERTICALS: { value: Vertical; emoji: string; label: string; disabled: boolean; comingSoon: boolean }[] = [
   { value: 'MORTGAGE_BROKER', emoji: '🏦', label: 'Mortgage Broker', disabled: false, comingSoon: false },
-  { value: 'FINANCIAL_ADVISOR', emoji: '💼', label: 'Financial Advisor', disabled: true, comingSoon: true },
-  { value: 'REAL_ESTATE_AGENT', emoji: '🏠', label: 'Real Estate Agent', disabled: true, comingSoon: true },
+  { value: 'FINANCIAL_ADVISOR', emoji: '💼', label: 'Financial Advisor', disabled: false, comingSoon: false },
+  { value: 'REAL_ESTATE_AGENT', emoji: '🏠', label: 'Real Estate Agent', disabled: false, comingSoon: false },
   { value: 'OTHER', emoji: '📹', label: 'Other / General', disabled: false, comingSoon: false },
 ]
 
-const SPECIALIZATIONS = [
-  { value: 'first_time_buyers', label: 'First-Time Buyers', audience: 'First-time home buyers' },
-  { value: 'refinancing', label: 'Refinancing & Renewals', audience: 'Homeowners approaching mortgage renewal' },
-  { value: 'investment', label: 'Investment Properties', audience: 'Real estate investors and property buyers' },
-  { value: 'commercial', label: 'Commercial Mortgages', audience: 'Business owners and commercial property investors' },
-  { value: 'self_employed', label: 'Self-Employed / Alt Lending', audience: 'Self-employed professionals and non-traditional borrowers' },
-]
+const SPECIALIZATIONS_BY_VERTICAL: Record<string, { value: string; label: string; audience: string }[]> = {
+  MORTGAGE_BROKER: [
+    { value: 'first_time_buyers', label: 'First-Time Buyers', audience: 'First-time home buyers' },
+    { value: 'refinancing', label: 'Refinancing & Renewals', audience: 'Homeowners approaching mortgage renewal' },
+    { value: 'investment', label: 'Investment Properties', audience: 'Real estate investors and property buyers' },
+    { value: 'commercial', label: 'Commercial Mortgages', audience: 'Business owners and commercial property investors' },
+    { value: 'self_employed', label: 'Self-Employed / Alt Lending', audience: 'Self-employed professionals and non-traditional borrowers' },
+  ],
+  REAL_ESTATE_AGENT: [
+    { value: 'residential_buyers', label: 'Residential Buyers', audience: 'Home buyers looking for residential properties' },
+    { value: 'luxury_homes', label: 'Luxury & High-End', audience: 'Luxury home buyers and sellers' },
+    { value: 'investment_properties', label: 'Investment Properties', audience: 'Real estate investors' },
+    { value: 'first_time_buyers', label: 'First-Time Buyers', audience: 'First-time home buyers' },
+    { value: 'listings_sellers', label: 'Sellers & Listings', audience: 'Home sellers preparing to list' },
+  ],
+  FINANCIAL_ADVISOR: [
+    { value: 'retirement_planning', label: 'Retirement Planning', audience: 'Pre-retirees and retirees' },
+    { value: 'wealth_management', label: 'Wealth Management', audience: 'High-net-worth individuals and families' },
+    { value: 'young_professionals', label: 'Young Professionals', audience: 'Millennials and Gen Z building wealth' },
+    { value: 'small_business', label: 'Small Business Owners', audience: 'Entrepreneurs and small business owners' },
+    { value: 'tax_planning', label: 'Tax & Estate Planning', audience: 'Individuals seeking tax optimization and estate planning' },
+  ],
+}
+
+const VERTICAL_LABELS: Record<string, string> = {
+  MORTGAGE_BROKER: 'mortgage brokers',
+  REAL_ESTATE_AGENT: 'real estate agents',
+  FINANCIAL_ADVISOR: 'financial advisors',
+}
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -91,9 +113,13 @@ export default function VerticalOnboardingPage() {
 
   const totalSteps = form.vertical === 'OTHER' ? 1 : 3
 
+  // Get specializations for selected vertical
+  const currentSpecializations = form.vertical ? (SPECIALIZATIONS_BY_VERTICAL[form.vertical] || []) : []
+  const verticalLabel = form.vertical ? (VERTICAL_LABELS[form.vertical] || 'your profession') : 'your profession'
+
   // Get readable specialization label
-  const specLabel = SPECIALIZATIONS.find(s => s.value === form.specialization)?.label || form.specialization
-  const specAudience = SPECIALIZATIONS.find(s => s.value === form.specialization)?.audience || ''
+  const specLabel = currentSpecializations.find(s => s.value === form.specialization)?.label || form.specialization
+  const specAudience = currentSpecializations.find(s => s.value === form.specialization)?.audience || ''
 
   // Save the onboarding data
   const saveOnboarding = useCallback(async () => {
@@ -127,7 +153,7 @@ export default function VerticalOnboardingPage() {
   // ─── Step Navigation ────────────────────────────────────────────
 
   const handleVerticalSelect = async (vertical: Vertical) => {
-    setForm(prev => ({ ...prev, vertical }))
+    setForm(prev => ({ ...prev, vertical, specialization: '' }))
     analytics.trackVerticalSelected(vertical)
 
     if (vertical === 'OTHER') {
@@ -312,7 +338,7 @@ export default function VerticalOnboardingPage() {
                   What&apos;s your specialization?
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {SPECIALIZATIONS.map((s) => (
+                  {currentSpecializations.map((s) => (
                     <button
                       key={s.value}
                       onClick={() => setForm(prev => ({ ...prev, specialization: s.value }))}
@@ -361,8 +387,8 @@ export default function VerticalOnboardingPage() {
                 Almost done!
               </h1>
               <p className="text-[#8a8580] text-center mb-8 text-sm sm:text-base max-w-lg mx-auto">
-                We&apos;ll customize your scripts, content calendar, and AI generation for mortgage brokers
-                in <strong className="text-[#0a0a0a]">{form.market}</strong> specializing
+                We&apos;ll customize your scripts, content calendar, and AI generation for {verticalLabel}
+                {' '}in <strong className="text-[#0a0a0a]">{form.market}</strong> specializing
                 in <strong className="text-[#0a0a0a]">{specLabel.toLowerCase()}</strong>.
               </p>
 
@@ -375,7 +401,7 @@ export default function VerticalOnboardingPage() {
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-[#0a0a0a]">Pre-written scripts</div>
-                      <div className="text-xs text-[#8a8580]">12 ready-to-record scripts for mortgage brokers</div>
+                      <div className="text-xs text-[#8a8580]">12 ready-to-record scripts for {verticalLabel}</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -384,7 +410,7 @@ export default function VerticalOnboardingPage() {
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-[#0a0a0a]">Content calendar</div>
-                      <div className="text-xs text-[#8a8580]">Monthly content ideas including BoC rate reactions</div>
+                      <div className="text-xs text-[#8a8580]">Monthly content ideas tailored to {verticalLabel}</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">

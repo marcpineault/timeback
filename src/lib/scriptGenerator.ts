@@ -169,6 +169,68 @@ Each idea MUST follow this structure:
 - CLOSE: Extract the universal lesson ("If you're in a similar situation, here's what you need to know") + soft CTA
 Personal stories are the HIGHEST engagement format because they're impossible to replicate. They build TRUST faster than any educational content. Drives COMMENTS (people sharing similar experiences) and FOLLOWS (they want to see more stories).`,
   },
+  // ── Real Estate Agent-specific styles ──
+  'market-update': {
+    label: 'Market Update',
+    description: 'Share local market data, trends, or a monthly market snapshot',
+    promptInstructions: `CONTENT FORMAT: Market Update / Data-Driven
+Each idea MUST follow this structure:
+- HOOK: Lead with a specific, surprising data point about the local market ("Homes in [neighborhood] are selling $30K over asking. Here's why.")
+- BODY: Break down 2-3 key metrics (average price, days on market, inventory levels) in plain language. Compare to last month or last year. Explain what it means for buyers AND sellers. Use a specific scenario to make the data tangible.
+- CLOSE: Give one clear action step based on the data + CTA to reach out
+This format positions you as THE local market expert. People follow market-update creators because they deliver consistent, reliable data. Drives SAVES (reference material) and FOLLOWS (they want monthly updates).`,
+  },
+  'listing-showcase': {
+    label: 'Listing Showcase',
+    description: 'Walk through a listing, open house recap, or property tour',
+    promptInstructions: `CONTENT FORMAT: Listing Showcase / Property Tour
+Each idea MUST follow this structure:
+- HOOK: Lead with the most surprising or aspirational element ("This $400K home has a feature most million-dollar homes don't have")
+- BODY: Walk through the property highlighting 3-4 standout features. For each feature, explain the BENEFIT, not just the feature (not "granite countertops" but "a kitchen you'll actually want to cook in"). Address potential objections preemptively. Paint a lifestyle picture — help viewers imagine living there.
+- CLOSE: Include neighborhood context (what's nearby) + CTA to book a showing or DM for details
+Property tours get MASSIVE engagement because everyone loves looking at homes. The key is to tell a STORY, not just list features. Drives SHARES ("look at this house!") and COMMENTS (opinions on the property).`,
+  },
+  'neighborhood-guide': {
+    label: 'Neighborhood Guide',
+    description: 'Spotlight a local neighborhood, community, or area',
+    promptInstructions: `CONTENT FORMAT: Neighborhood Guide / Local Expert
+Each idea MUST follow this structure:
+- HOOK: Open with a bold claim or surprising fact about the neighborhood ("This is the most underrated neighborhood in [city] and here's proof")
+- BODY: Cover the highlights — walkability, restaurants, schools, parks, community vibe, price range, transit access. Be HONEST — mention downsides too (this builds credibility). Include a "best for" statement (families, young professionals, retirees, etc.). Reference specific places by name.
+- CLOSE: Invite viewers to suggest neighborhoods for future guides + CTA
+Neighborhood guides are the ULTIMATE local content. They rank in search, get shared by locals, and demonstrate deep market knowledge. Drives COMMENTS ("do my neighborhood next!") and SAVES (people reference them when house hunting).`,
+  },
+  // ── Financial Advisor-specific styles ──
+  'market-commentary': {
+    label: 'Market Commentary',
+    description: 'React to market news, economic data, or financial events',
+    promptInstructions: `CONTENT FORMAT: Market Commentary / Financial News Reaction
+Each idea MUST follow this structure:
+- HOOK: Lead with the news or data point — make it feel relevant to everyday people ("The Fed just made a decision that affects every single person with a savings account")
+- BODY: Break down what happened in plain language (no jargon). Explain the REAL impact on regular people — not Wall Street. Use a specific scenario ("If you have $50K in a savings account, this means..."). Add your professional perspective — what should people actually DO about this?
+- CLOSE: Give one clear, non-advisory action step ("Review your allocation" not "buy X stock") + CTA
+This format works because financial news creates ANXIETY and people are actively searching for a calm, knowledgeable voice. Position yourself as the advisor who cuts through the noise. Drives SHARES and FOLLOWS.`,
+  },
+  'financial-education': {
+    label: 'Client Education',
+    description: 'Explain a financial concept in simple, jargon-free language',
+    promptInstructions: `CONTENT FORMAT: Financial Education / Jargon Buster
+Each idea MUST follow this structure:
+- HOOK: Start with the confusing concept, then promise clarity ("Everyone talks about compound interest but nobody explains it like this")
+- BODY: Explain the concept as if talking to a smart friend over coffee. Use a real-world example with actual numbers ("If you start investing $200/month at 25, here's exactly what happens by 65..."). Break it into 2-3 bite-sized pieces. Each piece should have an "aha moment."
+- CLOSE: Summarize in one sentence + "Save this for when you need it"
+Financial jargon intimidates people and stops them from taking action. This format makes you the approachable expert. Maximizes SAVES (people bookmark for reference) and FOLLOWS (they want more simple explanations). CRITICAL: Frame as educational, never as specific advice.`,
+  },
+  'trust-building': {
+    label: 'Trust Building',
+    description: 'Build credibility through transparency, client stories, or industry insights',
+    promptInstructions: `CONTENT FORMAT: Trust Building / Transparency Content
+Each idea MUST follow this structure:
+- HOOK: Open with radical transparency or a surprising admission ("I'm a financial advisor and here's what I think about the fees in my own industry")
+- BODY: Be genuinely transparent about something in the financial industry — how advisors get paid, what to watch out for, what questions to ask. Share anonymized client success stories with specific (but private) results. Show your process — what happens in a first meeting, how you build a plan, etc.
+- CLOSE: Invite questions or offer a free consultation for people who want to learn more
+Trust content is the HIGHEST converting format for financial advisors because it addresses the #1 barrier: "Can I trust this person with my money?" Drives FOLLOWS (they want someone transparent) and COMMENTS (people sharing their own experiences or asking questions).`,
+  },
 } as const;
 
 export type ContentStyle = keyof typeof CONTENT_STYLES;
@@ -310,8 +372,13 @@ function buildVerticalPrompt(vertical: string, market?: string, specialization?:
   if (vertical === 'MORTGAGE_BROKER') {
     return buildMortgageBrokerPrompt(market, specialization);
   }
+  if (vertical === 'REAL_ESTATE_AGENT') {
+    return buildRealEstateAgentPrompt(market, specialization);
+  }
+  if (vertical === 'FINANCIAL_ADVISOR') {
+    return buildFinancialAdvisorPrompt(market, specialization);
+  }
 
-  // Future verticals can be added here
   return '';
 }
 
@@ -365,6 +432,120 @@ function buildMortgageBrokerPrompt(market?: string, specialization?: string): st
   parts.push(`- Content should educate AND build trust — every video should make the viewer think "I want this person handling my mortgage"`);
   parts.push(`- Timely content around rate announcements and market shifts performs extremely well`);
   parts.push(`- NEVER give specific financial advice — frame as educational ("here's how it generally works" not "you should do X")`);
+
+  return parts.join('\n');
+}
+
+function buildRealEstateAgentPrompt(market?: string, specialization?: string): string {
+  const parts: string[] = [
+    `\nINDUSTRY CONTEXT — REAL ESTATE AGENT:`,
+    `This creator is a licensed real estate agent. All content must reflect this professional context:`,
+  ];
+
+  if (market) {
+    parts.push(`\nMARKET: ${market}`);
+    parts.push(`- Reference the local market naturally (e.g. "here in ${market}")`);
+    parts.push(`- Use local housing market conditions, price ranges, and neighborhoods relevant to ${market}`);
+    parts.push(`- Reference local landmarks, school districts, and community features when relevant`);
+
+    // Canadian market detection
+    const canadianMarkers = [
+      'Toronto', 'Vancouver', 'Calgary', 'Edmonton', 'Ottawa', 'Montreal',
+      'Winnipeg', 'Halifax', 'Victoria', 'Kitchener', 'Hamilton', 'London',
+      'GTA', 'Greater Toronto', 'Lower Mainland', 'Ontario', 'BC', 'British Columbia',
+      'Alberta', 'Quebec', 'Manitoba', 'Saskatchewan', 'Nova Scotia', 'Canada',
+    ];
+    const isCanadian = canadianMarkers.some(m => market.toLowerCase().includes(m.toLowerCase()));
+
+    if (isCanadian) {
+      parts.push(`\nCANADIAN REAL ESTATE CONTEXT (MUST reference these where relevant):`);
+      parts.push(`- Use Canadian terminology: "realtor", "listing agent", "buyer's agent"`);
+      parts.push(`- Reference Canadian processes: conditional offers, home inspections, lawyer-based closings`);
+      parts.push(`- Canadian-specific costs: land transfer tax, CMHC insurance for buyers, GST/HST on new builds`);
+      parts.push(`- Reference the Canadian Real Estate Association (CREA) and local board data`);
+      parts.push(`- NEVER reference US-specific terms like "closing costs" in a US sense, "HOA" (use "condo fees"), "realtor commissions" post-NAR settlement`);
+    } else {
+      parts.push(`\nUS REAL ESTATE CONTEXT:`);
+      parts.push(`- Reference MLS data and local market statistics`);
+      parts.push(`- US-specific processes: escrow, title insurance, HOA`);
+      parts.push(`- Be aware of NAR settlement changes and buyer agent compensation`);
+    }
+  }
+
+  if (specialization) {
+    parts.push(`\nSPECIALIZATION: ${specialization}`);
+    parts.push(`- Lean into this specialty when generating ideas — it's what differentiates this creator`);
+  }
+
+  parts.push(`\nREAL ESTATE CONTENT GUIDELINES:`);
+  parts.push(`- Be the local market expert — reference specific neighborhoods, price points, and trends`);
+  parts.push(`- Use real numbers and scenarios (e.g. "A 3-bed in [neighborhood] is going for $X right now")`);
+  parts.push(`- Address common fears: bidding wars, overpaying, hidden problems, market timing`);
+  parts.push(`- Position the creator as the trusted local expert who knows the market inside and out`);
+  parts.push(`- Content should educate AND build trust — every video should make the viewer think "I want this agent representing me"`);
+  parts.push(`- Neighborhood tours, market updates, and buyer/seller tips perform extremely well`);
+  parts.push(`- Show personality — real estate is a relationship business and people hire agents they like`);
+  parts.push(`- NEVER make guarantees about returns or market predictions — frame as analysis and informed opinions`);
+
+  return parts.join('\n');
+}
+
+function buildFinancialAdvisorPrompt(market?: string, specialization?: string): string {
+  const parts: string[] = [
+    `\nINDUSTRY CONTEXT — FINANCIAL ADVISOR:`,
+    `This creator is a financial advisor/planner. All content must reflect this professional context:`,
+  ];
+
+  if (market) {
+    parts.push(`\nMARKET: ${market}`);
+    parts.push(`- Reference the local market naturally when relevant (e.g. "here in ${market}")`);
+    parts.push(`- Reference local cost of living, state/provincial tax implications, and economic conditions`);
+
+    // Canadian market detection
+    const canadianMarkers = [
+      'Toronto', 'Vancouver', 'Calgary', 'Edmonton', 'Ottawa', 'Montreal',
+      'Winnipeg', 'Halifax', 'Victoria', 'Kitchener', 'Hamilton', 'London',
+      'GTA', 'Greater Toronto', 'Lower Mainland', 'Ontario', 'BC', 'British Columbia',
+      'Alberta', 'Quebec', 'Manitoba', 'Saskatchewan', 'Nova Scotia', 'Canada',
+    ];
+    const isCanadian = canadianMarkers.some(m => market.toLowerCase().includes(m.toLowerCase()));
+
+    if (isCanadian) {
+      parts.push(`\nCANADIAN FINANCIAL CONTEXT (MUST reference these where relevant):`);
+      parts.push(`- TFSA (Tax-Free Savings Account) — annual contribution limits and lifetime room`);
+      parts.push(`- RRSP (Registered Retirement Savings Plan) — contribution limits, RRSP vs TFSA debate`);
+      parts.push(`- FHSA (First Home Savings Account) — newer account for first-time buyers`);
+      parts.push(`- CPP (Canada Pension Plan) and OAS (Old Age Security) — when to start collecting`);
+      parts.push(`- RESP (Registered Education Savings Plan) — for education savings`);
+      parts.push(`- Canadian capital gains and dividend tax treatment`);
+      parts.push(`- NEVER reference US-specific terms like "401(k)", "IRA", "Social Security", "529 plan" unless comparing to Canadian equivalents`);
+    } else {
+      parts.push(`\nUS FINANCIAL CONTEXT:`);
+      parts.push(`- 401(k) and IRA (Traditional & Roth) contribution limits and strategies`);
+      parts.push(`- Social Security optimization — when to start collecting`);
+      parts.push(`- 529 plans for education savings`);
+      parts.push(`- HSA (Health Savings Account) as a triple-tax-advantaged account`);
+      parts.push(`- US capital gains tax brackets and tax-loss harvesting strategies`);
+      parts.push(`- State-specific tax considerations when relevant`);
+    }
+  }
+
+  if (specialization) {
+    parts.push(`\nSPECIALIZATION: ${specialization}`);
+    parts.push(`- Lean into this specialty when generating ideas — it's what differentiates this creator`);
+  }
+
+  parts.push(`\nFINANCIAL ADVISOR CONTENT GUIDELINES:`);
+  parts.push(`- Simplify complex financial concepts — viewers are overwhelmed, not unintelligent`);
+  parts.push(`- Use real-number scenarios (e.g. "If you're 35 and saving $500/month, here's what you'll have at 65...")`);
+  parts.push(`- Address common fears: running out of money in retirement, market crashes, not saving enough, taxes`);
+  parts.push(`- Position the creator as the calm, knowledgeable advisor who makes money less scary`);
+  parts.push(`- Content should educate AND build trust — every video should make the viewer think "I need to talk to this person"`);
+  parts.push(`- Myth-busting and jargon-breaking content performs extremely well`);
+  parts.push(`- Emphasize the FIDUCIARY standard and fee transparency — differentiate from salespeople`);
+  parts.push(`- COMPLIANCE IS CRITICAL: NEVER give specific investment recommendations, guarantee returns, or provide personalized financial advice`);
+  parts.push(`- Always frame as educational content: "here's how it generally works" not "you should buy X"`);
+  parts.push(`- Include appropriate disclaimers in tone: "talk to your advisor" or "this is educational, not advice"`);
 
   return parts.join('\n');
 }
