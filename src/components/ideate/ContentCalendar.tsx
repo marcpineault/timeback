@@ -31,19 +31,53 @@ const MONTH_NAMES = [
 ]
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  // Mortgage Broker
   rate_reactions: { bg: 'bg-blue-500/15', text: 'text-blue-500' },
   first_time_buyers: { bg: 'bg-green-500/15', text: 'text-green-500' },
   renewals: { bg: 'bg-amber-500/15', text: 'text-amber-500' },
   myths: { bg: 'bg-purple-500/15', text: 'text-purple-500' },
   personal: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]' },
+  // Real Estate Agent
+  market_updates: { bg: 'bg-blue-500/15', text: 'text-blue-500' },
+  buyer_tips: { bg: 'bg-green-500/15', text: 'text-green-500' },
+  seller_strategies: { bg: 'bg-amber-500/15', text: 'text-amber-500' },
+  neighborhood_guides: { bg: 'bg-teal-500/15', text: 'text-teal-500' },
+  behind_the_scenes: { bg: 'bg-purple-500/15', text: 'text-purple-500' },
+  // Financial Advisor
+  education: { bg: 'bg-blue-500/15', text: 'text-blue-500' },
+  myth_busting: { bg: 'bg-purple-500/15', text: 'text-purple-500' },
+  trust_building: { bg: 'bg-green-500/15', text: 'text-green-500' },
+  seasonal: { bg: 'bg-amber-500/15', text: 'text-amber-500' },
+  social_proof: { bg: 'bg-teal-500/15', text: 'text-teal-500' },
+  personal_brand: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]' },
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
+  // Mortgage Broker
   rate_reactions: 'Rate Reactions',
   first_time_buyers: 'First-Time Buyers',
   renewals: 'Renewals',
   myths: 'Myths & Education',
   personal: 'Personal',
+  // Real Estate Agent
+  market_updates: 'Market Updates',
+  buyer_tips: 'Buyer Tips',
+  seller_strategies: 'Seller Strategies',
+  neighborhood_guides: 'Neighborhood Guides',
+  behind_the_scenes: 'Behind the Scenes',
+  // Financial Advisor
+  education: 'Education',
+  myth_busting: 'Myth Busting',
+  trust_building: 'Trust Building',
+  seasonal: 'Seasonal',
+  social_proof: 'Social Proof',
+  personal_brand: 'Personal Brand',
+}
+
+const VERTICAL_CALENDAR_DESCRIPTIONS: Record<string, string> = {
+  MORTGAGE_BROKER: 'Timely content ideas for mortgage brokers. Know what to post and when.',
+  REAL_ESTATE_AGENT: 'Timely content ideas for real estate agents. Know what to post and when.',
+  FINANCIAL_ADVISOR: 'Timely content ideas for financial advisors. Know what to post and when.',
 }
 
 function getCategoryColors(category: string) {
@@ -195,7 +229,7 @@ export default function ContentCalendar({ onNavigateToTemplates, onNavigateToIde
         <p className="text-[#8a8580] text-sm mb-6 max-w-md mx-auto">
           {vertical === null
             ? 'Set your profession to unlock a personalized content calendar with timely post ideas.'
-            : 'Content calendars are available for Mortgage Brokers (more verticals coming soon). Switch your profession in Profile to unlock.'}
+            : 'Content calendars are available for Mortgage Brokers, Real Estate Agents, and Financial Advisors. Switch your profession in Profile to unlock.'}
         </p>
         <Link
           href="/dashboard/onboarding"
@@ -215,7 +249,7 @@ export default function ContentCalendar({ onNavigateToTemplates, onNavigateToIde
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Content Calendar</h2>
         <p className="text-[#8a8580] text-sm">
-          Timely content ideas for mortgage brokers. Know what to post and when.
+          {vertical ? (VERTICAL_CALENDAR_DESCRIPTIONS[vertical] || 'Timely content ideas. Know what to post and when.') : 'Timely content ideas. Know what to post and when.'}
         </p>
       </div>
 

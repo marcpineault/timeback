@@ -320,6 +320,603 @@ const mortgageBrokerCalendar: {
   },
 ];
 
+// ─── Real Estate Agent Script Templates ─────────────────────────────
+
+const realEstateAgentScripts = [
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "market_updates",
+    title: "Here's What Happened in [city] Real Estate This Month",
+    scriptBody: `Let's talk about what just happened in [market] real estate. This month we saw [X] homes sell, the average price was $[X], and homes sat on the market for an average of [X] days. What does that mean for you? If you're a buyer, [analysis]. If you're a seller, [analysis]. The key takeaway: [insight]. I track these numbers every single month so you don't have to. Follow me for your monthly [market] market update.`,
+    tags: ["market-update", "data", "local", "timely"],
+    sortOrder: 1,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "market_updates",
+    title: "What $500K Gets You in [city] Right Now",
+    scriptBody: `Want to see what $500,000 actually buys you in [market] right now? I pulled three listings at this price point and the range might surprise you. Option one: [description — neighborhood, size, features]. Option two: [description]. Option three: [description]. The same budget gets you completely different lifestyles depending on the neighborhood. That's why working with someone who knows [market] inside and out matters. DM me your budget and I'll show you what's realistic.`,
+    tags: ["market-update", "budget", "local", "education"],
+    sortOrder: 2,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "buyer_tips",
+    title: "5 Mistakes First-Time Buyers Make",
+    scriptBody: `If you're buying your first home, avoid these five mistakes I see all the time. One: looking at houses before getting pre-approved. You're wasting everyone's time, including yours. Two: only looking at the monthly mortgage payment. Property taxes, insurance, maintenance, and closing costs add up fast. Three: waiving the home inspection to win a bidding war. That's how you end up with a $40,000 foundation problem. Four: not hiring your own agent. The listing agent works for the seller, not you. Five: falling in love with a house before running the numbers. Emotions are expensive in real estate. DM me 'BUYER' and I'll walk you through the process step by step.`,
+    tags: ["first-time", "buyer", "education", "mistakes"],
+    sortOrder: 3,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "buyer_tips",
+    title: "The Offer That Wins in a Bidding War",
+    scriptBody: `You found the perfect home — and so did five other buyers. Here's how to write the offer that wins. It's not always about the highest price. Sellers care about three things: price, certainty, and timeline. A clean offer with no conditions, a flexible closing date, and proof of financing often beats a higher price with strings attached. Also — write a personal letter. I know it sounds old-school, but sellers are emotional. They want to know their home is going to someone who loves it. I've had clients win bidding wars $20,000 under the top offer because of their letter. DM me and I'll help you build a winning strategy.`,
+    tags: ["buyer", "bidding", "strategy", "negotiation"],
+    sortOrder: 4,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "seller_strategies",
+    title: "5 Things to Do Before Listing Your Home",
+    scriptBody: `Thinking about selling? Do these five things BEFORE you list and you could add thousands to your sale price. One: declutter ruthlessly. Buyers need to imagine their life in your space, not yours. Two: deep clean everything — especially kitchens, bathrooms, and windows. Three: fix the small stuff. That leaky faucet and cracked tile make buyers wonder what ELSE is wrong. Four: boost your curb appeal. First impressions happen before they walk through the door. Five: get a pre-listing inspection. Finding problems early means you control the narrative — not the buyer's inspector. Want a personalized checklist for your home? DM me your address.`,
+    tags: ["seller", "listing", "preparation", "checklist"],
+    sortOrder: 5,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "seller_strategies",
+    title: "Why Your Home Isn't Selling",
+    scriptBody: `Your home's been on the market for 30 days with no offers. Here's the truth nobody wants to tell you. In today's market, there are only three reasons a home doesn't sell: price, condition, or exposure. If your agent is marketing it well — professional photos, video tours, social media, open houses — then it's price or condition. And here's the hard part: the market doesn't care what you paid for it, what you spent on renovations, or what your neighbor sold for. The market tells you what your home is worth. If you're not getting offers, the market is speaking. The question is whether you're listening. Thinking about making a change? DM me for a honest assessment.`,
+    tags: ["seller", "pricing", "tough-love", "education"],
+    sortOrder: 6,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "neighborhood_guides",
+    title: "Living in [Neighborhood] — The Honest Truth",
+    scriptBody: `Thinking about moving to [neighborhood in market]? Here's the honest truth from someone who's sold [X] homes there. The pros: [walkability/schools/parks/restaurants/community feel]. The cons: [traffic/parking/noise/price/age of homes]. The average home price right now is around $[X], and most homes sell within [X] days. It's best for [type of buyer — young families, professionals, downsizers]. If you want the full breakdown of any neighborhood in [market], drop the name in the comments and I'll do a deep dive.`,
+    tags: ["neighborhood", "local", "guide", "education"],
+    sortOrder: 7,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "neighborhood_guides",
+    title: "Best Neighborhoods for First-Time Buyers in [city]",
+    scriptBody: `If you're buying your first home in [market], here are three neighborhoods you should be looking at right now. Number one: [neighborhood] — great value, up-and-coming, average price around $[X]. Number two: [neighborhood] — slightly higher price but walkable to everything, perfect for young professionals. Number three: [neighborhood] — if you don't mind a short commute, you get way more space for your money. First-time buyers: stop scrolling Zillow and actually come see these neighborhoods. DM me and I'll set up a tour of all three in one afternoon.`,
+    tags: ["neighborhood", "first-time", "local", "guide"],
+    sortOrder: 8,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "behind_the_scenes",
+    title: "What Your Agent Actually Does Behind the Scenes",
+    scriptBody: `People think real estate agents just open doors and collect a check. Let me show you what actually happens behind the scenes on a single transaction. Before showing: researching comparable sales, checking tax records, reviewing the listing history. During showings: evaluating the condition, estimating repair costs, spotting red flags you'd miss. Writing the offer: negotiating price, terms, conditions, timelines — sometimes going back and forth five or six times. After acceptance: coordinating inspectors, appraisers, lenders, lawyers, and the other agent — putting out fires daily. From first showing to closing day, I'm working 40+ hours on YOUR deal alone. And that's exactly how it should be.`,
+    tags: ["behind-the-scenes", "agent-value", "trust", "education"],
+    sortOrder: 9,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "behind_the_scenes",
+    title: "Day in the Life of a Real Estate Agent",
+    scriptBody: `People think being a real estate agent is glamorous. Here's what my Tuesday actually looked like. 7 AM: checked new listings, prepped for a morning showing. 9 AM: met first-time buyers at a condo — they loved it but the parking was a dealbreaker. 11 AM: listing appointment — walked through a home, discussed pricing strategy, took notes for the photographer. 1 PM: lunch at my desk, three phone calls about an offer that's going sideways. 3 PM: wrote a counter-offer, negotiated $15K off the price for my buyer. 5 PM: open house prep for Saturday. 7 PM: responded to 12 DMs from people asking about the market. This job is 24/7. But handing someone the keys to their first home? Worth every late night.`,
+    tags: ["behind-the-scenes", "day-in-life", "personal", "trust"],
+    sortOrder: 10,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "personal",
+    title: "Why I Became a Real Estate Agent",
+    scriptBody: `People ask me why I got into real estate. Here's the real answer. I've always been obsessed with homes — not just the buildings, but what they represent. Stability. Roots. The place where your kids take their first steps. I watched my parents buy their first home and I still remember the look on their faces. Now I get to create that moment for other people. Is it stressful? Absolutely. Are the hours insane? Yes. Do I sometimes miss weekends and evenings? All the time. But there's nothing like the moment at the closing table when someone realizes they just became a homeowner. That's why I do this. And that's why I'm not going anywhere.`,
+    tags: ["personal", "trust", "story", "motivation"],
+    sortOrder: 11,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    category: "personal",
+    title: "The Hardest Part of Real Estate Nobody Talks About",
+    scriptBody: `I need to be honest about something. The hardest part of real estate isn't the long hours or the competitive market. It's when you can't help someone. When a first-time buyer loses their dream home to a cash offer. When someone's life changes — divorce, job loss, death in the family — and selling the home becomes emotional, not just financial. When you've done everything right and the deal still falls apart. Those moments stick with you. But they also make you better. They make you fight harder for the next client. They remind you that behind every transaction is a real person going through one of the biggest decisions of their life. That's why I take this personally. Because it IS personal.`,
+    tags: ["personal", "vulnerability", "trust", "authenticity"],
+    sortOrder: 12,
+  },
+];
+
+// ─── Real Estate Agent Content Calendar ─────────────────────────────
+
+const realEstateAgentCalendar: typeof mortgageBrokerCalendar = [
+  // January
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 1,
+    title: "New Year Market Predictions",
+    description: "Share your predictions for the local housing market in the new year",
+    contentAngle: "My [market] housing market prediction for this year",
+    category: "market_updates",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 1,
+    title: "Buyer Resolution Content",
+    description: "New year motivation for people thinking about buying their first home",
+    contentAngle: "Make this the year you stop renting — here's how to start",
+    category: "buyer_tips",
+    isRecurring: true,
+  },
+  // February
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 2,
+    title: "Spring Market Prep for Sellers",
+    description: "Now is the time to start preparing to list — beat the spring rush",
+    contentAngle: "Thinking about selling this spring? Start prepping NOW",
+    category: "seller_strategies",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 2,
+    title: "Valentine's Day — Love Your Neighborhood",
+    description: "Fun neighborhood spotlight tied to Valentine's Day",
+    contentAngle: "5 things I love about living in [neighborhood]",
+    category: "neighborhood_guides",
+    isRecurring: true,
+  },
+  // March
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 3,
+    title: "Spring Market Kickoff",
+    description: "The busiest season is here — monthly market data + what to expect",
+    contentAngle: "Spring market is HERE — here's what I'm seeing in [market]",
+    category: "market_updates",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 3,
+    title: "First-Time Buyer Guide",
+    description: "Peak season for first-time buyers entering the market",
+    contentAngle: "First-time buyer? The 5 things you need to do before house hunting",
+    category: "buyer_tips",
+    isRecurring: true,
+  },
+  // April
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 4,
+    title: "Monthly Market Snapshot",
+    description: "Share last month's sales data and trends",
+    contentAngle: "March numbers are in — here's what happened in [market]",
+    category: "market_updates",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 4,
+    title: "Curb Appeal Season",
+    description: "Spring landscaping and exterior prep tips for sellers",
+    contentAngle: "Your front yard is your first showing — 5 curb appeal fixes under $500",
+    category: "seller_strategies",
+    isRecurring: true,
+  },
+  // May
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 5,
+    title: "Open House Season",
+    description: "How to prepare for and get the most out of open houses",
+    contentAngle: "Going to open houses this weekend? Here's what to actually look for",
+    category: "buyer_tips",
+    isRecurring: true,
+  },
+  // June
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 6,
+    title: "Mid-Year Market Check-In",
+    description: "Half-year market analysis and summer outlook",
+    contentAngle: "Half the year is done — here's where [market] real estate stands",
+    category: "market_updates",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 6,
+    title: "Summer Neighborhood Spotlight",
+    description: "Highlight neighborhoods that shine in summer — patios, parks, community events",
+    contentAngle: "The best neighborhood in [market] for summer vibes",
+    category: "neighborhood_guides",
+    isRecurring: true,
+  },
+  // July
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 7,
+    title: "Summer Market Reality Check",
+    description: "Summer slowdown vs. opportunity — what to expect",
+    contentAngle: "Is summer a bad time to buy? Here's the truth",
+    category: "buyer_tips",
+    isRecurring: true,
+  },
+  // August
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 8,
+    title: "Back to School & Family Neighborhoods",
+    description: "Neighborhood guides focused on schools and family-friendliness",
+    contentAngle: "Best neighborhoods in [market] for families with kids",
+    category: "neighborhood_guides",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 8,
+    title: "Fall Listing Prep",
+    description: "Get sellers thinking about fall listings before the rush",
+    contentAngle: "Want to sell this fall? Start here — it's closer than you think",
+    category: "seller_strategies",
+    isRecurring: true,
+  },
+  // September
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 9,
+    title: "Fall Market Kickoff",
+    description: "Second busiest season — what's happening in the market",
+    contentAngle: "Fall market is heating up — here's what buyers and sellers need to know",
+    category: "market_updates",
+    isRecurring: true,
+  },
+  // October
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 10,
+    title: "Seasonal Home Maintenance Tips",
+    description: "Helpful content that builds trust — winterizing your home",
+    contentAngle: "5 things to do before winter hits (your home will thank you)",
+    category: "behind_the_scenes",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 10,
+    title: "Year-End Market Update",
+    description: "Q3 data and end-of-year market trajectory",
+    contentAngle: "Q3 numbers are in — here's how [market] is closing out the year",
+    category: "market_updates",
+    isRecurring: true,
+  },
+  // November
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 11,
+    title: "Holiday Buying Opportunity",
+    description: "Fewer buyers in the market = opportunity for those willing to look",
+    contentAngle: "The best time to buy might be when nobody else is looking",
+    category: "buyer_tips",
+    isRecurring: true,
+  },
+  // December
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 12,
+    title: "Year in Review & Predictions",
+    description: "Recap the local market year and preview next year",
+    contentAngle: "[market] real estate year in review — and what's coming next",
+    category: "market_updates",
+    isRecurring: true,
+  },
+  {
+    vertical: "REAL_ESTATE_AGENT",
+    month: 12,
+    title: "Holiday Gratitude & Client Wins",
+    description: "Personal content — thank clients, share highlights from the year",
+    contentAngle: "Thank you to everyone who trusted me with their biggest investment this year",
+    category: "personal",
+    isRecurring: true,
+  },
+];
+
+// ─── Financial Advisor Script Templates ─────────────────────────────
+
+const financialAdvisorScripts = [
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "education",
+    title: "Roth IRA vs Traditional IRA — Which Is Right for You?",
+    scriptBody: `The number one question I get: should I contribute to a Roth IRA or a Traditional IRA? Here's the simple answer. If you think you'll be in a higher tax bracket in retirement, go Roth — you pay taxes now and withdraw tax-free later. If you think you'll be in a lower bracket, go Traditional — you get the tax break now. But here's what most people miss: it's not either/or. Many of my clients do BOTH. The Roth gives you tax-free income in retirement, and the Traditional reduces your taxable income today. The right mix depends on your income, your age, and your retirement timeline. DM me 'IRA' and I'll help you figure out the right split.`,
+    tags: ["education", "ira", "retirement", "tax-planning"],
+    sortOrder: 1,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "education",
+    title: "How Much Should You Actually Have Saved by 30? 40? 50?",
+    scriptBody: `Let's talk about retirement savings benchmarks. By 30, aim to have 1x your annual salary saved. By 40, 3x. By 50, 6x. By 60, 8x. By retirement, 10-12x. Now — if you're behind, don't panic. These are guidelines, not rules. The most important number isn't what you've saved — it's your savings RATE. If you're saving 15-20% of your income consistently, you're on track even if you started late. The magic of compound growth means every dollar you invest today is worth significantly more than one you invest 10 years from now. The best time to start was 10 years ago. The second best time is today. DM me and I'll run a personalized projection for you.`,
+    tags: ["education", "retirement", "benchmarks", "savings"],
+    sortOrder: 2,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "myth_busting",
+    title: "You Don't Need to Be Rich to Work With a Financial Advisor",
+    scriptBody: `The biggest myth in my industry: financial advisors are only for rich people. False. Some of my most impactful work has been with people earning $60,000 to $100,000 who just needed a plan. Here's what a good advisor actually does for you: creates a budget that works, maximizes your employer 401(k) match (free money you might be leaving on the table), builds an emergency fund strategy, sets up tax-efficient investing, and creates a roadmap to your specific goals. You don't need a million dollars to start. You need a plan. DM me 'PLAN' and let's build yours.`,
+    tags: ["myths", "accessibility", "trust-building", "education"],
+    sortOrder: 3,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "myth_busting",
+    title: "Why Timing the Market Always Fails",
+    scriptBody: `I need to tell you something that could save you a fortune: stop trying to time the market. I know — you see headlines about crashes and corrections and your instinct says 'sell everything and wait.' Here's the data. If you invested $10,000 in the S&P 500 20 years ago and stayed invested, you'd have roughly $60,000 today. But if you missed just the 10 best days — ten days out of 7,300 — you'd have less than $30,000. Half. The best days often come right after the worst days. The people who panic-sell lock in their losses and miss the recovery. Time IN the market beats timing the market. Every single time. Save this for the next time you're tempted to sell.`,
+    tags: ["myths", "investing", "market", "education"],
+    sortOrder: 4,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "trust_building",
+    title: "Questions to Ask Before Hiring a Financial Advisor",
+    scriptBody: `Before you hire a financial advisor, ask these five questions. One: are you a fiduciary? This means they're legally required to act in YOUR best interest, not theirs. If they hesitate, walk away. Two: how do you get paid? Fee-only means they charge you directly. Commission-based means they earn money when they sell you products. Know the difference. Three: what's your investment philosophy? You want someone who has a clear, evidence-based approach — not someone chasing hot stocks. Four: what's your typical client look like? Make sure you're not too small or too large for their practice. Five: can I see a sample financial plan? If they can't show you what the work looks like, they're selling, not planning. I'm happy to answer all five of these. DM me.`,
+    tags: ["trust", "advisor-selection", "education", "transparency"],
+    sortOrder: 5,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "trust_building",
+    title: "The Difference Between a Financial Advisor and a Salesperson",
+    scriptBody: `Not all financial advisors are the same. Some are advisors. Some are salespeople in disguise. Here's how to tell the difference. A salesperson pushes products — annuities, whole life insurance, loaded mutual funds — and earns a commission every time you buy. An advisor creates a plan FIRST, then recommends solutions that fit the plan. A salesperson talks about returns. An advisor talks about YOUR goals. A salesperson makes you feel rushed. An advisor makes you feel heard. The simplest test: ask them 'are you a fiduciary?' If the answer isn't an immediate yes, you're talking to a salesperson. I'm a fiduciary. I work for you, not a product company. DM me if you want to know the difference firsthand.`,
+    tags: ["trust", "fiduciary", "transparency", "education"],
+    sortOrder: 6,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "seasonal",
+    title: "5 Smart Money Moves Before December 31",
+    scriptBody: `The year is almost over and there are five money moves you should make before December 31. One: max out your 401(k) or IRA contributions — you can't go back and contribute for last year. Two: harvest your tax losses. If you have investments that are down, selling them can offset your gains and reduce your tax bill. Three: use your FSA or HSA funds before they expire. Four: review your beneficiaries — life changes (marriage, kids, divorce) mean your accounts might go to the wrong person. Five: schedule a year-end review with your advisor. Fifteen minutes now could save you thousands in April. DM me 'YEAR-END' and I'll run through your checklist.`,
+    tags: ["seasonal", "tax", "year-end", "checklist"],
+    sortOrder: 7,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "seasonal",
+    title: "Tax Season: 3 Things Your CPA Wishes You Knew",
+    scriptBody: `Tax season is here and your CPA wishes you knew these three things. One: tax PLANNING happens all year, not just in April. By the time you're filing, it's too late to make most strategic moves. Two: your CPA files your taxes — but a financial advisor PLANS your taxes. We work together, not instead of each other. Three: the goal isn't to pay the least tax this year — it's to pay the least tax over your LIFETIME. Sometimes paying more now saves you significantly more later. If your only tax strategy is 'send everything to my CPA in March,' you're probably overpaying. DM me and I'll show you what proactive tax planning looks like.`,
+    tags: ["seasonal", "tax", "education", "planning"],
+    sortOrder: 8,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "social_proof",
+    title: "How I Helped a Client Retire 5 Years Early",
+    scriptBody: `One of my favorite client stories. A couple came to me at 50, convinced they couldn't retire until 67. They had decent savings but no real plan. We did three things. One: consolidated their five old 401(k) accounts into a single managed portfolio — they were paying duplicate fees and had overlapping investments. Two: optimized their tax strategy — we shifted some money into Roth accounts during lower-income years, which will save them over $100,000 in retirement taxes. Three: built a withdrawal strategy that maximizes Social Security by delaying benefits. Result? They're retiring at 62. Five years early. Not because they made more money — because they had a plan. That's what financial planning does. DM me if you want to know YOUR earliest possible retirement date.`,
+    tags: ["social-proof", "retirement", "client-story", "results"],
+    sortOrder: 9,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "social_proof",
+    title: "The $200K Mistake I Saved a Client From Making",
+    scriptBody: `A client called me last year wanting to cash out their entire 401(k) to pay off their mortgage. On the surface, it sounds smart — no more mortgage payment. But here's what would have actually happened. They would have paid roughly $80,000 in federal and state income taxes on the withdrawal. Plus a 10% early withdrawal penalty of $20,000 because they were under 59½. And they would have lost the compound growth on that money — which over 15 years would have been worth an additional $100,000+. Total cost: over $200,000 to eliminate a $180,000 mortgage at 3.5% interest. We found a better solution. We refinanced at a lower rate, increased their monthly 401(k) contribution, and they'll be debt-free AND have a bigger retirement fund. Always run the numbers before making big financial moves. DM me before you make yours.`,
+    tags: ["social-proof", "mistake-prevention", "education", "results"],
+    sortOrder: 10,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "personal_brand",
+    title: "Why I Became a Financial Advisor",
+    scriptBody: `People ask me why I became a financial advisor. Here's the honest answer. I grew up in a household where money was stressful. Not because we didn't have enough — because nobody talked about it. No plan, no budget, no strategy. Just anxiety. I watched smart, hardworking people make avoidable mistakes because nobody taught them how money actually works. I became a financial advisor because I believe everyone deserves a plan. Not just the wealthy. Not just the financially savvy. Everyone. My job is to take the stress out of money and replace it with confidence. If money keeps you up at night, you don't need more money — you need a plan. DM me and let's build yours.`,
+    tags: ["personal", "trust", "story", "motivation"],
+    sortOrder: 11,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    category: "personal_brand",
+    title: "What a Day in My Life Actually Looks Like",
+    scriptBody: `People think financial advisors sit in fancy offices watching stock tickers all day. Here's what my Thursday actually looked like. 7 AM: reviewed overnight market moves, prepped for two client meetings. 9 AM: annual review with a couple planning for retirement — adjusted their allocation and updated their withdrawal strategy. 11 AM: call with a 28-year-old who just got their first real paycheck and wanted to start investing. Set up their Roth IRA and automated contributions. 1 PM: tax planning call with a business owner — restructured their compensation to save $15,000 in taxes. 3 PM: researched new fund options for client portfolios. 5 PM: recorded this video. No stock tickers. No Wall Street chaos. Just real people, real plans, real results. That's financial planning.`,
+    tags: ["personal", "day-in-life", "trust", "transparency"],
+    sortOrder: 12,
+  },
+];
+
+// ─── Financial Advisor Content Calendar ─────────────────────────────
+
+const financialAdvisorCalendar: typeof mortgageBrokerCalendar = [
+  // January
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 1,
+    title: "New Year Financial Reset",
+    description: "Help people set financial goals and build a plan for the new year",
+    contentAngle: "3 money goals everyone should set this year",
+    category: "education",
+    isRecurring: true,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 1,
+    title: "401(k) Contribution Limits Update",
+    description: "New year = new contribution limits. Educate your audience.",
+    contentAngle: "New 401(k) limits just dropped — here's what changed",
+    category: "education",
+    isRecurring: true,
+  },
+  // February
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 2,
+    title: "Tax Season Prep",
+    description: "Get ahead of tax season with planning content",
+    contentAngle: "Tax season is coming — 3 things to do before you file",
+    category: "seasonal",
+    isRecurring: true,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 2,
+    title: "Couples & Money",
+    description: "Valentine's Day angle — how couples should manage finances together",
+    contentAngle: "The money conversation every couple needs to have",
+    category: "trust_building",
+    isRecurring: true,
+  },
+  // March
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 3,
+    title: "Market Volatility Response",
+    description: "Q1 market swings — reassure and educate",
+    contentAngle: "The market dropped — here's what you should (and shouldn't) do",
+    category: "myth_busting",
+    isRecurring: true,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 3,
+    title: "Spring Financial Checkup",
+    description: "Encourage a mid-Q1 financial review",
+    contentAngle: "When's the last time you actually looked at your 401(k)?",
+    category: "education",
+    isRecurring: true,
+  },
+  // April
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 4,
+    title: "Tax Day Content",
+    description: "Last-minute tax tips and IRA contribution deadline",
+    contentAngle: "You have until April 15 to contribute to last year's IRA",
+    category: "seasonal",
+    isRecurring: true,
+    specificDate: new Date("2026-04-15"),
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 4,
+    title: "Post-Tax Season Planning",
+    description: "Now that taxes are done, start planning for NEXT year",
+    contentAngle: "Your taxes are filed — now do THIS to pay less next year",
+    category: "seasonal",
+    isRecurring: true,
+  },
+  // May
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 5,
+    title: "Graduation & Young Professional Finance",
+    description: "Content for new grads and young professionals starting their careers",
+    contentAngle: "Just graduated? Here's the money playbook I wish someone gave me",
+    category: "education",
+    isRecurring: true,
+  },
+  // June
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 6,
+    title: "Mid-Year Financial Review",
+    description: "Encourage clients and prospects to do a mid-year check-in",
+    contentAngle: "Half the year is gone — are you on track? Here's how to check",
+    category: "trust_building",
+    isRecurring: true,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 6,
+    title: "Summer Market Commentary",
+    description: "Share your market outlook for the second half of the year",
+    contentAngle: "My market outlook for the rest of the year",
+    category: "education",
+    isRecurring: true,
+  },
+  // July
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 7,
+    title: "Financial Independence Day",
+    description: "Independence Day angle — what financial independence actually means",
+    contentAngle: "What 'financial independence' actually means (it's not what you think)",
+    category: "myth_busting",
+    isRecurring: true,
+  },
+  // August
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 8,
+    title: "Back-to-School 529 Plans",
+    description: "Education savings content timed to back-to-school season",
+    contentAngle: "Paying for college? Here's why you need a 529 plan",
+    category: "education",
+    isRecurring: true,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 8,
+    title: "Small Business Retirement Plans",
+    description: "Summer content for business owners — SEP IRA, Solo 401(k)",
+    contentAngle: "Business owners: you're probably not using the best retirement account",
+    category: "education",
+    isRecurring: true,
+  },
+  // September
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 9,
+    title: "Open Enrollment Prep",
+    description: "Benefits enrollment season is coming — help people prepare",
+    contentAngle: "Open enrollment is coming — 3 benefits most people get wrong",
+    category: "seasonal",
+    isRecurring: true,
+  },
+  // October
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 10,
+    title: "Open Enrollment Season",
+    description: "Deep-dive into health insurance, FSA/HSA, and benefit optimization",
+    contentAngle: "Open enrollment mistakes that could cost you thousands",
+    category: "seasonal",
+    isRecurring: true,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 10,
+    title: "Q3 Market Recap",
+    description: "Third quarter market review and year-end outlook",
+    contentAngle: "Q3 is done — here's where the market stands and what I expect next",
+    category: "education",
+    isRecurring: true,
+  },
+  // November
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 11,
+    title: "Year-End Tax Planning",
+    description: "Critical tax planning window before December 31",
+    contentAngle: "5 tax moves to make before December 31 (or you'll miss them forever)",
+    category: "seasonal",
+    isRecurring: true,
+  },
+  // December
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 12,
+    title: "Year in Review & Market Outlook",
+    description: "Recap the financial year and share predictions for next year",
+    contentAngle: "The financial year in review — and what I'm watching in the year ahead",
+    category: "education",
+    isRecurring: true,
+  },
+  {
+    vertical: "FINANCIAL_ADVISOR",
+    month: 12,
+    title: "Holiday Gratitude & Client Wins",
+    description: "Personal content — thank clients, share success stories from the year",
+    contentAngle: "Thank you to everyone who trusted me with their financial future this year",
+    category: "personal_brand",
+    isRecurring: true,
+  },
+];
+
 async function main() {
   // --- Script Templates ---
   console.log("Seeding script templates...");
@@ -342,6 +939,48 @@ async function main() {
   const scriptResult = await prisma.scriptTemplate.createMany({ data: scriptRecords });
   console.log(`Seeded ${scriptResult.count} mortgage broker script templates.`);
 
+  // --- Real Estate Agent Script Templates ---
+  console.log("Seeding real estate agent script templates...");
+
+  await prisma.scriptTemplate.deleteMany({
+    where: { vertical: "REAL_ESTATE_AGENT" },
+  });
+
+  const reScriptRecords = realEstateAgentScripts.map((script) => ({
+    vertical: script.vertical,
+    category: script.category,
+    title: script.title,
+    scriptBody: script.scriptBody,
+    wordCount: script.scriptBody.split(/\s+/).length,
+    tags: script.tags,
+    sortOrder: script.sortOrder,
+    isActive: true,
+  }));
+
+  const reScriptResult = await prisma.scriptTemplate.createMany({ data: reScriptRecords });
+  console.log(`Seeded ${reScriptResult.count} real estate agent script templates.`);
+
+  // --- Financial Advisor Script Templates ---
+  console.log("Seeding financial advisor script templates...");
+
+  await prisma.scriptTemplate.deleteMany({
+    where: { vertical: "FINANCIAL_ADVISOR" },
+  });
+
+  const faScriptRecords = financialAdvisorScripts.map((script) => ({
+    vertical: script.vertical,
+    category: script.category,
+    title: script.title,
+    scriptBody: script.scriptBody,
+    wordCount: script.scriptBody.split(/\s+/).length,
+    tags: script.tags,
+    sortOrder: script.sortOrder,
+    isActive: true,
+  }));
+
+  const faScriptResult = await prisma.scriptTemplate.createMany({ data: faScriptRecords });
+  console.log(`Seeded ${faScriptResult.count} financial advisor script templates.`);
+
   // --- Content Calendar ---
   console.log("Seeding content calendar...");
 
@@ -353,6 +992,26 @@ async function main() {
     data: mortgageBrokerCalendar,
   });
   console.log(`Seeded ${calendarResult.count} mortgage broker content calendar entries.`);
+
+  // --- Real Estate Agent Content Calendar ---
+  await prisma.contentCalendar.deleteMany({
+    where: { vertical: "REAL_ESTATE_AGENT" },
+  });
+
+  const reCalendarResult = await prisma.contentCalendar.createMany({
+    data: realEstateAgentCalendar,
+  });
+  console.log(`Seeded ${reCalendarResult.count} real estate agent content calendar entries.`);
+
+  // --- Financial Advisor Content Calendar ---
+  await prisma.contentCalendar.deleteMany({
+    where: { vertical: "FINANCIAL_ADVISOR" },
+  });
+
+  const faCalendarResult = await prisma.contentCalendar.createMany({
+    data: financialAdvisorCalendar,
+  });
+  console.log(`Seeded ${faCalendarResult.count} financial advisor content calendar entries.`);
 }
 
 main()

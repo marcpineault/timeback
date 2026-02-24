@@ -15,6 +15,8 @@ type StatusFilter = '' | 'SAVED' | 'SCRIPTED' | 'FILMED' | 'ARCHIVED'
 // Per-vertical placeholder text for the topic input
 const VERTICAL_PLACEHOLDERS: Record<string, string> = {
   MORTGAGE_BROKER: 'Optional: focus on a topic (e.g. stress test changes, first-time buyers, BoC rate impact)',
+  REAL_ESTATE_AGENT: 'Optional: focus on a topic (e.g. spring market update, first-time buyers, neighborhood guide)',
+  FINANCIAL_ADVISOR: 'Optional: focus on a topic (e.g. Roth vs Traditional IRA, retirement planning, tax strategies)',
 }
 
 export default function IdeaGenerator({ onScriptGenerated, initialTopic, vertical }: Props) {
@@ -141,6 +143,20 @@ export default function IdeaGenerator({ onScriptGenerated, initialTopic, vertica
                 <option value="rate-reaction">Rate Reaction</option>
                 <option value="client-education">Client Education</option>
                 <option value="personal-story">Personal Story</option>
+              </>
+            )}
+            {vertical === 'REAL_ESTATE_AGENT' && (
+              <>
+                <option value="market-update">Market Update</option>
+                <option value="listing-showcase">Listing Showcase</option>
+                <option value="neighborhood-guide">Neighborhood Guide</option>
+              </>
+            )}
+            {vertical === 'FINANCIAL_ADVISOR' && (
+              <>
+                <option value="market-commentary">Market Commentary</option>
+                <option value="financial-education">Client Education</option>
+                <option value="trust-building">Trust Building</option>
               </>
             )}
           </select>
