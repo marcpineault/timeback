@@ -46,10 +46,6 @@ export default async function DashboardPage() {
     redirect('/sign-in')
   }
 
-  if (!user.vertical) {
-    redirect('/dashboard/onboarding')
-  }
-
   if (!usage) {
     redirect('/sign-in')
   }
@@ -194,6 +190,25 @@ export default async function DashboardPage() {
         {/* Content Suggestions — only for specific verticals */}
         {user.vertical && user.vertical !== 'OTHER' && (
           <DashboardSuggestions />
+        )}
+
+        {/* Personalization banner for users without a vertical */}
+        {!user.vertical && (
+          <div className="bg-white border border-dashed border-[#e0dbd4] rounded-2xl p-4 sm:p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xl flex-shrink-0">🎯</span>
+              <div>
+                <p className="text-sm font-semibold text-[#0a0a0a]">Personalize your experience</p>
+                <p className="text-xs text-[#8a8580]">Tell us your profession to unlock tailored scripts, content calendars, and posting ideas.</p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/onboarding"
+              className="px-4 py-2 bg-[#e85d26] hover:bg-[#d14d1a] text-white rounded-full text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 text-center"
+            >
+              Set Up
+            </Link>
+          </div>
         )}
 
         {/* Video Processor */}

@@ -12,6 +12,12 @@ interface Props {
 
 type StatusFilter = '' | 'SAVED' | 'SCRIPTED' | 'FILMED' | 'ARCHIVED'
 
+const VERTICAL_DISPLAY_NAMES: Record<string, string> = {
+  MORTGAGE_BROKER: 'Mortgage Broker',
+  REAL_ESTATE_AGENT: 'Real Estate Agent',
+  FINANCIAL_ADVISOR: 'Financial Advisor',
+}
+
 // Per-vertical placeholder text for the topic input
 const VERTICAL_PLACEHOLDERS: Record<string, string> = {
   MORTGAGE_BROKER: 'Optional: focus on a topic (e.g. stress test changes, first-time buyers, BoC rate impact)',
@@ -201,6 +207,18 @@ export default function IdeaGenerator({ onScriptGenerated, initialTopic, vertica
           </button>
         ))}
       </div>
+
+      {/* Info banner for users with a vertical — clarifies that old ideas are preserved */}
+      {vertical && vertical !== 'OTHER' && ideas.length > 0 && (
+        <div className="flex items-center gap-2 bg-[#f5f0e8] border border-[#e0dbd4] rounded-xl px-3 py-2 mb-4">
+          <svg className="w-4 h-4 text-[#8a8580] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-[#8a8580]">
+            Showing ideas from all your past sessions. New ideas will be tailored to your {VERTICAL_DISPLAY_NAMES[vertical] || vertical} profile.
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-[#8a8580] text-center py-12">Loading ideas...</div>

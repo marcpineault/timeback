@@ -158,7 +158,7 @@ const mortgageBrokerCalendar: {
     contentAngle: "The BoC just announced — here's what it means for your mortgage",
     category: "rate_reactions",
     isRecurring: true,
-    specificDate: new Date("2026-03-12"),
+    specificDate: new Date("2026-03-12T12:00:00Z"),
   },
   {
     vertical: "MORTGAGE_BROKER",
@@ -178,7 +178,7 @@ const mortgageBrokerCalendar: {
     contentAngle: "Rate decision day — here's my breakdown",
     category: "rate_reactions",
     isRecurring: true,
-    specificDate: new Date("2026-04-16"),
+    specificDate: new Date("2026-04-16T12:00:00Z"),
   },
   {
     vertical: "MORTGAGE_BROKER",
@@ -208,7 +208,7 @@ const mortgageBrokerCalendar: {
     contentAngle: "June rate decision — what it means for summer buyers",
     category: "rate_reactions",
     isRecurring: true,
-    specificDate: new Date("2026-06-04"),
+    specificDate: new Date("2026-06-04T12:00:00Z"),
   },
   {
     vertical: "MORTGAGE_BROKER",
@@ -228,7 +228,7 @@ const mortgageBrokerCalendar: {
     contentAngle: "Mid-summer rate check — here's where we stand",
     category: "rate_reactions",
     isRecurring: true,
-    specificDate: new Date("2026-07-16"),
+    specificDate: new Date("2026-07-16T12:00:00Z"),
   },
   {
     vertical: "MORTGAGE_BROKER",
@@ -258,7 +258,7 @@ const mortgageBrokerCalendar: {
     contentAngle: "September rate decision — fall market outlook",
     category: "rate_reactions",
     isRecurring: true,
-    specificDate: new Date("2026-09-10"),
+    specificDate: new Date("2026-09-10T12:00:00Z"),
   },
   {
     vertical: "MORTGAGE_BROKER",
@@ -278,7 +278,7 @@ const mortgageBrokerCalendar: {
     contentAngle: "Rate decision day — closing before year-end?",
     category: "rate_reactions",
     isRecurring: true,
-    specificDate: new Date("2026-10-29"),
+    specificDate: new Date("2026-10-29T12:00:00Z"),
   },
   {
     vertical: "MORTGAGE_BROKER",
@@ -788,7 +788,7 @@ const financialAdvisorCalendar: typeof mortgageBrokerCalendar = [
     contentAngle: "You have until April 15 to contribute to last year's IRA",
     category: "seasonal",
     isRecurring: true,
-    specificDate: new Date("2026-04-15"),
+    specificDate: new Date("2026-04-15T12:00:00Z"),
   },
   {
     vertical: "FINANCIAL_ADVISOR",

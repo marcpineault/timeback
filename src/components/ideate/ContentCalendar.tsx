@@ -90,15 +90,16 @@ function getCategoryLabel(category: string) {
 
 function formatSpecificDate(dateStr: string): string {
   const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
 
 function daysUntil(dateStr: string): number {
   const now = new Date()
-  now.setHours(0, 0, 0, 0)
+  // Compare using UTC dates to avoid timezone shifts
+  const nowUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
   const target = new Date(dateStr)
-  target.setHours(0, 0, 0, 0)
-  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const targetUTC = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate())
+  return Math.ceil((targetUTC - nowUTC) / (1000 * 60 * 60 * 24))
 }
 
 // ─── Component ──────────────────────────────────────────────────────
