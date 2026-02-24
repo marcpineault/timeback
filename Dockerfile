@@ -46,31 +46,35 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install prisma CLI globally for database migrations
+# Placed before COPY commands so this layer stays cached across code changes
+RUN npm install -g prisma@6.19.2
+
 # Create directories for uploads and processed files (including /data for Railway volume mount)
 RUN mkdir -p /app/uploads /app/processed /data/uploads /data/processed
 
-# Copy built application
+# Copy built application (changes on every code push)
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
-COPY --from=builder /app/node_modules/@img ./node_modules/@img
-COPY --from=builder /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
-COPY --from=builder /app/node_modules/openai ./node_modules/openai
 
-# Install prisma CLI globally for database migrations
-RUN npm install -g prisma@6.19.2
+# Copy runtime deps after standalone so they overlay its node_modules
+# Sourced from deps stage (stable — only changes when package.json changes)
+COPY --from=deps /app/node_modules/sharp ./node_modules/sharp
+COPY --from=deps /app/node_modules/@img ./node_modules/@img
+COPY --from=deps /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
+COPY --from=deps /app/node_modules/openai ./node_modules/openai
 
 EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Copy and use startup script that runs migrations before starting
-COPY --from=builder /app/start.sh ./start.sh
+# Copy startup script directly from build context (cached unless start.sh changes)
+COPY start.sh ./start.sh
 RUN chmod +x ./start.sh
 
 CMD ["./start.sh"]
