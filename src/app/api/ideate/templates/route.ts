@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getOrCreateUser } from '@/lib/user';
 import { prisma } from '@/lib/db';
+import { ensureVerticalDataSeeded } from '@/lib/seedVerticalData';
 
 // GET - Fetch script templates for user's vertical
 export async function GET(request: NextRequest) {
@@ -19,6 +20,9 @@ export async function GET(request: NextRequest) {
     if (!user.vertical) {
       return NextResponse.json({ templates: [], vertical: null });
     }
+
+    // Ensure seed data exists (runs once per server lifecycle)
+    await ensureVerticalDataSeeded();
 
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
