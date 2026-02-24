@@ -60,6 +60,7 @@ function formatDate(dateStr: string): string {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
+    timeZone: 'UTC',
   })
 }
 
