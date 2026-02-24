@@ -61,12 +61,8 @@ COPY --from=builder /app/node_modules/@img ./node_modules/@img
 COPY --from=builder /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
 COPY --from=builder /app/node_modules/openai ./node_modules/openai
 
-# Copy prisma CLI from builder instead of slow global npm install (~30s saved)
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-RUN mkdir -p ./node_modules/.bin && \
-    ln -sf ../prisma/build/index.js ./node_modules/.bin/prisma && \
-    chmod +x ./node_modules/.bin/prisma
-ENV PATH="/app/node_modules/.bin:$PATH"
+# Install prisma CLI globally for database migrations
+RUN npm install -g prisma@6.19.2
 
 EXPOSE 3000
 
