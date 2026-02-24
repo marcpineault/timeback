@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getOrCreateUser } from '@/lib/user';
 import { prisma } from '@/lib/db';
+import { ensureVerticalDataSeeded } from '@/lib/seedVerticalData';
 
 export async function GET() {
   try {
@@ -18,6 +19,9 @@ export async function GET() {
     if (!user.vertical || user.vertical === 'OTHER') {
       return NextResponse.json({ vertical: user.vertical || null, weeklySuggestion: null, templates: [] });
     }
+
+    // Ensure seed data exists (runs once per server lifecycle)
+    await ensureVerticalDataSeeded();
 
     const now = new Date();
     const currentMonth = now.getMonth() + 1;

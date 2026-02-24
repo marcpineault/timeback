@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
+import { ensureVerticalDataSeeded } from '@/lib/seedVerticalData';
 
 // GET - Fetch recommended script based on specialization
 export async function GET(request: NextRequest) {
@@ -9,6 +10,9 @@ export async function GET(request: NextRequest) {
     if (!clerkId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Ensure seed data exists (runs once per server lifecycle)
+    await ensureVerticalDataSeeded();
 
     const specialization = request.nextUrl.searchParams.get('specialization') || '';
 
