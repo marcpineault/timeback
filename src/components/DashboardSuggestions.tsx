@@ -6,12 +6,6 @@ import { analytics } from '@/components/Analytics'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
-interface TemplateCard {
-  id: string
-  title: string
-  category: string
-}
-
 interface WeeklySuggestion {
   type: 'dated' | 'rotating'
   calendarEntry?: {
@@ -29,31 +23,7 @@ interface WeeklySuggestion {
   dayLabel?: string
 }
 
-// ─── Constants ──────────────────────────────────────────────────────
-
-const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  rate_reactions: { bg: 'bg-blue-500/15', text: 'text-blue-500' },
-  first_time_buyers: { bg: 'bg-green-500/15', text: 'text-green-500' },
-  renewals: { bg: 'bg-amber-500/15', text: 'text-amber-500' },
-  myths: { bg: 'bg-purple-500/15', text: 'text-purple-500' },
-  personal: { bg: 'bg-[rgba(232,93,38,0.1)]', text: 'text-[#e85d26]' },
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  rate_reactions: 'Rate Reactions',
-  first_time_buyers: 'First-Time Buyers',
-  renewals: 'Renewals',
-  myths: 'Myths & Education',
-  personal: 'Personal',
-}
-
-function getCategoryColors(category: string) {
-  return CATEGORY_COLORS[category] || { bg: 'bg-gray-500/15', text: 'text-gray-500' }
-}
-
-function getCategoryLabel(category: string) {
-  return CATEGORY_LABELS[category] || category
-}
+// ─── Helpers ─────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -68,7 +38,6 @@ function formatDate(dateStr: string): string {
 
 export default function DashboardSuggestions() {
   const [weeklySuggestion, setWeeklySuggestion] = useState<WeeklySuggestion | null>(null)
-  const [templates, setTemplates] = useState<TemplateCard[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchSuggestions = useCallback(async () => {
@@ -78,7 +47,6 @@ export default function DashboardSuggestions() {
         const data = await res.json()
         if (data.vertical && data.vertical !== 'OTHER') {
           setWeeklySuggestion(data.weeklySuggestion)
-          setTemplates(data.templates)
         }
       }
     } catch (err) {
@@ -99,17 +67,12 @@ export default function DashboardSuggestions() {
           <div className="skeleton skeleton-text w-48 h-5 mb-2" />
           <div className="skeleton skeleton-text w-full h-4" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="skeleton w-full h-20 rounded-xl" />
-          ))}
-        </div>
       </div>
     )
   }
 
   // Don't render anything if no data (vertical is null or OTHER)
-  if (!weeklySuggestion && templates.length === 0) return null
+  if (!weeklySuggestion) return null
 
   return (
     <div className="space-y-4 mb-6">
@@ -191,51 +154,6 @@ export default function DashboardSuggestions() {
         </div>
       )}
 
-      {/* Your Script Templates Quick Access */}
-      {templates.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-[#0a0a0a]">Your Script Templates</h3>
-            <Link
-              href="/dashboard/ideate"
-              className="text-xs text-[#e85d26] hover:text-[#d14d1a] font-medium transition-colors flex items-center gap-0.5"
-            >
-              See all templates
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {templates.map(template => {
-              const colors = getCategoryColors(template.category)
-              return (
-                <Link
-                  key={template.id}
-                  href="/dashboard/ideate"
-                  onClick={() => analytics.trackDashboardSuggestionClicked('template_card', template.category)}
-                  className="bg-white border border-[#e0dbd4] rounded-xl p-3 hover:border-[#8a8580] hover:shadow-sm transition-all group"
-                >
-                  <h4 className="text-sm font-medium text-[#0a0a0a] mb-1.5 line-clamp-1 group-hover:text-[#e85d26] transition-colors">
-                    {template.title}
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${colors.bg} ${colors.text}`}>
-                      {getCategoryLabel(template.category)}
-                    </span>
-                    <span className="text-xs text-[#e85d26] font-medium sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-                      Use
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
