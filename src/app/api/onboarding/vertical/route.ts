@@ -145,18 +145,17 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingProfile) {
-      // Only update fields that are still empty
-      const updates: Record<string, string> = {};
-      if (!existingProfile.niche) updates.niche = specProfile.niche;
-      if (!existingProfile.targetAudience) updates.targetAudience = targetAudience;
-      if (!existingProfile.contentGoal) updates.contentGoal = 'Generate leads, build trust, establish expertise';
+      // Always update these fields during onboarding with vertical-specific values
+      const updates: Record<string, string> = {
+        niche: specProfile.niche,
+        targetAudience: targetAudience,
+        contentGoal: 'Get leads, build trust, establish expertise as a mortgage broker',
+      };
 
-      if (Object.keys(updates).length > 0) {
-        await prisma.creatorProfile.update({
-          where: { userId: user.id },
-          data: updates,
-        });
-      }
+      await prisma.creatorProfile.update({
+        where: { userId: user.id },
+        data: updates,
+      });
     } else {
       // Create new profile with pre-filled values
       await prisma.creatorProfile.create({
@@ -164,7 +163,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           niche: specProfile.niche,
           targetAudience,
-          contentGoal: 'Generate leads, build trust, establish expertise',
+          contentGoal: 'Get leads, build trust, establish expertise as a mortgage broker',
         },
       });
     }
