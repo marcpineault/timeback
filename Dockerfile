@@ -17,7 +17,7 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 COPY package.json package-lock.json* ./
 
 # Cache npm download cache so reinstalls after lockfile changes are faster
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN --mount=type=cache,id=npm-cache,target=/root/.npm npm ci
 
 # ── Build the application ────────────────────────────────────────────
 FROM build-base AS builder
@@ -37,7 +37,7 @@ ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 # Cache Next.js build output for faster incremental rebuilds
-RUN --mount=type=cache,target=/app/.next/cache npm run build
+RUN --mount=type=cache,id=next-cache,target=/app/.next/cache npm run build
 
 # ── Production image (runtime base with media tools) ─────────────────
 FROM runtime-base AS runner
