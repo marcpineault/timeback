@@ -48,3 +48,15 @@ processed/*
 # Testing
 coverage
 .nyc_output
+
+# Documentation (not needed in build)
+README.md
+SPEECH_CORRECTION_PLAN.md
+docs
+
+# Deployment configs (not needed inside container)
+railway.json
+render.yaml
+
+# CLI scripts (not needed at build time)
+scripts
