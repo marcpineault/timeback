@@ -475,6 +475,146 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* ── BEFORE/AFTER VIDEO ── */
+.lp-before-after {
+  padding: 5rem 2rem 3rem;
+  text-align: center;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.lp-before-after h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+}
+
+.lp-before-after > p {
+  color: var(--lp-muted);
+  font-size: 1.05rem;
+  max-width: 540px;
+  margin: 0 auto 3rem;
+}
+
+.ba-container {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.ba-video-wrap {
+  text-align: center;
+}
+
+.ba-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.3rem 0.9rem;
+  border-radius: 100px;
+  margin-bottom: 0.75rem;
+}
+
+.ba-label-before {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.ba-label-after {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.ba-player {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1a1a1a;
+  aspect-ratio: 9 / 16;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--lp-border);
+}
+
+.ba-player video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ba-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: #888;
+  font-size: 0.9rem;
+  background: #1a1a1a;
+}
+
+.ba-placeholder-icon {
+  font-size: 2.5rem;
+}
+
+.ba-caption {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--lp-muted);
+}
+
+.ba-arrow {
+  font-size: 2rem;
+  color: var(--lp-accent);
+  font-weight: 700;
+  align-self: center;
+  margin-top: 1.5rem;
+}
+
+.ba-play-btn {
+  margin-top: 2rem;
+  padding: 0.75rem 2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: 2px solid var(--lp-black);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--lp-black);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ba-play-btn:hover {
+  background: var(--lp-black);
+  color: var(--lp-cream);
+}
+
+@media (max-width: 640px) {
+  .ba-container {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .ba-arrow {
+    display: none;
+  }
+
+  .ba-player {
+    border-radius: 8px;
+  }
+
+  .lp-before-after {
+    padding: 3rem 1.25rem 2rem;
+  }
+}
+
 /* ── PROBLEM SECTION ── */
 .lp-problem {
   padding: 2rem 2rem;
