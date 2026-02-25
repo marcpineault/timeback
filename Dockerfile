@@ -39,7 +39,7 @@ ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 # Cap heap to 1.5 GB and limit build workers to reduce peak memory usage.
 # This prevents the Railway build daemon from OOM-killing the process
 # (which surfaces as "context canceled").
-ENV NODE_OPTIONS="--max-old-space-size=1536"
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
 # ── Production image (runtime base with media tools) ─────────────────
