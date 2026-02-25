@@ -3,6 +3,7 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile",
+    "dockerfileLayerCaching": true,
     "buildArgs": {
       "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "${{NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}}"
     }
