@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import ScrollReveal from '@/components/ScrollReveal'
 import IndustrySelector from '@/components/IndustrySelector'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
+import BeforeAfterVideo from '@/components/BeforeAfterVideo'
 
 export default async function LandingPage() {
   const { userId } = await auth()
@@ -86,6 +87,9 @@ export default async function LandingPage() {
           <img src="/screenshot-ideate.svg" alt="TimeBack Ideate — AI-powered inspiration and swipe file for creators" />
         </div>
       </div>
+
+      {/* BEFORE & AFTER */}
+      <BeforeAfterVideo />
 
       {/* PROBLEM */}
       <section className="lp-problem reveal">
