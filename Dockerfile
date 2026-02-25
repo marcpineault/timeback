@@ -3,8 +3,7 @@ FROM node:20-alpine AS build-base
 
 # ── Runtime base: includes system packages needed for media processing ─
 FROM node:20-alpine AS runtime-base
-RUN --mount=type=cache,id=apk,target=/var/cache/apk \
-    apk add ffmpeg fontconfig ttf-dejavu vips chromium nss freetype harfbuzz ca-certificates
+RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu vips chromium nss freetype harfbuzz ca-certificates
 ENV CHROME_PATH=/usr/bin/chromium-browser
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
@@ -17,9 +16,8 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 COPY package.json package-lock.json* ./
 
-# Cache npm downloads across builds so only changed packages are fetched
-RUN --mount=type=cache,id=npm,target=/root/.npm \
-    npm ci
+# Install dependencies (layer cached when package.json + lockfile are unchanged)
+RUN npm ci
 
 # ── Build the application ────────────────────────────────────────────
 FROM build-base AS builder
