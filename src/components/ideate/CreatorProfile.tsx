@@ -42,13 +42,18 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
   const [primaryPlatform, setPrimaryPlatform] = useState(profile?.primaryPlatform ?? 'instagram')
   const [typicalVideoLength, setTypicalVideoLength] = useState(profile?.typicalVideoLength ?? 60)
 
-  // Step 2: SPCL
+  // Step 2: Your Story
+  const [originStory, setOriginStory] = useState(profile?.originStory ?? '')
+  const [struggle, setStruggle] = useState(profile?.struggle ?? '')
+  const [mission, setMission] = useState(profile?.mission ?? '')
+
+  // Step 3: SPCL
   const [statusProof, setStatusProof] = useState<string[]>(profile?.statusProof ?? [])
   const [powerExamples, setPowerExamples] = useState<string[]>(profile?.powerExamples ?? [])
   const [credibilityMarkers, setCredibilityMarkers] = useState<string[]>(profile?.credibilityMarkers ?? [])
   const [likenessTraits, setLikenessTraits] = useState<string[]>(profile?.likenessTraits ?? [])
 
-  // Step 3: Voice
+  // Step 4: Voice
   const [toneOfVoice, setToneOfVoice] = useState(profile?.toneOfVoice ?? 'direct')
   const [personalCatchphrases, setPersonalCatchphrases] = useState<string[]>(profile?.personalCatchphrases ?? [])
   const [avoidTopics, setAvoidTopics] = useState<string[]>(profile?.avoidTopics ?? [])
@@ -71,6 +76,9 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
           contentGoal,
           primaryPlatform,
           typicalVideoLength,
+          originStory,
+          struggle,
+          mission,
           statusProof,
           powerExamples,
           credibilityMarkers,
@@ -96,16 +104,17 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
 
   async function handleSaveAndContinue() {
     await handleSave()
-    if (step < 3) setStep(step + 1)
+    if (step < 4) setStep(step + 1)
   }
 
   const isStep1Valid = niche.trim() && targetAudience.trim()
 
   // Calculate completion percentage
   const step1Complete = niche.trim() && targetAudience.trim() ? 1 : 0
-  const step2Complete = (statusProof.length > 0 || powerExamples.length > 0 || credibilityMarkers.length > 0 || likenessTraits.length > 0) ? 1 : 0
-  const step3Complete = toneOfVoice ? 1 : 0
-  const completionPercent = Math.round(((step1Complete + step2Complete + step3Complete) / 3) * 100)
+  const step2Complete = (originStory.trim() || struggle.trim() || mission.trim()) ? 1 : 0
+  const step3Complete = (statusProof.length > 0 || powerExamples.length > 0 || credibilityMarkers.length > 0 || likenessTraits.length > 0) ? 1 : 0
+  const step4Complete = toneOfVoice ? 1 : 0
+  const completionPercent = Math.round(((step1Complete + step2Complete + step3Complete + step4Complete) / 4) * 100)
 
   return (
     <div className="max-w-2xl">
@@ -113,7 +122,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <button
                 key={s}
                 onClick={() => setStep(s)}
@@ -125,7 +134,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
                       : 'bg-[#f5f0e8] text-[#8a8580]'
                 }`}
               >
-                {s}. {s === 1 ? 'Identity' : s === 2 ? 'SPCL Framework' : 'Voice & Style'}
+                {s}. {s === 1 ? 'Identity' : s === 2 ? 'Your Story' : s === 3 ? 'SPCL' : 'Voice & Style'}
               </button>
             ))}
           </div>
@@ -252,8 +261,87 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
         </div>
       )}
 
-      {/* Step 2: SPCL Framework */}
+      {/* Step 2: Your Story */}
       {step === 2 && (
+        <div className="space-y-4">
+          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Your Story</h2>
+            <p className="text-[#8a8580] text-sm mb-6">
+              Your personal story is what makes your content unique. These answers help the AI
+              craft scripts that feel authentic to you — not generic.
+            </p>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">
+                  Why did you get into this business?
+                </label>
+                <p className="text-[#8a8580] text-xs mb-2">
+                  What drew you in? What moment or experience made you say &quot;this is what I want to do&quot;?
+                </p>
+                <textarea
+                  value={originStory}
+                  onChange={(e) => setOriginStory(e.target.value)}
+                  placeholder="e.g. I didn't grow up with a lot of money. I saw my parents struggle with debt and I never wanted that for my family, so I got into financial services to help people become financially free no matter where they start."
+                  rows={4}
+                  className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26] resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">
+                  What&apos;s a challenge or struggle that shaped who you are today?
+                </label>
+                <p className="text-[#8a8580] text-xs mb-2">
+                  The hard stuff — a failure, setback, or obstacle that became part of your story.
+                </p>
+                <textarea
+                  value={struggle}
+                  onChange={(e) => setStruggle(e.target.value)}
+                  placeholder="e.g. I was rejected by 20 clients before I landed my first deal. That taught me resilience and how to really listen to what people need."
+                  rows={4}
+                  className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26] resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#0a0a0a] mb-1.5">
+                  Who do you want to help, and why does it matter to you personally?
+                </label>
+                <p className="text-[#8a8580] text-xs mb-2">
+                  Your mission — the deeper &quot;why&quot; behind your content.
+                </p>
+                <textarea
+                  value={mission}
+                  onChange={(e) => setMission(e.target.value)}
+                  placeholder="e.g. I help first-time homebuyers who feel overwhelmed by the process, because I remember how lost I felt buying my first home."
+                  rows={4}
+                  className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm placeholder-[#8a8580] focus:outline-none focus:border-[#e85d26] resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-between">
+            <button
+              onClick={() => setStep(1)}
+              className="px-4 py-2 text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
+            >
+              Back
+            </button>
+            <button
+              onClick={handleSaveAndContinue}
+              disabled={saving}
+              className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] disabled:opacity-50 text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save & Continue'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: SPCL Framework */}
+      {step === 3 && (
         <div className="space-y-4">
           <SPCLSection
             title="Status"
@@ -290,7 +378,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
 
           <div className="flex justify-between">
             <button
-              onClick={() => setStep(1)}
+              onClick={() => setStep(2)}
               className="px-4 py-2 text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
             >
               Back
@@ -306,8 +394,8 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
         </div>
       )}
 
-      {/* Step 3: Voice & Style */}
-      {step === 3 && (
+      {/* Step 4: Voice & Style */}
+      {step === 4 && (
         <div className="space-y-4">
           <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6">
             <h2 className="text-lg font-semibold text-[#0a0a0a] mb-1">Voice & Style</h2>
@@ -365,7 +453,7 @@ export default function CreatorProfile({ profile, onSaved }: Props) {
 
           <div className="flex justify-between">
             <button
-              onClick={() => setStep(2)}
+              onClick={() => setStep(3)}
               className="px-4 py-2 text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors"
             >
               Back

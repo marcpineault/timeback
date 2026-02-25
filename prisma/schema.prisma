@@ -287,6 +287,11 @@ model CreatorProfile {
   targetAudience      String   @default("")
   contentGoal         String   @default("")
 
+  // Origin story
+  originStory         String   @default("")
+  struggle            String   @default("")
+  mission             String   @default("")
+
   // SPCL Framework fields
   statusProof         String[]
   powerExamples       String[]

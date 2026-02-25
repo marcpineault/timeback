@@ -9,6 +9,9 @@ export interface CreatorProfile {
   niche: string;
   targetAudience: string;
   contentGoal: string;
+  originStory: string;
+  struggle: string;
+  mission: string;
   statusProof: string[];
   powerExamples: string[];
   credibilityMarkers: string[];
