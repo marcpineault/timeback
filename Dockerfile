@@ -3,7 +3,8 @@ FROM node:20-alpine AS build-base
 
 # ── Runtime base: includes system packages needed for media processing ─
 FROM node:20-alpine AS runtime-base
-RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu vips chromium nss freetype harfbuzz ca-certificates
+RUN --mount=type=cache,target=/var/cache/apk \
+    apk add ffmpeg fontconfig ttf-dejavu vips chromium nss freetype harfbuzz ca-certificates
 ENV CHROME_PATH=/usr/bin/chromium-browser
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
@@ -16,8 +17,9 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 COPY package.json package-lock.json* ./
 
-# Cache npm downloads for faster reinstalls after lockfile changes
-RUN npm ci
+# Cache npm downloads across builds so only changed packages are fetched
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # ── Build the application ────────────────────────────────────────────
 FROM build-base AS builder
@@ -36,7 +38,10 @@ ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
-# Build the application
+# Cap heap to 1.5 GB and limit build workers to reduce peak memory usage.
+# This prevents the Railway build daemon from OOM-killing the process
+# (which surfaces as "context canceled").
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN npm run build
 
 # ── Production image (runtime base with media tools) ─────────────────
