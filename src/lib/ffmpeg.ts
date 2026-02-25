@@ -74,10 +74,10 @@ const CAPTION_STYLE_MAP: Record<string, string> = {
   // Instagram style - white text on semi-transparent dark background box
   // Clean, modern, refined look with better readability on busy backgrounds
   // MarginV=70 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
-  instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+  instagram: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
   // Minimal style - clean white text with thin black outline, no background box
   // Subtle, modern look that lets the video show through
-  minimal: 'Fontname=Helvetica,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+  minimal: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
 };
 
 /**
@@ -985,11 +985,11 @@ async function generateHeadlinePNG(
   const line2 = xmlEscape(rawLine2);
   const hasSecondLine = rawLine2.length > 0;
 
-  const fontSize = 48;
-  const paddingX = 40;
-  const paddingY = 28;
-  const lineGap = 16;
-  const borderRadius = 20;
+  const fontSize = 34;
+  const paddingX = 32;
+  const paddingY = 20;
+  const lineGap = 12;
+  const borderRadius = 14;
   const maxWidth = canvasWidth - 120; // 60px margin each side
   const minWidth = 200;
 
@@ -1008,7 +1008,7 @@ async function generateHeadlinePNG(
 
   // Style-specific colors
   const bgFill = style === 'speech-bubble' ? 'white' : 'black';
-  const bgOpacity = style === 'speech-bubble' ? '1' : '0.7';
+  const bgOpacity = style === 'speech-bubble' ? '0.9' : '0.6';
   const textFill = style === 'speech-bubble' ? 'black' : 'white';
 
   // Build SVG with centered text on rounded rectangle
@@ -1017,11 +1017,11 @@ async function generateHeadlinePNG(
   const textBlockHeight = fontSize * lineCount + lineGap * (lineCount - 1);
   const textStartY = (boxHeight - textBlockHeight) / 2 + fontSize * 0.78; // 0.78 = approximate ascender ratio
 
-  let textElements = `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${textFill}">${line1}</text>`;
+  let textElements = `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="500" fill="${textFill}">${line1}</text>`;
 
   if (hasSecondLine) {
     const line2Y = textStartY + fontSize + lineGap;
-    textElements += `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${textFill}">${line2}</text>`;
+    textElements += `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="500" fill="${textFill}">${line2}</text>`;
   }
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${boxWidth}" height="${boxHeight}">

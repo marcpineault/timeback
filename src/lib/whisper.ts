@@ -155,13 +155,13 @@ function formatAssTime(seconds: number): string {
 
 /**
  * Split text into short chunks for short-form video captions
- * Max ~6 words per caption (fits nicely on 2 lines of ~3 words each)
+ * Max ~4 words per caption for a clean, minimal look
  */
 function splitIntoShortCaptions(
   text: string,
   start: number,
   end: number,
-  maxWords: number = 6
+  maxWords: number = 4
 ): TranscriptionSegment[] {
   const words = text.trim().split(/\s+/);
   if (words.length <= maxWords) {
@@ -220,11 +220,11 @@ export function generateSrt(
 
 /**
  * Group words into lines for display
- * Short-form style: max 3-4 words per line for easy reading
+ * Short-form style: max 2 words per line for a clean, minimal look
  */
 function groupWordsIntoLines(
   words: TranscriptionWord[],
-  maxWordsPerLine: number = 3
+  maxWordsPerLine: number = 2
 ): Array<{ words: TranscriptionWord[]; start: number; end: number }> {
   const lines: Array<{ words: TranscriptionWord[]; start: number; end: number }> = [];
   let currentLine: TranscriptionWord[] = [];
@@ -278,8 +278,8 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,48,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,2,2,100,100,100,1
-Style: Highlight,Arial,48,&H0000FFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,2,2,100,100,100,1
+Style: Default,Arial,36,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,100,100,100,1
+Style: Highlight,Arial,36,&H0000FFFF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,100,100,100,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
