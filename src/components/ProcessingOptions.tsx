@@ -20,7 +20,7 @@ interface ProcessingOptionsProps {
 
 export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
 
-export type HeadlineStyle = 'classic' | 'speech-bubble';
+export type HeadlineStyle = 'classic' | 'speech-bubble' | 'clean';
 
 export type CaptionStyle = 'instagram' | 'minimal';
 
@@ -806,7 +806,7 @@ export default function ProcessingOptions({
         {(config.headline || config.useHookAsHeadline || config.generateAIHeadline) && (
           <div>
             <label className="block text-sm text-[#8a8580] mb-2">Style</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setConfig({ ...config, headlineStyle: 'speech-bubble' })}
@@ -843,6 +843,27 @@ export default function ProcessingOptions({
                   </div>
                   <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
                     Classic
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, headlineStyle: 'clean' })}
+                className={`p-3 rounded-2xl border-2 transition-colors ${
+                  config.headlineStyle === 'clean'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
+                    : 'border-[#e0dbd4] hover:border-[#8a8580]'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  {/* Clean preview - no background */}
+                  <div className="text-white text-xs font-medium px-4 py-2"
+                       style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.5)' }}>
+                    Headline
+                  </div>
+                  <span className={`text-xs ${config.headlineStyle === 'clean' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
+                    Clean
                   </span>
                 </div>
               </button>

@@ -53,7 +53,7 @@ export interface SilenceInterval {
   end: number;
 }
 
-export type HeadlineStyle = 'classic' | 'speech-bubble';
+export type HeadlineStyle = 'classic' | 'speech-bubble' | 'clean';
 
 export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
@@ -985,11 +985,11 @@ async function generateHeadlinePNG(
   const line2 = xmlEscape(rawLine2);
   const hasSecondLine = rawLine2.length > 0;
 
-  const fontSize = 34;
-  const paddingX = 32;
-  const paddingY = 20;
-  const lineGap = 12;
-  const borderRadius = 14;
+  const fontSize = 48;
+  const paddingX = 40;
+  const paddingY = 28;
+  const lineGap = 16;
+  const borderRadius = 20;
   const maxWidth = canvasWidth - 120; // 60px margin each side
   const minWidth = 200;
 
@@ -1007,8 +1007,9 @@ async function generateHeadlinePNG(
   const boxHeight = Math.ceil(paddingY * 2 + fontSize * lineCount + lineGap * (lineCount - 1));
 
   // Style-specific colors
+  const isClean = style === 'clean';
   const bgFill = style === 'speech-bubble' ? 'white' : 'black';
-  const bgOpacity = style === 'speech-bubble' ? '0.9' : '0.6';
+  const bgOpacity = isClean ? '0' : style === 'speech-bubble' ? '1' : '0.7';
   const textFill = style === 'speech-bubble' ? 'black' : 'white';
 
   // Build SVG with centered text on rounded rectangle
@@ -1017,11 +1018,17 @@ async function generateHeadlinePNG(
   const textBlockHeight = fontSize * lineCount + lineGap * (lineCount - 1);
   const textStartY = (boxHeight - textBlockHeight) / 2 + fontSize * 0.78; // 0.78 = approximate ascender ratio
 
-  let textElements = `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="500" fill="${textFill}">${line1}</text>`;
+  const fontWeight = isClean ? '500' : 'bold';
+
+  let textElements = isClean
+    ? `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="white"><tspan stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${line1}</tspan></text>`
+    : `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textFill}">${line1}</text>`;
 
   if (hasSecondLine) {
     const line2Y = textStartY + fontSize + lineGap;
-    textElements += `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="500" fill="${textFill}">${line2}</text>`;
+    textElements += isClean
+      ? `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="white"><tspan stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${line2}</tspan></text>`
+      : `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textFill}">${line2}</text>`;
   }
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${boxWidth}" height="${boxHeight}">
