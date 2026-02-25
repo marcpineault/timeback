@@ -124,7 +124,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
           >
             &larr; Back
           </button>
-          <h2 className="text-lg font-semibold text-[#0a0a0a] truncate">{script.title}</h2>
+          <h2 className="text-xl text-[#0a0a0a] truncate" style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400 }}>{script.title}</h2>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -181,34 +181,34 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       </div>
 
       {/* Script Sections */}
-      <div className="space-y-4 mb-6">
-        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-          <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Hook</label>
+      <div className="space-y-6 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400 }}>Hook</label>
           <textarea
             value={hook}
             onChange={(e) => setHook(e.target.value)}
             rows={2}
-            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
           />
         </div>
 
-        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-          <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Body</label>
+        <div>
+          <label className="block text-sm font-medium text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400 }}>Body</label>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={10}
-            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
           />
         </div>
 
-        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-          <label className="block text-green-400 text-xs font-semibold uppercase tracking-wider mb-2">Call to Action</label>
+        <div>
+          <label className="block text-sm font-medium text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400 }}>Call to Action</label>
           <textarea
             value={cta}
             onChange={(e) => setCta(e.target.value)}
             rows={2}
-            className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
           />
         </div>
       </div>
