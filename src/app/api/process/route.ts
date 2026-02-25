@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       silenceThreshold,
       silenceDuration,
       autoSilenceThreshold,
+      silencePreset,  // 'jumpCut' | 'natural' | 'gentle' — controls silence removal style
       generateCaptions,
       useHookAsHeadline,
       generateAIHeadline: shouldGenerateAIHeadline,
@@ -276,6 +277,7 @@ export async function POST(request: NextRequest) {
       silenceThreshold: silenceThreshold ?? -25,
       silenceDuration: silenceDuration ?? 0.4,
       autoSilenceThreshold: autoSilenceThreshold ?? false,
+      silencePreset: silencePreset || undefined,
       headline: headline || undefined,
       headlinePosition: headlinePosition || 'top',
       headlineStyle: headlineStyle || 'speech-bubble',
@@ -284,7 +286,9 @@ export async function POST(request: NextRequest) {
 
     // Determine what features need transcription
     const needsTranscription = generateCaptions || useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll || speechCorrection;
-    const needsEarlyTranscription = useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll; // These can use original video transcription
+    // Early transcription: needed for hook/B-roll, AND for hybrid silence removal word boundary refinement
+    const useHybridSilenceRemoval = options.autoSilenceThreshold !== false;
+    const needsEarlyTranscription = useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll || useHybridSilenceRemoval;
 
     // Determine the headline we'll use (before step counting so we know if we need captions+headline)
     // Note: AI headline text will be determined later, but we know if we need the step
@@ -307,25 +311,44 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // OPTIMIZATION: Run silence removal and early transcription in parallel
-    // Hook extraction and B-roll identification don't need exact timestamps from silence-removed video
-    let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[] }> | null = null;
+    // OPTIMIZATION: Run early transcription WITH word-level timestamps in parallel
+    // Word timestamps are used by the hybrid silence removal pipeline for boundary refinement,
+    // and also for hook/B-roll detection
+    let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] }> | null = null;
 
     if (needsEarlyTranscription && !speechCorrection) {
-      // Start transcribing original video in parallel (for hook/B-roll detection)
-      logger.info('Starting parallel transcription of original video for hook/B-roll');
+      // Start transcribing original video in parallel — include word timestamps for hybrid silence removal
+      logger.info('Starting parallel transcription of original video (with word timestamps for hybrid silence removal)');
       earlyTranscriptionPromise = transcribeVideo(inputPath, processedDir, {
-        animated: false, // Don't need word-level for hook/B-roll detection
+        animated: false,
         forSpeechCorrection: false,
-      }).then(t => ({ text: t.text, segments: t.segments }));
+      }).then(t => ({ text: t.text, segments: t.segments, words: t.words }));
     }
 
-    // Step 1: Remove silence (runs in parallel with early transcription if applicable)
+    // For hybrid silence removal, we want word timestamps from the early transcription.
+    // Wait for early transcription if hybrid mode needs it; otherwise run silence removal in parallel.
+    let earlyTranscriptionWords: TranscriptionWord[] | undefined;
+
+    if (useHybridSilenceRemoval && earlyTranscriptionPromise) {
+      logger.info('Waiting for word timestamps before hybrid silence removal...');
+      try {
+        const earlyResult = await earlyTranscriptionPromise;
+        earlyTranscriptionWords = earlyResult.words;
+        logger.info(`Got ${earlyTranscriptionWords?.length || 0} word timestamps for hybrid silence removal`);
+      } catch (transcriptionErr) {
+        logger.warn('Early transcription failed, proceeding without word timestamps', {
+          error: transcriptionErr instanceof Error ? transcriptionErr.message : String(transcriptionErr),
+        });
+        // Continue without word timestamps — hybrid pipeline will use VAD-only mode
+      }
+    }
+
+    // Step 1: Remove silence using hybrid pipeline (VAD + word boundaries + gap processing)
     reportProgress('Removing silence...');
     logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     intermediateFiles.push(stepOutput); // Track for cleanup on error
-    await removeSilence(currentInput, stepOutput, options);
+    await removeSilence(currentInput, stepOutput, options, earlyTranscriptionWords);
     // Clean up intermediate file (and remove from tracking since it's deleted)
     if (currentInput !== inputPath) {
       await fs.unlink(currentInput).catch(() => {});
@@ -350,12 +373,18 @@ export async function POST(request: NextRequest) {
       currentInput = stepOutput;
     }
 
-    // Get early transcription result if we started one
-    let earlyTranscription: { text: string; segments: { start: number; end: number; text: string }[] } | null = null;
+    // Get early transcription result if we started one (may already be resolved from hybrid mode)
+    let earlyTranscription: { text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] } | null = null;
     if (earlyTranscriptionPromise) {
-      logger.info('Waiting for parallel transcription to complete');
-      earlyTranscription = await earlyTranscriptionPromise;
-      logger.info('Parallel transcription completed');
+      try {
+        logger.info('Getting parallel transcription result');
+        earlyTranscription = await earlyTranscriptionPromise;
+        logger.info('Parallel transcription completed');
+      } catch (earlyTranscriptionErr) {
+        logger.warn('Early transcription failed', {
+          error: earlyTranscriptionErr instanceof Error ? earlyTranscriptionErr.message : String(earlyTranscriptionErr),
+        });
+      }
     }
 
     // Step 2: Transcribe the SILENCE-REMOVED video (only if needed for captions or speech correction)

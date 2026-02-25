@@ -32,6 +32,8 @@ export interface BRollConfig {
   maxMoments: number;
 }
 
+export type SilencePreset = 'jumpCut' | 'natural' | 'gentle';
+
 export interface ProcessingConfig {
   generateCaptions: boolean;
   headline: string;
@@ -41,6 +43,7 @@ export interface ProcessingConfig {
   silenceThreshold: number;
   silenceDuration: number;
   autoSilenceThreshold: boolean;
+  silencePreset: SilencePreset;
   useHookAsHeadline: boolean;
   generateAIHeadline: boolean;  // Use AI to generate engaging headline
   generateBRoll: boolean;
@@ -192,6 +195,7 @@ const DEFAULT_CONFIG: ProcessingConfig = {
   silenceThreshold: -25,
   silenceDuration: 0.5,
   autoSilenceThreshold: true, // Default to auto for better out-of-box experience
+  silencePreset: 'natural',
   useHookAsHeadline: false,
   generateAIHeadline: false,
   generateBRoll: false,
@@ -337,12 +341,41 @@ export default function ProcessingOptions({
       <div className="space-y-3 sm:space-y-4">
         <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Silence Removal</h3>
 
+        {/* Editing Style Presets */}
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { key: 'jumpCut' as SilencePreset, label: 'Jump Cut', desc: 'Fast-paced, TikTok style' },
+            { key: 'natural' as SilencePreset, label: 'Natural', desc: 'Conversational, podcast style' },
+            { key: 'gentle' as SilencePreset, label: 'Gentle', desc: 'Minimal editing, lectures' },
+          ]).map(({ key, label, desc }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setConfig({ ...config, silencePreset: key, autoSilenceThreshold: true })}
+              className={`p-3 rounded-2xl border text-center transition-all ${
+                config.silencePreset === key
+                  ? 'border-[#e85d26] bg-[#e85d26]/5 ring-1 ring-[#e85d26]'
+                  : 'border-[#e0dbd4] hover:border-[#c5bfb8]'
+              }`}
+            >
+              <span className={`block text-xs sm:text-sm font-medium ${
+                config.silencePreset === key ? 'text-[#e85d26]' : 'text-[#0a0a0a]'
+              }`}>
+                {label}
+              </span>
+              <span className="block text-[10px] sm:text-xs text-[#8a8580] mt-0.5 leading-tight">
+                {desc}
+              </span>
+            </button>
+          ))}
+        </div>
+
         {/* Auto-detect toggle */}
         <div className="flex items-center justify-between p-3 bg-[#f5f0e8] rounded-2xl">
           <div>
-            <span className="text-sm text-[#0a0a0a]">Auto-detect threshold</span>
+            <span className="text-sm text-[#0a0a0a]">Smart detection (AI-powered)</span>
             <p className="text-xs text-[#8a8580] mt-0.5">
-              Analyzes audio to find optimal settings for each video
+              Uses neural voice detection for precise silence removal
             </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -401,31 +434,6 @@ export default function ProcessingOptions({
                 <span>Short pauses</span>
                 <span>Long pauses</span>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Show min silence duration even when auto is enabled */}
-        {config.autoSilenceThreshold && (
-          <div className="p-3 border border-[#e0dbd4] rounded-2xl">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs sm:text-sm text-[#8a8580]">
-                Min Silence Duration
-              </label>
-              <span className="text-xs sm:text-sm text-[#0a0a0a] font-medium">{config.silenceDuration}s</span>
-            </div>
-            <input
-              type="range"
-              value={config.silenceDuration}
-              onChange={(e) => setConfig({ ...config, silenceDuration: Number(e.target.value) })}
-              className="w-full h-2 bg-[#e0dbd4] rounded-full appearance-none cursor-pointer accent-[#e85d26]"
-              min="0.2"
-              max="2"
-              step="0.1"
-            />
-            <div className="flex justify-between text-xs text-[#8a8580] mt-1">
-              <span>Short pauses</span>
-              <span>Long pauses</span>
             </div>
           </div>
         )}

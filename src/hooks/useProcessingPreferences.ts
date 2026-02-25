@@ -16,6 +16,7 @@ const DEFAULT_CONFIG: ProcessingConfig = {
   silenceThreshold: -25,
   silenceDuration: 0.5,
   autoSilenceThreshold: true,
+  silencePreset: 'natural' as const,
   useHookAsHeadline: false,
   generateAIHeadline: false,
   generateBRoll: false,

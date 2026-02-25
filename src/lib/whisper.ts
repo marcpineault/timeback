@@ -583,11 +583,11 @@ export async function transcribeVideo(
   await extractAudio(videoPath, audioPath);
 
   // Transcribe
-  // - Include word-level timestamps for animated captions or speech correction
+  // - Always include word-level timestamps (needed for hybrid silence removal boundary refinement,
+  //   animated captions, and speech correction)
   // - Include filler words prompt when doing speech correction
-  const needsWords = options.animated || options.forSpeechCorrection;
   const { text, segments, words } = await transcribeAudio(audioPath, {
-    includeWords: needsWords,
+    includeWords: true,
     includeFillerWords: options.forSpeechCorrection,
   });
 

@@ -5,6 +5,12 @@ import fs, { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { logger } from './logger';
 import { runFFmpegCommand, runFFmpegWithRetry, runFFmpegSpawn, FFmpegProcessError, FFmpegProcessConfig, getMemoryEfficientOptions } from './ffmpegProcess';
+import { detectSilenceWithVad, isSileroVadAvailable, SpeechSegment, SileroVadConfig, DEFAULT_VAD_CONFIG } from './sileroVadDetection';
+import { refineWithWordBoundaries, refinedSegmentsToSilences, RefinedSpeechSegment, RefinementConfig, DEFAULT_REFINEMENT_CONFIG } from './hybridBoundaryRefinement';
+import { buildFinalSegments, GapProcessingConfig, DEFAULT_GAP_CONFIG } from './gapProcessing';
+import { buildCrossfadeFilterComplex, BoundaryRefinementConfig, DEFAULT_BOUNDARY_CONFIG } from './boundaryRefinement';
+import { SilencePresetName, getConfigsFromPreset, validatePresetName } from './silencePresets';
+import type { TranscriptionWord } from './whisper';
 
 /**
  * Custom error class for file not found errors during video processing
@@ -59,6 +65,7 @@ export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
   silenceDuration?: number; // minimum silence duration in seconds, default 0.35
   autoSilenceThreshold?: boolean; // auto-detect optimal threshold based on audio noise floor
+  silencePreset?: SilencePresetName; // 'jumpCut' | 'natural' | 'gentle' — controls VAD+gap aggressiveness
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
   headlineStyle?: HeadlineStyle;
@@ -713,75 +720,76 @@ export function getNonSilentSegments(
 }
 
 /**
- * Remove silent parts from video by concatenating non-silent segments
- * Uses adaptive silence detection when autoSilenceThreshold is enabled
+ * Remove silent parts from video using the hybrid three-layer pipeline:
+ * 1. Silero VAD (primary) or FFmpeg silencedetect (fallback)
+ * 2. Transcription word boundary refinement (when word timestamps available)
+ * 3. Audio energy analysis with crossfades at splice points
+ *
+ * @param wordTimestamps - Optional word-level timestamps from transcription for boundary refinement
  */
 export async function removeSilence(
   inputPath: string,
   outputPath: string,
-  options: ProcessingOptions = {}
+  options: ProcessingOptions = {},
+  wordTimestamps?: TranscriptionWord[]
 ): Promise<string> {
   // Validate input file exists before spawning any ffmpeg processes
   validateFileExists(inputPath, 'silence removal');
 
-  let threshold = options.silenceThreshold ?? -20;
-  const minDuration = options.silenceDuration ?? 0.35;  // Slightly relaxed from 0.3 to avoid clipping sentence tails
-  let silences: SilenceInterval[];
-  let duration: number;
+  const duration = await getVideoDuration(inputPath);
+  const presetName = validatePresetName(options.silencePreset);
+  const { vadConfig, refinementConfig, gapConfig, boundaryConfig } = getConfigsFromPreset(presetName);
 
-  // Use adaptive detection when auto-detection is enabled (more robust)
-  if (options.autoSilenceThreshold) {
-    logger.info(`[Silence Removal] Using adaptive silence detection...`);
-    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
-    silences = adaptiveResult.silences;
-    threshold = adaptiveResult.threshold;
-    duration = await getVideoDuration(inputPath);
-    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
+  logger.info(`[Silence Removal] Starting hybrid pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
+
+  let segments: SilenceInterval[];
+
+  // Try the hybrid pipeline (Silero VAD + word boundaries + gap processing)
+  if (options.autoSilenceThreshold !== false) {
+    try {
+      segments = await runHybridPipeline(
+        inputPath,
+        duration,
+        vadConfig,
+        refinementConfig,
+        gapConfig,
+        boundaryConfig,
+        wordTimestamps
+      );
+    } catch (hybridErr) {
+      // Hybrid pipeline failed — fall back to legacy FFmpeg detection
+      logger.warn(`[Silence Removal] Hybrid pipeline failed, falling back to FFmpeg silencedetect`, {
+        error: hybridErr instanceof Error ? hybridErr.message : String(hybridErr),
+      });
+      segments = await runLegacyPipeline(inputPath, duration, options);
+    }
   } else {
-    // Manual threshold mode - use legacy detection
-    silences = await detectSilence(inputPath, threshold, minDuration);
-    duration = await getVideoDuration(inputPath);
+    // Manual threshold mode — use legacy FFmpeg detection
+    segments = await runLegacyPipeline(inputPath, duration, options);
   }
 
-  logger.debug(`[Silence Removal] Video duration: ${duration.toFixed(2)}s`);
-  logger.debug(`[Silence Removal] Found ${silences.length} silent intervals`);
+  logger.debug(`[Silence Removal] Final segments to keep: ${segments.length}`);
 
-  const segments = getNonSilentSegments(silences, duration);
-
-  logger.debug(`[Silence Removal] Non-silent segments to keep: ${segments.length}`);
-
-  // If no silences found or no non-silent segments detected, copy the original file
-  // This handles cases where the audio is too quiet or the threshold is too aggressive
-  if (silences.length === 0 || segments.length === 0) {
-    if (segments.length === 0) {
-      logger.debug(`[Silence Removal] No non-silent segments found (audio may be too quiet for threshold ${threshold}dB), copying original file`);
-    } else {
-      logger.debug(`[Silence Removal] No silences found, copying original file`);
-    }
+  // If no segments to keep, copy the original file
+  if (segments.length === 0) {
+    logger.debug(`[Silence Removal] No segments to keep, copying original file`);
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
 
-  // Create filter complex for concatenating segments
-  const filterParts: string[] = [];
-  const concatInputs: string[] = [];
+  // Build FFmpeg filter complex with crossfades at splice points
+  const { filterComplex } = buildCrossfadeFilterComplex(
+    segments,
+    boundaryConfig.crossfadeMs
+  );
 
-  segments.forEach((segment, index) => {
-    filterParts.push(
-      `[0:v]trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS[v${index}]`
-    );
-    filterParts.push(
-      `[0:a]atrim=start=${segment.start}:end=${segment.end},asetpts=PTS-STARTPTS[a${index}]`
-    );
-    concatInputs.push(`[v${index}][a${index}]`);
-  });
+  if (!filterComplex) {
+    logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
 
-  const filterComplex = [
-    ...filterParts,
-    `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`,
-  ].join(';');
-
-  logger.debug(`[Silence Removal] Processing ${segments.length} segments...`);
+  logger.debug(`[Silence Removal] Concatenating ${segments.length} segments with crossfades...`);
 
   // Use retry wrapper for resilience against SIGKILL/memory issues
   const processConfig: FFmpegProcessConfig = {
@@ -797,13 +805,12 @@ export async function removeSilence(
         .outputOptions([
           '-map', '[outv]',
           '-map', '[outa]',
-          // Memory-efficient settings for constrained server environments
           '-c:v', 'libx264',
           '-preset', 'ultrafast',
           '-crf', '28',
-          '-threads', '4',  // Balance speed vs memory pressure
-          '-max_muxing_queue_size', '512',  // Limit muxing buffer
-          '-bufsize', '1M',  // Limit rate control buffer
+          '-threads', '4',
+          '-max_muxing_queue_size', '512',
+          '-bufsize', '1M',
           '-c:a', 'aac',
           '-b:a', '128k',
         ])
@@ -813,10 +820,9 @@ export async function removeSilence(
     logger.debug(`[Silence Removal] Complete!`);
     return outputPath;
   } catch (err) {
-    // Provide more helpful error messages for common failures
     if (err instanceof FFmpegProcessError) {
       if (err.isMemoryKill) {
-        logger.error(`[Silence Removal] Process killed due to memory constraints. Video may be too long or complex.`);
+        logger.error(`[Silence Removal] Process killed due to memory constraints.`);
         throw new Error('Video processing failed due to memory constraints. Try a shorter video or disable some processing options.');
       }
       if (err.isTimeout) {
@@ -827,6 +833,161 @@ export async function removeSilence(
     logger.error(`[Silence Removal] Error:`, err instanceof Error ? err : new Error(String(err)));
     throw err;
   }
+}
+
+/**
+ * Run the hybrid three-layer silence detection pipeline:
+ * Layer 1: Silero VAD (neural voice activity detection)
+ * Layer 2: Transcription word boundary refinement
+ * Layer 3: Gap processing with context-aware sizing
+ *
+ * Falls back to FFmpeg silencedetect if Silero VAD is not available.
+ */
+async function runHybridPipeline(
+  inputPath: string,
+  duration: number,
+  vadConfig: SileroVadConfig,
+  refinementConfig: RefinementConfig,
+  gapConfig: GapProcessingConfig,
+  boundaryConfig: BoundaryRefinementConfig,
+  wordTimestamps?: TranscriptionWord[]
+): Promise<SilenceInterval[]> {
+  // Layer 1: Silero VAD (primary detection)
+  const vadAvailable = await isSileroVadAvailable();
+
+  let speechSegments: SpeechSegment[];
+  let silences: SilenceInterval[];
+
+  if (vadAvailable) {
+    logger.info('[Silence Removal] Layer 1: Using Silero VAD for speech detection');
+    const vadResult = await detectSilenceWithVad(inputPath, duration, vadConfig);
+    speechSegments = vadResult.speechSegments;
+    silences = vadResult.silences;
+    logger.info(`[Silence Removal] ${vadResult.analysisInfo}`);
+  } else {
+    // Silero VAD not available — use improved FFmpeg fallback
+    logger.info('[Silence Removal] Layer 1: Silero VAD unavailable, using FFmpeg silencedetect fallback');
+    const minDuration = vadConfig.minSilenceDurationMs / 1000;
+    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
+    silences = adaptiveResult.silences;
+    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
+
+    // Convert silences to speech segments for Layer 2
+    speechSegments = silencesToSpeechSegments(silences, duration);
+  }
+
+  // If no speech detected at all, return empty (caller will copy original)
+  if (speechSegments.length === 0) {
+    logger.warn('[Silence Removal] No speech segments detected');
+    return [];
+  }
+
+  // Layer 2: Refine boundaries with word-level timestamps (if available)
+  let refinedSegments: RefinedSpeechSegment[];
+
+  if (wordTimestamps && wordTimestamps.length > 0) {
+    logger.info(`[Silence Removal] Layer 2: Refining with ${wordTimestamps.length} word timestamps`);
+    refinedSegments = refineWithWordBoundaries(
+      speechSegments,
+      wordTimestamps,
+      duration,
+      refinementConfig
+    );
+  } else {
+    logger.info('[Silence Removal] Layer 2: No word timestamps available, using VAD segments directly');
+    refinedSegments = speechSegments.map(seg => ({
+      ...seg,
+      words: [],
+      isNonVerbal: false,
+    }));
+  }
+
+  // Layer 3: Intelligent gap processing
+  logger.info('[Silence Removal] Layer 3: Processing gaps with context-aware sizing');
+  const finalSegments = buildFinalSegments(refinedSegments, duration, gapConfig);
+
+  const totalKept = finalSegments.reduce((sum, s) => sum + (s.end - s.start), 0);
+  const percentKept = (totalKept / duration) * 100;
+  logger.info(`[Silence Removal] Hybrid pipeline complete: ${finalSegments.length} segments, keeping ${percentKept.toFixed(1)}% of video`);
+
+  return finalSegments;
+}
+
+/**
+ * Run the legacy FFmpeg-based silence detection pipeline
+ * Used as fallback when hybrid pipeline fails or manual threshold is set
+ */
+async function runLegacyPipeline(
+  inputPath: string,
+  duration: number,
+  options: ProcessingOptions
+): Promise<SilenceInterval[]> {
+  let threshold = options.silenceThreshold ?? -20;
+  const minDuration = options.silenceDuration ?? 0.35;
+  let silences: SilenceInterval[];
+
+  if (options.autoSilenceThreshold) {
+    logger.info(`[Silence Removal] Using adaptive silence detection (legacy)...`);
+    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
+    silences = adaptiveResult.silences;
+    threshold = adaptiveResult.threshold;
+    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
+  } else {
+    silences = await detectSilence(inputPath, threshold, minDuration);
+  }
+
+  logger.debug(`[Silence Removal] Found ${silences.length} silent intervals (threshold: ${threshold}dB)`);
+
+  const segments = getNonSilentSegments(silences, duration);
+
+  if (silences.length === 0 || segments.length === 0) {
+    if (segments.length === 0) {
+      logger.debug(`[Silence Removal] No non-silent segments found`);
+    } else {
+      logger.debug(`[Silence Removal] No silences found`);
+    }
+    return [];
+  }
+
+  return segments;
+}
+
+/**
+ * Convert silence intervals to speech segments (inverse operation)
+ * Used when falling back from Silero VAD to FFmpeg silencedetect
+ */
+function silencesToSpeechSegments(
+  silences: SilenceInterval[],
+  totalDuration: number
+): SpeechSegment[] {
+  const segments: SpeechSegment[] = [];
+
+  if (silences.length === 0) {
+    // No silences = everything is speech
+    return [{ start: 0, end: totalDuration, confidence: 1.0 }];
+  }
+
+  // Speech before first silence
+  if (silences[0].start > 0.01) {
+    segments.push({ start: 0, end: silences[0].start, confidence: 0.8 });
+  }
+
+  // Speech between silences
+  for (let i = 0; i < silences.length - 1; i++) {
+    const speechStart = silences[i].end;
+    const speechEnd = silences[i + 1].start;
+    if (speechEnd - speechStart > 0.01) {
+      segments.push({ start: speechStart, end: speechEnd, confidence: 0.8 });
+    }
+  }
+
+  // Speech after last silence
+  const lastSilence = silences[silences.length - 1];
+  if (totalDuration - lastSilence.end > 0.01) {
+    segments.push({ start: lastSilence.end, end: totalDuration, confidence: 0.8 });
+  }
+
+  return segments;
 }
 
 /**
