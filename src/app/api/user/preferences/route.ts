@@ -44,6 +44,7 @@ export async function GET() {
         silenceThreshold: preferences.silenceThreshold,
         silenceDuration: preferences.silenceDuration,
         autoSilenceThreshold: preferences.autoSilenceThreshold,
+        silencePreset: preferences.silencePreset,
         normalizeAudio: preferences.normalizeAudio,
         aspectRatio: preferences.aspectRatio,
         speechCorrection: preferences.speechCorrection,
@@ -97,7 +98,7 @@ export async function PATCH(request: Request) {
     ] as const;
     const stringFields = [
       'activePreset', 'captionStyle', 'headline', 'headlinePosition',
-      'headlineStyle', 'aspectRatio',
+      'headlineStyle', 'aspectRatio', 'silencePreset',
     ] as const;
     const numberFields = ['silenceThreshold', 'silenceDuration'] as const;
 
@@ -131,6 +132,7 @@ export async function PATCH(request: Request) {
     if (body.silenceThreshold !== undefined) updateData.silenceThreshold = body.silenceThreshold;
     if (body.silenceDuration !== undefined) updateData.silenceDuration = body.silenceDuration;
     if (body.autoSilenceThreshold !== undefined) updateData.autoSilenceThreshold = body.autoSilenceThreshold;
+    if (body.silencePreset !== undefined) updateData.silencePreset = body.silencePreset;
     if (body.normalizeAudio !== undefined) updateData.normalizeAudio = body.normalizeAudio;
     if (body.aspectRatio !== undefined) updateData.aspectRatio = body.aspectRatio;
     if (body.speechCorrection !== undefined) updateData.speechCorrection = body.speechCorrection;
@@ -186,6 +188,7 @@ export async function PUT(request: Request) {
       silenceThreshold: body.silenceThreshold ?? -25,
       silenceDuration: body.silenceDuration ?? 0.5,
       autoSilenceThreshold: body.autoSilenceThreshold ?? true,
+      silencePreset: body.silencePreset ?? 'natural',
       normalizeAudio: body.normalizeAudio ?? true,
       aspectRatio: body.aspectRatio ?? 'original',
       speechCorrection: body.speechCorrection ?? false,
@@ -228,6 +231,7 @@ export async function PUT(request: Request) {
         silenceThreshold: preferences.silenceThreshold,
         silenceDuration: preferences.silenceDuration,
         autoSilenceThreshold: preferences.autoSilenceThreshold,
+        silencePreset: preferences.silencePreset,
         normalizeAudio: preferences.normalizeAudio,
         aspectRatio: preferences.aspectRatio,
         speechCorrection: preferences.speechCorrection,
