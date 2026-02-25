@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react'
 import { rateScript, type ScriptData } from '@/hooks/useIdeate'
 
+type HeadlineStyle = 'classic' | 'minimal'
+
 interface Props {
   script: ScriptData
   onBack: () => void
   onOpenTeleprompter: (script: ScriptData) => void
   onScriptUpdated: (script: ScriptData) => void
+  headlineStyle?: HeadlineStyle
 }
 
 function renderScriptWithNotes(text: string) {
@@ -54,7 +57,7 @@ function renderScriptWithNotes(text: string) {
   })
 }
 
-export default function ScriptView({ script, onBack, onOpenTeleprompter, onScriptUpdated }: Props) {
+export default function ScriptView({ script, onBack, onOpenTeleprompter, onScriptUpdated, headlineStyle: initialStyle = 'classic' }: Props) {
   const [hook, setHook] = useState(script.hook)
   const [body, setBody] = useState(script.body)
   const [cta, setCta] = useState(script.cta)
@@ -63,6 +66,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
   const [currentRating, setCurrentRating] = useState<string | null>(script.rating)
   const [showSpcl, setShowSpcl] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [style, setStyle] = useState<HeadlineStyle>(initialStyle)
 
   useEffect(() => {
     setHook(script.hook)
@@ -124,10 +128,18 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
           >
             &larr; Back
           </button>
-          <h2 className="text-xl text-[#0a0a0a] truncate" style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400 }}>{script.title}</h2>
+          <h2 className="text-lg font-semibold text-[#0a0a0a] truncate">{script.title}</h2>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Style toggle */}
+          <button
+            onClick={() => setStyle(style === 'classic' ? 'minimal' : 'classic')}
+            className="text-[#8a8580] hover:text-[#0a0a0a] text-xs transition-colors px-2 py-1 rounded-md border border-[#e0dbd4] hover:border-[#8a8580]"
+            title={`Switch to ${style === 'classic' ? 'minimal' : 'classic'} style`}
+          >
+            {style === 'classic' ? 'Minimal' : 'Classic'}
+          </button>
           {/* Rating */}
           <button
             onClick={() => handleRate('up')}
@@ -181,37 +193,71 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       </div>
 
       {/* Script Sections */}
-      <div className="space-y-6 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400 }}>Hook</label>
-          <textarea
-            value={hook}
-            onChange={(e) => setHook(e.target.value)}
-            rows={2}
-            className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
-          />
-        </div>
+      {style === 'classic' ? (
+        <div className="space-y-4 mb-6">
+          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
+            <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Hook</label>
+            <textarea
+              value={hook}
+              onChange={(e) => setHook(e.target.value)}
+              rows={2}
+              className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400 }}>Body</label>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={10}
-            className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
-          />
-        </div>
+          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
+            <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Body</label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={10}
+              className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem', fontWeight: 400 }}>Call to Action</label>
-          <textarea
-            value={cta}
-            onChange={(e) => setCta(e.target.value)}
-            rows={2}
-            className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
-          />
+          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
+            <label className="block text-green-400 text-xs font-semibold uppercase tracking-wider mb-2">Call to Action</label>
+            <textarea
+              value={cta}
+              onChange={(e) => setCta(e.target.value)}
+              rows={2}
+              className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-6 mb-6">
+          <div>
+            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Hook</label>
+            <textarea
+              value={hook}
+              onChange={(e) => setHook(e.target.value)}
+              rows={2}
+              className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Body</label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={10}
+              className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Call to Action</label>
+            <textarea
+              value={cta}
+              onChange={(e) => setCta(e.target.value)}
+              rows={2}
+              className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Script Preview with Production Notes */}
       {(fullText.includes('[TEXT OVERLAY:') || fullText.includes('[PATTERN INTERRUPT]') || fullText.includes('[B-ROLL:') || fullText.includes('[ENERGY SHIFT:')) && (
