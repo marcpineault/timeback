@@ -53,7 +53,7 @@ export interface SilenceInterval {
   end: number;
 }
 
-export type HeadlineStyle = 'classic' | 'speech-bubble';
+export type HeadlineStyle = 'classic' | 'speech-bubble' | 'clean';
 
 export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
@@ -74,10 +74,10 @@ const CAPTION_STYLE_MAP: Record<string, string> = {
   // Instagram style - white text on semi-transparent dark background box
   // Clean, modern, refined look with better readability on busy backgrounds
   // MarginV=70 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
-  instagram: 'Fontname=Helvetica,FontSize=13,Bold=1,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+  instagram: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
   // Minimal style - clean white text with thin black outline, no background box
   // Subtle, modern look that lets the video show through
-  minimal: 'Fontname=Helvetica,FontSize=14,Bold=1,PrimaryColour=&HFFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+  minimal: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
 };
 
 /**
@@ -1007,8 +1007,9 @@ async function generateHeadlinePNG(
   const boxHeight = Math.ceil(paddingY * 2 + fontSize * lineCount + lineGap * (lineCount - 1));
 
   // Style-specific colors
+  const isClean = style === 'clean';
   const bgFill = style === 'speech-bubble' ? 'white' : 'black';
-  const bgOpacity = style === 'speech-bubble' ? '1' : '0.7';
+  const bgOpacity = isClean ? '0' : style === 'speech-bubble' ? '1' : '0.7';
   const textFill = style === 'speech-bubble' ? 'black' : 'white';
 
   // Build SVG with centered text on rounded rectangle
@@ -1017,11 +1018,17 @@ async function generateHeadlinePNG(
   const textBlockHeight = fontSize * lineCount + lineGap * (lineCount - 1);
   const textStartY = (boxHeight - textBlockHeight) / 2 + fontSize * 0.78; // 0.78 = approximate ascender ratio
 
-  let textElements = `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${textFill}">${line1}</text>`;
+  const fontWeight = isClean ? '500' : 'bold';
+
+  let textElements = isClean
+    ? `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="white"><tspan stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${line1}</tspan></text>`
+    : `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textFill}">${line1}</text>`;
 
   if (hasSecondLine) {
     const line2Y = textStartY + fontSize + lineGap;
-    textElements += `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${textFill}">${line2}</text>`;
+    textElements += isClean
+      ? `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="white"><tspan stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${line2}</tspan></text>`
+      : `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textFill}">${line2}</text>`;
   }
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${boxWidth}" height="${boxHeight}">

@@ -20,7 +20,7 @@ interface ProcessingOptionsProps {
 
 export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
 
-export type HeadlineStyle = 'classic' | 'speech-bubble';
+export type HeadlineStyle = 'classic' | 'speech-bubble' | 'clean';
 
 export type CaptionStyle = 'instagram' | 'minimal';
 
@@ -619,7 +619,7 @@ export default function ProcessingOptions({
       {/* Captions Settings */}
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm text-[#0a0a0a]">Captions</h3>
+          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Captions</h3>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -627,49 +627,56 @@ export default function ProcessingOptions({
               onChange={(e) => setConfig({ ...config, generateCaptions: e.target.checked })}
               className="w-5 h-5 rounded bg-[#e0dbd4] border-[#e0dbd4] text-[#e85d26] focus:ring-[#e85d26]"
             />
-            <span className="text-xs text-[#8a8580]">Enable</span>
+            <span className="text-[#8a8580]">Generate captions</span>
           </label>
         </div>
 
         {config.generateCaptions && (
           <div>
+            <label className="block text-sm text-[#8a8580] mb-2">Style</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setConfig({ ...config, captionStyle: 'instagram' })}
-                className={`p-3 rounded-xl border transition-colors ${
+                className={`p-3 rounded-2xl border-2 transition-colors ${
                   config.captionStyle === 'instagram'
-                    ? 'border-[#e85d26] bg-[#e85d26]/5'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
                     : 'border-[#e0dbd4] hover:border-[#8a8580]'
                 }`}
               >
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="bg-black/50 text-white text-[10px] px-2.5 py-1 rounded">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="bg-black/50 text-white text-xs font-bold px-3 py-1.5 rounded">
                     Caption
                   </div>
-                  <span className={`text-[11px] ${config.captionStyle === 'instagram' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
+                  <span className={`text-xs ${config.captionStyle === 'instagram' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
                     Boxed
                   </span>
+                  <p className="text-xs text-[#8a8580] text-center">
+                    White text on dark background
+                  </p>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setConfig({ ...config, captionStyle: 'minimal' })}
-                className={`p-3 rounded-xl border transition-colors ${
+                className={`p-3 rounded-2xl border-2 transition-colors ${
                   config.captionStyle === 'minimal'
-                    ? 'border-[#e85d26] bg-[#e85d26]/5'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
                     : 'border-[#e0dbd4] hover:border-[#8a8580]'
                 }`}
               >
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="text-white text-[10px] px-2.5 py-1"
-                       style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8)' }}>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-white text-xs font-bold px-3 py-1.5"
+                       style={{ WebkitTextStroke: '0.5px black', textShadow: '1px 1px 2px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.8)' }}>
                     Caption
                   </div>
-                  <span className={`text-[11px] ${config.captionStyle === 'minimal' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
-                    Outline
+                  <span className={`text-xs ${config.captionStyle === 'minimal' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
+                    Minimal
                   </span>
+                  <p className="text-xs text-[#8a8580] text-center">
+                    Clean outline, no background
+                  </p>
                 </div>
               </button>
             </div>
@@ -799,7 +806,7 @@ export default function ProcessingOptions({
         {(config.headline || config.useHookAsHeadline || config.generateAIHeadline) && (
           <div>
             <label className="block text-sm text-[#8a8580] mb-2">Style</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setConfig({ ...config, headlineStyle: 'speech-bubble' })}
@@ -836,6 +843,27 @@ export default function ProcessingOptions({
                   </div>
                   <span className={`text-xs ${config.headlineStyle === 'classic' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
                     Classic
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfig({ ...config, headlineStyle: 'clean' })}
+                className={`p-3 rounded-2xl border-2 transition-colors ${
+                  config.headlineStyle === 'clean'
+                    ? 'border-[#e85d26] bg-[#e85d26]/10'
+                    : 'border-[#e0dbd4] hover:border-[#8a8580]'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  {/* Clean preview - no background */}
+                  <div className="text-white text-xs font-medium px-4 py-2"
+                       style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.5)' }}>
+                    Headline
+                  </div>
+                  <span className={`text-xs ${config.headlineStyle === 'clean' ? 'text-[#e85d26]' : 'text-[#8a8580]'}`}>
+                    Clean
                   </span>
                 </div>
               </button>
