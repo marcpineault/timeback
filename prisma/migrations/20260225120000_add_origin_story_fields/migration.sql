@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "CreatorProfile" ADD COLUMN "originStory" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "struggle" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "mission" TEXT NOT NULL DEFAULT '';

@@ -24,6 +24,9 @@ export interface CreatorContext {
   niche: string;
   targetAudience: string;
   contentGoal: string;
+  originStory: string;
+  struggle: string;
+  mission: string;
   statusProof: string[];
   powerExamples: string[];
   credibilityMarkers: string[];
@@ -326,6 +329,16 @@ export function buildCreatorPrompt(ctx: CreatorContext): string {
     `- Platform: ${ctx.primaryPlatform}`,
     `- Target video length: ${ctx.typicalVideoLength} seconds`,
   ];
+
+  // Origin story — personal narrative for authentic content
+  const hasOriginStory = ctx.originStory || ctx.struggle || ctx.mission;
+  if (hasOriginStory) {
+    const storyParts = [`\nORIGIN STORY (weave these personal elements into content naturally — they make the creator relatable and authentic):`];
+    if (ctx.originStory) storyParts.push(`- Why they got into this: ${ctx.originStory}`);
+    if (ctx.struggle) storyParts.push(`- Defining challenge/struggle: ${ctx.struggle}`);
+    if (ctx.mission) storyParts.push(`- Personal mission: ${ctx.mission}`);
+    parts.push(storyParts.join('\n'));
+  }
 
   if (ctx.statusProof.length > 0) {
     parts.push(`\nSTATUS PROOF (scarce resources they control):\n${ctx.statusProof.map((s) => `- ${s}`).join('\n')}`);
