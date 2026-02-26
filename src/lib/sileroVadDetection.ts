@@ -125,8 +125,8 @@ export async function runSileroVad(
   sampleRate: number = 16000,
   config: SileroVadConfig = DEFAULT_VAD_CONFIG
 ): Promise<SpeechSegment[]> {
-  // Dynamic import for onnxruntime-node
-  const ort = await import('onnxruntime-node');
+  // Dynamic import for onnxruntime-web (WASM backend — no native/glibc dependency)
+  const ort = await import('onnxruntime-web');
 
   // Locate the Silero VAD ONNX model
   const modelPath = await getSileroModelPath();
@@ -135,7 +135,10 @@ export async function runSileroVad(
   }
 
   logger.info(`[Silero VAD] Loading model from ${modelPath}`);
-  const session = await ort.InferenceSession.create(modelPath);
+  const modelBuffer = fs.readFileSync(modelPath);
+  const session = await ort.InferenceSession.create(modelBuffer, {
+    executionProviders: ['wasm'],
+  });
 
   const windowSize = 512; // 32ms at 16kHz — Silero expects this
   const numWindows = Math.floor(samples.length / windowSize);
@@ -507,7 +510,7 @@ export async function detectSilenceWithVad(
 export async function isSileroVadAvailable(): Promise<boolean> {
   try {
     logger.info('[Silero VAD] Checking ONNX runtime availability...');
-    await import('onnxruntime-node');
+    await import('onnxruntime-web');
     logger.info('[Silero VAD] ONNX runtime loaded successfully');
   } catch (err) {
     logger.warn(`[Silero VAD] ONNX runtime not available: ${err instanceof Error ? err.message : String(err)}`);
