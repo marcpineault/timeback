@@ -323,33 +323,51 @@ function applyPadding(
 
 /**
  * Locate the Silero VAD ONNX model file
- * Checks multiple possible locations where the model might be installed
+ * Checks multiple possible locations where the model might be installed.
+ * In Next.js, process.cwd() may differ from the project root, so we also
+ * try __dirname-relative paths and require.resolve.
  */
 async function getSileroModelPath(): Promise<string | null> {
-  const possiblePaths = [
-    // @ricky0123/vad-node bundles the model
-    path.resolve(process.cwd(), 'node_modules', '@ricky0123', 'vad-node', 'dist', 'silero_vad.onnx'),
-    path.resolve(process.cwd(), 'node_modules', '@ricky0123', 'vad-node', 'dist', 'silero_vad_legacy.onnx'),
-    // Local model in project
-    path.resolve(process.cwd(), 'models', 'silero_vad.onnx'),
-    // Check in the vad-node package directory
-    path.resolve(process.cwd(), 'node_modules', '@ricky0123', 'vad-node', 'silero_vad.onnx'),
+  // Try require.resolve first — most reliable in bundled environments
+  try {
+    const resolved = require.resolve('@ricky0123/vad-node/dist/silero_vad.onnx');
+    if (fs.existsSync(resolved)) {
+      return resolved;
+    }
+  } catch {
+    // Package not resolvable — try manual paths
+  }
+
+  const possibleRoots = [
+    process.cwd(),
+    path.resolve(__dirname, '..', '..'),  // src/lib -> project root
+    path.resolve(__dirname, '..', '..', '..'),  // .next/server -> project root
   ];
 
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      return p;
+  for (const root of possibleRoots) {
+    const candidates = [
+      path.resolve(root, 'node_modules', '@ricky0123', 'vad-node', 'dist', 'silero_vad.onnx'),
+      path.resolve(root, 'node_modules', '@ricky0123', 'vad-node', 'dist', 'silero_vad_legacy.onnx'),
+      path.resolve(root, 'models', 'silero_vad.onnx'),
+      path.resolve(root, 'node_modules', '@ricky0123', 'vad-node', 'silero_vad.onnx'),
+    ];
+
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
     }
   }
 
-  // Try to find via glob-like search in node_modules
-  const vadNodeDir = path.resolve(process.cwd(), 'node_modules', '@ricky0123', 'vad-node');
-  if (fs.existsSync(vadNodeDir)) {
-    const files = findOnnxFiles(vadNodeDir);
-    if (files.length > 0) {
-      // Prefer silero_vad.onnx over legacy
-      const preferred = files.find(f => f.endsWith('silero_vad.onnx') && !f.includes('legacy'));
-      return preferred || files[0];
+  // Last resort: recursive search in the first root that has the vad-node dir
+  for (const root of possibleRoots) {
+    const vadNodeDir = path.resolve(root, 'node_modules', '@ricky0123', 'vad-node');
+    if (fs.existsSync(vadNodeDir)) {
+      const files = findOnnxFiles(vadNodeDir);
+      if (files.length > 0) {
+        const preferred = files.find(f => f.endsWith('silero_vad.onnx') && !f.includes('legacy'));
+        return preferred || files[0];
+      }
     }
   }
 
@@ -478,16 +496,24 @@ export async function detectSilenceWithVad(
  */
 export async function isSileroVadAvailable(): Promise<boolean> {
   try {
+    logger.info('[Silero VAD] Checking ONNX runtime availability...');
     await import('onnxruntime-node');
+    logger.info('[Silero VAD] ONNX runtime loaded successfully');
+  } catch (err) {
+    logger.warn(`[Silero VAD] ONNX runtime not available: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+
+  try {
     const modelPath = await getSileroModelPath();
     if (!modelPath) {
-      logger.debug('[Silero VAD] ONNX model not found');
+      logger.warn(`[Silero VAD] ONNX model not found. Searched cwd=${process.cwd()}, __dirname=${__dirname}`);
       return false;
     }
-    logger.debug(`[Silero VAD] Available (model at ${modelPath})`);
+    logger.info(`[Silero VAD] Available (model at ${modelPath})`);
     return true;
   } catch (err) {
-    logger.debug(`[Silero VAD] Not available: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(`[Silero VAD] Model path check failed: ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
 }
