@@ -7,7 +7,7 @@ import { logger } from './logger';
 import { runFFmpegCommand, runFFmpegWithRetry, runFFmpegSpawn, FFmpegProcessError, FFmpegProcessConfig, getMemoryEfficientOptions } from './ffmpegProcess';
 import { detectSilenceWithVad, isSileroVadAvailable, SpeechSegment, SileroVadConfig, DEFAULT_VAD_CONFIG } from './sileroVadDetection';
 import { refineWithWordBoundaries, refinedSegmentsToSilences, RefinedSpeechSegment, RefinementConfig, DEFAULT_REFINEMENT_CONFIG } from './hybridBoundaryRefinement';
-import { buildFinalSegments, GapProcessingConfig, DEFAULT_GAP_CONFIG } from './gapProcessing';
+import { buildFinalSegments, buildSegmentsFromWords, GapProcessingConfig, DEFAULT_GAP_CONFIG } from './gapProcessing';
 import { buildCrossfadeFilterComplex, BoundaryRefinementConfig, DEFAULT_BOUNDARY_CONFIG } from './boundaryRefinement';
 import { SilencePresetName, SILENCE_PRESETS, getConfigsFromPreset, validatePresetName } from './silencePresets';
 import type { TranscriptionWord } from './whisper';
@@ -854,6 +854,50 @@ async function runHybridPipeline(
   wordTimestamps?: TranscriptionWord[],
   fallbackPadMs: number = 120
 ): Promise<SilenceInterval[]> {
+  // ===== WORD-FIRST PATH (primary) =====
+  // When word timestamps are available, build segments directly from words.
+  // This skips VAD (Layer 1), word boundary refinement (Layer 2), and
+  // compensated gap processing (Layer 3), replacing all three with a single
+  // clean pass that aligns cut points precisely to word boundaries.
+  if (wordTimestamps && wordTimestamps.length > 0) {
+    logger.info(`[Silence Removal] Word-first path: building segments from ${wordTimestamps.length} word timestamps`);
+
+    // The gapConfig passed in has compensated minSilenceToRemoveMs (reduced by
+    // prePadMs + postPadMs to account for Layer 2 padding). Since we're skipping
+    // Layer 2, reverse the compensation to get the original preset value.
+    const wordFirstGapConfig: GapProcessingConfig = {
+      ...gapConfig,
+      minSilenceToRemoveMs: gapConfig.minSilenceToRemoveMs + refinementConfig.prePlosivePadMs + refinementConfig.postTrailingPadMs,
+    };
+
+    const segments = buildSegmentsFromWords(
+      wordTimestamps,
+      duration,
+      wordFirstGapConfig,
+      refinementConfig.prePlosivePadMs,
+      refinementConfig.postTrailingPadMs
+    );
+
+    const totalKept = segments.reduce((sum, s) => sum + (s.end - s.start), 0);
+    const removedSeconds = duration - totalKept;
+    const removedPercent = (removedSeconds / duration) * 100;
+    let totalGap = 0;
+    for (let i = 1; i < segments.length; i++) {
+      totalGap += segments[i].start - segments[i - 1].end;
+    }
+    const avgGapMs = segments.length > 1
+      ? (totalGap / (segments.length - 1)) * 1000
+      : 0;
+
+    logger.info(`[Silence Removal] Word-first result: ${segments.length} segments, removed ${removedSeconds.toFixed(1)}s (${removedPercent.toFixed(1)}%), avg gap: ${avgGapMs.toFixed(0)}ms`);
+
+    return segments;
+  }
+
+  // ===== VAD FALLBACK PATH =====
+  // No word timestamps — fall back to the existing three-layer pipeline
+  logger.info('[Silence Removal] No word timestamps, using VAD fallback pipeline');
+
   // Layer 1: Silero VAD (primary detection) with graceful fallback to FFmpeg
   const vadAvailable = await isSileroVadAvailable();
 

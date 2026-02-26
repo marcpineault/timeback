@@ -28,7 +28,7 @@ export const DEFAULT_BOUNDARY_CONFIG: BoundaryRefinementConfig = {
   preOnsetSearchMs: 200,
   postOffsetSearchMs: 200,
   onsetThresholdDb: 3,
-  crossfadeMs: 20,
+  crossfadeMs: 5,
   useRoomTone: true,
 };
 
