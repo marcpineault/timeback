@@ -738,7 +738,7 @@ export async function removeSilence(
 
   const duration = await getVideoDuration(inputPath);
   const presetName = validatePresetName(options.silencePreset);
-  const { vadConfig, refinementConfig, gapConfig, boundaryConfig } = getConfigsFromPreset(presetName);
+  const { vadConfig, refinementConfig, gapConfig, boundaryConfig, fallbackPadMs } = getConfigsFromPreset(presetName);
 
   logger.info(`[Silence Removal] Starting hybrid pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
 
@@ -754,7 +754,8 @@ export async function removeSilence(
         refinementConfig,
         gapConfig,
         boundaryConfig,
-        wordTimestamps
+        wordTimestamps,
+        fallbackPadMs
       );
     } catch (hybridErr) {
       // Hybrid pipeline failed — fall back to legacy FFmpeg detection
@@ -850,7 +851,8 @@ async function runHybridPipeline(
   refinementConfig: RefinementConfig,
   gapConfig: GapProcessingConfig,
   boundaryConfig: BoundaryRefinementConfig,
-  wordTimestamps?: TranscriptionWord[]
+  wordTimestamps?: TranscriptionWord[],
+  fallbackPadMs: number = 120
 ): Promise<SilenceInterval[]> {
   // Layer 1: Silero VAD (primary detection)
   const vadAvailable = await isSileroVadAvailable();
@@ -894,12 +896,27 @@ async function runHybridPipeline(
       refinementConfig
     );
   } else {
-    logger.info('[Silence Removal] Layer 2: No word timestamps available, using VAD segments directly');
-    refinedSegments = speechSegments.map(seg => ({
+    // No word timestamps — apply fallback padding since VAD speechPadMs is 0
+    const fallbackPadSec = fallbackPadMs / 1000;
+    logger.info(`[Silence Removal] Layer 2: No word timestamps, applying fallback padding (${fallbackPadMs}ms)`);
+    const padded = speechSegments.map(seg => ({
       ...seg,
-      words: [],
+      start: Math.max(0, seg.start - fallbackPadSec),
+      end: Math.min(duration, seg.end + fallbackPadSec),
+      words: [] as TranscriptionWord[],
       isNonVerbal: false,
     }));
+    // Re-merge overlapping segments after padding
+    const merged: RefinedSpeechSegment[] = [];
+    for (const seg of padded) {
+      if (merged.length === 0 || seg.start > merged[merged.length - 1].end) {
+        merged.push(seg);
+      } else {
+        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, seg.end);
+        merged[merged.length - 1].confidence = (merged[merged.length - 1].confidence + seg.confidence) / 2;
+      }
+    }
+    refinedSegments = merged;
   }
 
   // Layer 3: Intelligent gap processing
@@ -907,8 +924,19 @@ async function runHybridPipeline(
   const finalSegments = buildFinalSegments(refinedSegments, duration, gapConfig);
 
   const totalKept = finalSegments.reduce((sum, s) => sum + (s.end - s.start), 0);
-  const percentKept = (totalKept / duration) * 100;
-  logger.info(`[Silence Removal] Hybrid pipeline complete: ${finalSegments.length} segments, keeping ${percentKept.toFixed(1)}% of video`);
+  const removedSeconds = duration - totalKept;
+  const removedPercent = (removedSeconds / duration) * 100;
+
+  // Compute average gap between consecutive kept segments
+  let totalGap = 0;
+  for (let i = 1; i < finalSegments.length; i++) {
+    totalGap += finalSegments[i].start - finalSegments[i - 1].end;
+  }
+  const avgGapMs = finalSegments.length > 1
+    ? (totalGap / (finalSegments.length - 1)) * 1000
+    : 0;
+
+  logger.info(`[Silence Removal] Final result: ${finalSegments.length} segments, removed ${removedSeconds.toFixed(1)}s of silence (${removedPercent.toFixed(1)}%), avg gap: ${avgGapMs.toFixed(0)}ms`);
 
   return finalSegments;
 }

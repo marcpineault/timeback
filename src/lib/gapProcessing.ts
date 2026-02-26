@@ -130,6 +130,7 @@ export function processGaps(
 
     // Don't touch silences shorter than minSilenceToRemove — they're natural pauses
     if (gapDuration < minSilenceToRemove) {
+      logger.debug(`[Gap Processing] Gap ${i}: ${(gapDuration * 1000).toFixed(0)}ms — KEPT (below ${config.minSilenceToRemoveMs}ms threshold)`);
       resultGaps.push({
         originalStart: gapStart,
         originalEnd: gapEnd,
@@ -150,6 +151,9 @@ export function processGaps(
 
     // Don't extend gaps that are already shorter than target
     targetGap = Math.min(targetGap, gapDuration);
+
+    const removed = gapDuration - targetGap;
+    logger.debug(`[Gap Processing] Gap ${i}: ${(gapDuration * 1000).toFixed(0)}ms → ${(targetGap * 1000).toFixed(0)}ms — REMOVED ${(removed * 1000).toFixed(0)}ms`);
 
     resultGaps.push({
       originalStart: gapStart,
@@ -204,6 +208,7 @@ export function buildFinalSegments(
 
       if (gapDuration > 0 && gapDuration < minSilenceToRemove) {
         // Gap is too short to remove — extend this segment to include it
+        logger.debug(`[Gap Processing] Segment ${i}: gap ${(gapDuration * 1000).toFixed(0)}ms — KEPT (below ${config.minSilenceToRemoveMs}ms threshold)`);
         segEntry.end = nextSeg.start;
       } else if (gapDuration >= minSilenceToRemove) {
         // Gap is long enough to process — determine target gap
