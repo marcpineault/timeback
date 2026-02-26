@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     },
   },
   // Increase timeout for video processing
-  serverExternalPackages: ["fluent-ffmpeg"],
+  serverExternalPackages: ["fluent-ffmpeg", "onnxruntime-node", "@ricky0123/vad-node"],
   // Skip type-checking during `next build` — the Railway build container is
   // memory-constrained and the TS checker alone pushes past the heap limit.
   // Types should be validated in CI (e.g. `tsc --noEmit`) instead.
