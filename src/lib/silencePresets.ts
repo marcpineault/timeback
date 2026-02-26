@@ -14,9 +14,11 @@ export type SilencePresetName = 'jumpCut' | 'natural' | 'gentle';
 export interface SilencePreset {
   name: string;
   description: string;
-  /** Padding before speech segments (ms) */
+  /** Silero VAD speech padding (ms) — used as fallback when word timestamps unavailable */
+  speechPadMs: number;
+  /** Padding before speech segments (ms) — applied by word boundary refinement */
   prePadMs: number;
-  /** Padding after speech segments (ms) */
+  /** Padding after speech segments (ms) — applied by word boundary refinement */
   postPadMs: number;
   /** Minimum silence duration to trigger removal (ms) */
   minSilenceToRemoveMs: number;
@@ -26,7 +28,7 @@ export interface SilencePreset {
   sentenceGapMs: number;
   /** How to handle breaths: 'keep' | 'reduce' | 'remove' */
   breathHandling: 'keep' | 'reduce' | 'remove';
-  /** Silero VAD threshold (lower catches more speech) */
+  /** Silero VAD threshold (higher = detects less as speech) */
   vadThreshold: number;
 }
 
@@ -37,35 +39,38 @@ export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
   jumpCut: {
     name: 'Jump Cut',
     description: 'Fast-paced, TikTok/YouTube style',
-    prePadMs: 100,
-    postPadMs: 150,
-    minSilenceToRemoveMs: 500,
-    minRetainedGapMs: 200,
-    sentenceGapMs: 400,
+    speechPadMs: 80,
+    prePadMs: 60,
+    postPadMs: 80,
+    minSilenceToRemoveMs: 300,
+    minRetainedGapMs: 100,
+    sentenceGapMs: 250,
     breathHandling: 'remove',
-    vadThreshold: 0.4,
+    vadThreshold: 0.45,
   },
   natural: {
     name: 'Natural',
     description: 'Conversational, podcast style (default)',
-    prePadMs: 250,
-    postPadMs: 300,
-    minSilenceToRemoveMs: 800,
-    minRetainedGapMs: 300,
-    sentenceGapMs: 600,
+    speechPadMs: 120,
+    prePadMs: 100,
+    postPadMs: 120,
+    minSilenceToRemoveMs: 500,
+    minRetainedGapMs: 200,
+    sentenceGapMs: 400,
     breathHandling: 'reduce',
-    vadThreshold: 0.35,
+    vadThreshold: 0.4,
   },
   gentle: {
     name: 'Gentle',
     description: 'Minimal editing, presentations/lectures',
-    prePadMs: 400,
-    postPadMs: 500,
-    minSilenceToRemoveMs: 1200,
-    minRetainedGapMs: 500,
-    sentenceGapMs: 800,
+    speechPadMs: 180,
+    prePadMs: 200,
+    postPadMs: 250,
+    minSilenceToRemoveMs: 700,
+    minRetainedGapMs: 300,
+    sentenceGapMs: 600,
     breathHandling: 'keep',
-    vadThreshold: 0.3,
+    vadThreshold: 0.35,
   },
 };
 
@@ -77,13 +82,18 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
   refinementConfig: RefinementConfig;
   gapConfig: GapProcessingConfig;
   boundaryConfig: BoundaryRefinementConfig;
+  /** Fallback padding (ms) for when word timestamps are unavailable */
+  fallbackPadMs: number;
 } {
   const preset = SILENCE_PRESETS[presetName];
 
+  // CRITICAL: Set speechPadMs to 0 so VAD and word boundary padding don't stack.
+  // Word boundary refinement (Layer 2) handles ALL padding via prePadMs/postPadMs.
+  // The preset's speechPadMs is used as fallback only when word timestamps are unavailable.
   const vadConfig: SileroVadConfig = {
     ...DEFAULT_VAD_CONFIG,
     threshold: preset.vadThreshold,
-    speechPadMs: preset.prePadMs,
+    speechPadMs: 0,
     minSilenceDurationMs: Math.min(preset.minSilenceToRemoveMs, 300),
   };
 
@@ -109,7 +119,7 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
     crossfadeMs: presetName === 'jumpCut' ? 10 : 20,
   };
 
-  return { vadConfig, refinementConfig, gapConfig, boundaryConfig };
+  return { vadConfig, refinementConfig, gapConfig, boundaryConfig, fallbackPadMs: preset.speechPadMs };
 }
 
 /**
