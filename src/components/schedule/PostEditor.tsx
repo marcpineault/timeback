@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { ScheduledPostData } from '@/hooks/useSchedule'
 
 interface PostEditorProps {
@@ -14,6 +14,8 @@ export default function PostEditor({ post, onSave, onRegenerate, onClose }: Post
   const [caption, setCaption] = useState(post.caption)
   const [saving, setSaving] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  const [videoExpanded, setVideoExpanded] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   const initDate = new Date(post.scheduledFor)
   const initDateStr = `${initDate.getFullYear()}-${String(initDate.getMonth() + 1).padStart(2, '0')}-${String(initDate.getDate()).padStart(2, '0')}`
@@ -80,8 +82,67 @@ export default function PostEditor({ post, onSave, onRegenerate, onClose }: Post
         {/* Content */}
         <div className="p-5 flex-1 overflow-auto">
           <div className="flex gap-5">
-            {/* Video Info */}
-            <div className="flex-shrink-0 w-36">
+            {/* Video Preview & Info */}
+            <div className="flex-shrink-0 w-48">
+              {/* Video Thumbnail / Player */}
+              {post.video.processedUrl ? (
+                <div className="mb-3">
+                  {videoExpanded ? (
+                    <div className="rounded-2xl overflow-hidden bg-black">
+                      <video
+                        ref={videoRef}
+                        src={post.video.processedUrl}
+                        controls
+                        playsInline
+                        autoPlay
+                        className="w-full rounded-2xl"
+                      />
+                      <button
+                        onClick={() => {
+                          if (videoRef.current) videoRef.current.pause()
+                          setVideoExpanded(false)
+                        }}
+                        className="w-full py-1.5 text-[#8a8580] hover:text-[#0a0a0a] text-xs transition-colors bg-[#f5f0e8]"
+                      >
+                        Collapse
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setVideoExpanded(true)}
+                      className="w-full aspect-video rounded-2xl overflow-hidden relative group bg-[#e0dbd4]"
+                    >
+                      {post.coverImageUrl ? (
+                        <img
+                          src={post.coverImageUrl}
+                          alt={post.video.originalName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg className="w-8 h-8 text-[#8a8580]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <svg className="w-5 h-5 text-[#0a0a0a] ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-[#f5f0e8] rounded-2xl p-3 mb-3 flex items-center justify-center aspect-video">
+                  <svg className="w-8 h-8 text-[#8a8580]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              )}
+
               <div className="bg-[#f5f0e8] rounded-2xl p-3 mb-3">
                 <p className="text-[#0a0a0a] text-sm font-medium truncate">{post.video.originalName}</p>
                 <p className="text-[#8a8580] text-xs mt-1">@{post.instagramAccount.instagramUsername}</p>

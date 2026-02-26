@@ -9,10 +9,11 @@ interface QueueViewProps {
   onEditPost: (post: ScheduledPostData) => void
   onRemovePost: (postId: string) => void
   onPublishNow?: (postId: string) => void
+  onPreviewVideo?: (post: ScheduledPostData) => void
   publishingId?: string | null
 }
 
-export default function QueueView({ queue, stats, onEditPost, onRemovePost, onPublishNow, publishingId }: QueueViewProps) {
+export default function QueueView({ queue, stats, onEditPost, onRemovePost, onPublishNow, onPreviewVideo, publishingId }: QueueViewProps) {
   // Group posts by date
   const grouped: Record<string, ScheduledPostData[]> = {}
   queue.forEach((post) => {
@@ -89,6 +90,7 @@ export default function QueueView({ queue, stats, onEditPost, onRemovePost, onPu
                     onEdit={onEditPost}
                     onRemove={onRemovePost}
                     onPublishNow={onPublishNow}
+                    onPreviewVideo={onPreviewVideo}
                     publishingId={publishingId}
                   />
                 ))}

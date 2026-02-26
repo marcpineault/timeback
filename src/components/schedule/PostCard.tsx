@@ -7,6 +7,7 @@ interface PostCardProps {
   onEdit: (post: ScheduledPostData) => void
   onRemove: (postId: string) => void
   onPublishNow?: (postId: string) => void
+  onPreviewVideo?: (post: ScheduledPostData) => void
   publishingId?: string | null
 }
 
@@ -20,7 +21,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   CANCELLED: { bg: 'bg-gray-500/20', text: 'text-gray-500', label: 'Cancelled' },
 }
 
-export default function PostCard({ post, onEdit, onRemove, onPublishNow, publishingId }: PostCardProps) {
+export default function PostCard({ post, onEdit, onRemove, onPublishNow, onPreviewVideo, publishingId }: PostCardProps) {
   const status = STATUS_STYLES[post.status] || STATUS_STYLES.QUEUED
 
   const scheduledDate = new Date(post.scheduledFor)
@@ -28,6 +29,7 @@ export default function PostCard({ post, onEdit, onRemove, onPublishNow, publish
   const dateStr = scheduledDate.toLocaleDateString([], { month: 'short', day: 'numeric' })
 
   const captionPreview = post.caption.split('\n')[0]?.slice(0, 80) || 'No caption'
+  const hasVideo = !!post.video.processedUrl
 
   return (
     <div className="flex items-start gap-4 p-4 bg-[#f5f0e8] rounded-2xl hover:bg-[#e0dbd4] transition-colors">
@@ -36,6 +38,36 @@ export default function PostCard({ post, onEdit, onRemove, onPublishNow, publish
         <p className="text-[#0a0a0a] font-medium text-sm">{timeStr}</p>
         <p className="text-[#8a8580] text-xs">{dateStr}</p>
       </div>
+
+      {/* Video Thumbnail */}
+      <button
+        onClick={() => hasVideo && onPreviewVideo?.(post)}
+        disabled={!hasVideo}
+        className={`flex-shrink-0 w-20 h-14 rounded-xl overflow-hidden relative group ${
+          hasVideo ? 'cursor-pointer' : 'cursor-default'
+        }`}
+      >
+        {post.coverImageUrl ? (
+          <img
+            src={post.coverImageUrl}
+            alt={post.video.originalName}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-[#e0dbd4] flex items-center justify-center">
+            <svg className="w-6 h-6 text-[#8a8580]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+        )}
+        {hasVideo && (
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+            <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        )}
+      </button>
 
       {/* Video info */}
       <div className="flex-1 min-w-0">

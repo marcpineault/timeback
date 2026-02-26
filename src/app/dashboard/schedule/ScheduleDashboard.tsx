@@ -8,6 +8,7 @@ import QueueView from '@/components/schedule/QueueView'
 import CalendarView from '@/components/schedule/CalendarView'
 import PostEditor from '@/components/schedule/PostEditor'
 import PublishedHistory from '@/components/schedule/PublishedHistory'
+import VideoPreview from '@/components/VideoPreview'
 import {
   useInstagramAccounts,
   useScheduleSlots,
@@ -20,6 +21,7 @@ type Tab = 'queue' | 'calendar' | 'published' | 'settings'
 export default function ScheduleDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('queue')
   const [editingPost, setEditingPost] = useState<ScheduledPostData | null>(null)
+  const [previewingPost, setPreviewingPost] = useState<ScheduledPostData | null>(null)
   const [publishingId, setPublishingId] = useState<string | null>(null)
   const searchParams = useSearchParams()
 
@@ -169,6 +171,7 @@ export default function ScheduleDashboard() {
                   onEditPost={setEditingPost}
                   onRemovePost={handleRemovePost}
                   onPublishNow={handlePublishNow}
+                  onPreviewVideo={setPreviewingPost}
                   publishingId={publishingId}
                 />
               )}
@@ -209,6 +212,15 @@ export default function ScheduleDashboard() {
           onSave={handleSavePost}
           onRegenerate={() => refetchQueue()}
           onClose={() => setEditingPost(null)}
+        />
+      )}
+
+      {/* Video Preview Modal */}
+      {previewingPost && previewingPost.video.processedUrl && (
+        <VideoPreview
+          videoUrl={previewingPost.video.processedUrl}
+          videoName={previewingPost.video.originalName}
+          onClose={() => setPreviewingPost(null)}
         />
       )}
     </div>
