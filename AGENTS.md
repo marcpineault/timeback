@@ -26,6 +26,7 @@ A `.env` file at the workspace root is required. At minimum:
 ### Key gotchas
 
 - **Clerk middleware blocks all routes (including public ones) if the publishable key is invalid.** Even `/api/health` returns 500. You must have a real Clerk publishable key for any page to load.
+- **You must use Clerk _development_ keys (prefix `pk_test_` / `sk_test_`) for localhost.** Production keys (prefix `pk_live_` / `sk_live_`) are domain-locked to `timebackvideo.com` and will fail on localhost with "Production Keys are only allowed for domain 'timebackvideo.com'". Get dev keys from the Clerk dashboard by switching to your Development instance.
 - **`npm run build` also requires a valid Clerk key** because Next.js prerenders pages during build and Clerk validates the key at that stage.
 - The Prisma schema uses `package.json#prisma` config (deprecated in Prisma 7) — warnings are expected.
 - `next.config.ts` has `typescript.ignoreBuildErrors: true` — type errors won't block builds.
