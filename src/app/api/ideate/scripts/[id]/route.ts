@@ -82,6 +82,29 @@ export async function PUT(
       .split(/\s+/)
       .filter(Boolean).length;
 
+    // If headlineClean is being updated by the user, recompute accent_words fallback
+    const headlineUpdate: Record<string, unknown> = {};
+    if (body.headlineClean !== undefined) {
+      headlineUpdate.headlineClean = body.headlineClean;
+      headlineUpdate.headlineText = body.headlineClean; // Reset formatted version
+
+      // Recompute accent words: if the user changed the headline and existing accent words
+      // no longer match, fall back to highlighting the first number or last word
+      const cleanText = body.headlineClean as string;
+      const existingAccent = existing.accentWords || [];
+      const wordsStillMatch = existingAccent.length > 0 &&
+        existingAccent.every((w: string) => cleanText.toLowerCase().includes(w.toLowerCase()));
+
+      if (wordsStillMatch) {
+        headlineUpdate.accentWords = existingAccent;
+      } else {
+        // Fallback: first number found, or last word
+        const words = cleanText.split(/\s+/).filter(Boolean);
+        const numberWord = words.find((w: string) => /\d/.test(w));
+        headlineUpdate.accentWords = numberWord ? [numberWord] : words.length > 0 ? [words[words.length - 1]] : [];
+      }
+    }
+
     const script = await prisma.script.update({
       where: { id },
       data: {
@@ -94,6 +117,7 @@ export async function PUT(
         isEdited: true,
         version: { increment: 1 },
         ...originalFields,
+        ...headlineUpdate,
       },
     });
 

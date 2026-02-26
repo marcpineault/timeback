@@ -361,6 +361,14 @@ model Script {
   cta       String
   fullScript String
 
+  // Enhanced hook/headline fields
+  headlineText       String?   // Visual overlay text with **accent** markers
+  headlineClean      String?   // Same text without formatting
+  accentWords        String[]  // Words to highlight in accent color
+  openingLine        String?   // Spoken opening line (first 3 seconds)
+  hookFormulaUsed    String?   // Which hook formula category was used
+  hookStrengthNotes  String?   // Why this hook works for the audience
+
   // Metadata
   estimatedDuration Int  @default(60)
   wordCount         Int  @default(0)

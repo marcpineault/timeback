@@ -61,6 +61,13 @@ export interface ScriptData {
     credibility: string;
     likeness: string;
   } | null;
+  // Enhanced hook/headline fields
+  headlineText: string | null;
+  headlineClean: string | null;
+  accentWords: string[];
+  openingLine: string | null;
+  hookFormulaUsed: string | null;
+  hookStrengthNotes: string | null;
   isEdited: boolean;
   version: number;
   rating: string | null;

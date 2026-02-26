@@ -1121,13 +1121,16 @@ function estimateTextWidth(text: string, fontSize: number): number {
 
 /**
  * Generate a transparent PNG image of a headline with rounded-rectangle background
- * Uses Sharp SVG rendering for Instagram-native rounded corners
+ * Uses Sharp SVG rendering for Instagram-native rounded corners.
+ * Supports accent words that get highlighted in a different color.
  */
 async function generateHeadlinePNG(
   headline: string,
   style: HeadlineStyle,
   outputDir: string,
-  canvasWidth: number = 1080
+  canvasWidth: number = 1080,
+  accentWords: string[] = [],
+  accentColor: string = '#e85d26',
 ): Promise<{ pngPath: string; imageWidth: number; imageHeight: number }> {
   // XML-escape for SVG (not FFmpeg escaping)
   const xmlEscape = (s: string) => s
@@ -1142,8 +1145,6 @@ async function generateHeadlinePNG(
     .trim();
 
   const [rawLine1, rawLine2] = splitHeadlineIntoTwoLines(sanitized);
-  const line1 = xmlEscape(rawLine1);
-  const line2 = xmlEscape(rawLine2);
   const hasSecondLine = rawLine2.length > 0;
 
   const fontSize = 48;
@@ -1171,7 +1172,7 @@ async function generateHeadlinePNG(
   const isClean = style === 'clean';
   const bgFill = style === 'speech-bubble' ? 'white' : 'black';
   const bgOpacity = isClean ? '0' : style === 'speech-bubble' ? '1' : '0.7';
-  const textFill = style === 'speech-bubble' ? 'black' : 'white';
+  const defaultTextFill = style === 'speech-bubble' ? 'black' : 'white';
 
   // Build SVG with centered text on rounded rectangle
   const centerX = boxWidth / 2;
@@ -1181,15 +1182,43 @@ async function generateHeadlinePNG(
 
   const fontWeight = isClean ? '500' : 'bold';
 
-  let textElements = isClean
-    ? `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="white"><tspan stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${line1}</tspan></text>`
-    : `<text x="${centerX}" y="${textStartY}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textFill}">${line1}</text>`;
+  // Normalize accent words for case-insensitive matching
+  const accentSet = new Set(accentWords.map(w => w.toLowerCase().replace(/[^a-z0-9]/g, '')));
 
+  /**
+   * Build SVG tspan elements for a line, coloring accent words differently.
+   */
+  function buildAccentLine(rawLine: string, y: number): string {
+    if (accentSet.size === 0) {
+      // No accent words — render as a single text element (original behavior)
+      const escaped = xmlEscape(rawLine);
+      if (isClean) {
+        return `<text x="${centerX}" y="${y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="white"><tspan stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${escaped}</tspan></text>`;
+      }
+      return `<text x="${centerX}" y="${y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${defaultTextFill}">${escaped}</text>`;
+    }
+
+    // Split line into words and build tspan elements with accent coloring
+    const words = rawLine.split(/(\s+)/);
+    const tspans = words.map(segment => {
+      const escaped = xmlEscape(segment);
+      if (segment.trim() === '') return escaped; // whitespace
+      const normalized = segment.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const isAccent = accentSet.has(normalized);
+      const fill = isAccent ? accentColor : defaultTextFill;
+      if (isClean) {
+        return `<tspan fill="${fill}" stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${escaped}</tspan>`;
+      }
+      return `<tspan fill="${fill}">${escaped}</tspan>`;
+    }).join('');
+
+    return `<text x="${centerX}" y="${y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}">${tspans}</text>`;
+  }
+
+  let textElements = buildAccentLine(rawLine1, textStartY);
   if (hasSecondLine) {
     const line2Y = textStartY + fontSize + lineGap;
-    textElements += isClean
-      ? `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="white"><tspan stroke="black" stroke-width="1.5" stroke-opacity="0.3" paint-order="stroke">${line2}</tspan></text>`
-      : `\n    <text x="${centerX}" y="${line2Y}" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${textFill}">${line2}</text>`;
+    textElements += '\n    ' + buildAccentLine(rawLine2, line2Y);
   }
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${boxWidth}" height="${boxHeight}">
@@ -1200,7 +1229,8 @@ async function generateHeadlinePNG(
   const pngPath = path.join(outputDir, `headline_${Date.now()}.png`);
   await sharp(Buffer.from(svg)).png().toFile(pngPath);
 
-  logger.debug(`[Headline] Generated PNG: ${boxWidth}x${boxHeight} at ${pngPath}`);
+  logger.debug(`[Headline] Generated PNG: ${boxWidth}x${boxHeight} at ${pngPath}` +
+    (accentWords.length > 0 ? `, accent: [${accentWords.join(', ')}]` : ''));
   return { pngPath, imageWidth: boxWidth, imageHeight: boxHeight };
 }
 
@@ -1218,7 +1248,9 @@ export async function addHeadline(
   headline: string,
   position: 'top' | 'center' | 'bottom' = 'top',
   captionStyle: string = 'instagram',
-  headlineStyle: HeadlineStyle = 'speech-bubble'
+  headlineStyle: HeadlineStyle = 'speech-bubble',
+  accentWords: string[] = [],
+  accentColor: string = '#e85d26',
 ): Promise<string> {
   validateFileExists(inputPath, 'add headline');
 
@@ -1238,7 +1270,9 @@ export async function addHeadline(
   };
 
   const processDir = path.dirname(outputPath);
-  const { pngPath, imageHeight } = await generateHeadlinePNG(headline, headlineStyle, processDir);
+  const { pngPath, imageHeight } = await generateHeadlinePNG(
+    headline, headlineStyle, processDir, 1080, accentWords, accentColor
+  );
 
   const baseY = baseYPositions[position];
   // Center the headline image vertically around the target Y position
@@ -1680,6 +1714,8 @@ export interface CombinedProcessingOptions {
   headlinePosition?: 'top' | 'center' | 'bottom';
   headlineStyle?: HeadlineStyle;
   captionStyle?: string;
+  accentWords?: string[];
+  accentColor?: string;
 }
 
 /**
@@ -1749,7 +1785,8 @@ export async function applyCombinedFilters(
       };
 
       const { pngPath, imageHeight } = await generateHeadlinePNG(
-        options.headline!, headlineStyle, processDir
+        options.headline!, headlineStyle, processDir, 1080,
+        options.accentWords || [], options.accentColor || '#e85d26'
       );
       headlinePngPath = pngPath;
 

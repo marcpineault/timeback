@@ -139,6 +139,12 @@ export async function POST(request: NextRequest) {
         estimatedDuration: generated.estimatedDuration,
         wordCount: generated.wordCount,
         spclBreakdown: generated.spclBreakdown,
+        headlineText: generated.headlineText,
+        headlineClean: generated.headlineClean,
+        accentWords: generated.accentWords,
+        openingLine: generated.openingLine,
+        hookFormulaUsed: generated.hookFormulaUsed,
+        hookStrengthNotes: generated.hookStrengthNotes,
       },
     });
 

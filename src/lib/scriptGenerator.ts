@@ -74,6 +74,13 @@ export interface GeneratedScript {
     credibility: string;
     likeness: string;
   };
+  // Enhanced hook fields
+  headlineText: string | null;
+  headlineClean: string | null;
+  accentWords: string[];
+  openingLine: string | null;
+  hookFormulaUsed: string | null;
+  hookStrengthNotes: string | null;
 }
 
 interface LearningContext {
@@ -710,10 +717,187 @@ Return ONLY valid JSON array (no markdown, no code fences):
   }
 }
 
+// ─── Hook Generation ─────────────────────────────────────────────────
+
+/**
+ * Build the hook specialist prompt for generating scroll-stopping headline text
+ * and opening lines. Uses the creator's profile data to personalize output.
+ */
+function buildHookPrompt(
+  creatorContext: CreatorContext,
+  contentTopic: string,
+  vertical?: string,
+): string {
+  // Map profile fields to hook prompt variables with sensible defaults
+  const userProfession = vertical
+    ? verticalToLabel(vertical)
+    : 'professional';
+  const userNiche = creatorContext.niche || '';
+  const userTargetAudience = creatorContext.targetAudience || 'potential clients';
+  const userTonePreference = creatorContext.toneOfVoice || 'professional but approachable';
+
+  const nicheSection = userNiche
+    ? `- Niche/Specialty: ${userNiche}`
+    : '';
+
+  return `You are a short-form video hook specialist for professional service providers. Your job is to write scroll-stopping headline text and opening lines for Instagram Reels, TikTok, and YouTube Shorts.
+
+## CONTEXT ABOUT THIS CREATOR
+- Profession: ${userProfession}
+${nicheSection}
+- Target Audience: ${userTargetAudience}
+- Tone: ${userTonePreference}
+- Content Topic: ${contentTopic}
+
+## YOUR TASK
+Generate a hook for a short-form video about the topic above. You must produce:
+
+1. HEADLINE TEXT (the visual text overlay burned into the first 3 seconds of the video)
+2. OPENING LINE (what the creator says out loud in the first 3 seconds)
+
+## HEADLINE TEXT RULES
+- 3 to 8 words MAXIMUM. Shorter is better. This gets displayed in large text on screen.
+- Must be instantly understandable with zero context
+- Must create a curiosity gap, challenge an assumption, or promise specific value
+- Must feel relevant to the target audience — they should think "this is for me" instantly
+- Use concrete numbers when possible ("3 mistakes", "$500K", "90 days")
+- Use the audience's language, not industry jargon
+- NEVER start with "How to" — it's the weakest hook format
+- NEVER use generic openings like "Did you know" or "In this video"
+- Mark 1-2 KEY WORDS that should be visually highlighted (accent color) in the overlay by wrapping them in **double asterisks**
+
+## HEADLINE FORMULAS (rotate between these — do NOT always use the same one):
+
+CHALLENGE FORMULA: Challenge a common belief or behavior
+- "Stop **overpaying** on your mortgage"
+- "Your realtor is **hiding** this from you"
+- "This retirement myth is **costing** you"
+
+SPECIFIC VALUE FORMULA: Promise a concrete, specific outcome
+- "**$2,400**/year in hidden fees"
+- "Sell your home **17 days** faster"
+- "The **1%** rule nobody follows"
+
+MISTAKE/WARNING FORMULA: Call out a costly error
+- "The **#1** first-time buyer mistake"
+- "**3** tax moves you're missing"
+- "This document could **save** your estate"
+
+INSIDER/SECRET FORMULA: Position as exclusive knowledge
+- "What lenders **won't** tell you"
+- "The clause your lawyer **skips**"
+- "Rates are changing — here's **why**"
+
+RESULT/PROOF FORMULA: Lead with an outcome or transformation
+- "How my client **saved $48K**"
+- "From 0 to **12 offers** in 6 days"
+- "This one change **doubled** her savings"
+
+CONTRARIAN FORMULA: Take an unexpected position
+- "**Don't** pay off your mortgage early"
+- "The worst time to **buy** a home"
+- "Why I tell clients to **stop** saving"
+
+## OPENING LINE RULES
+- 1-2 sentences spoken in under 4 seconds (roughly 12-20 words)
+- Must expand on the headline — don't just repeat it
+- Should make the viewer feel "I need to hear the rest of this"
+- Match the creator's tone preference (professional, conversational, authoritative, friendly)
+- First person ("I", "my clients") feels more authentic than second person for professionals
+- End on an open loop — don't resolve the curiosity in the opening line
+
+## OPENING LINE FORMULAS:
+
+DIRECT CHALLENGE: "Most [profession] will tell you [common advice]. They're wrong, and here's why."
+SPECIFIC STORY: "I just saved a client [specific amount/outcome] by doing one thing differently."
+PATTERN INTERRUPT: "Okay, this is going to sound counterintuitive, but [unexpected claim]."
+QUALIFYING: "If you're [specific situation], you need to hear this before [action/deadline]."
+AUTHORITY: "After [X years/clients], the biggest mistake I see is [specific mistake]."
+TIMELY: "[Current event/season] just changed everything about [topic], and nobody's talking about it."
+
+## QUALITY CHECKS — reject and regenerate if:
+- The headline is longer than 8 words
+- The headline uses "How to" or "Did you know"
+- The headline could apply to any profession (not specific enough)
+- The opening line resolves the curiosity gap (gives away the answer)
+- The opening line sounds like a textbook or press release
+- The hook wouldn't make YOU stop scrolling
+
+## OUTPUT FORMAT
+Return a JSON object:
+{
+  "headline_text": "The visual overlay text with **accent words** marked",
+  "headline_clean": "Same text without asterisk formatting",
+  "accent_words": ["word1", "word2"],
+  "opening_line": "The spoken first line of the script",
+  "hook_formula_used": "which formula category was used",
+  "hook_strength_notes": "brief note on why this hook works for the target audience"
+}
+
+Generate the single best hook. Pick the strongest formula for this specific topic and audience — do NOT hedge or offer alternatives. Commit to one.`;
+}
+
+/**
+ * Map vertical enum to a human-readable profession label.
+ */
+function verticalToLabel(vertical: string): string {
+  const labels: Record<string, string> = {
+    MORTGAGE_BROKER: 'mortgage broker',
+    REAL_ESTATE_AGENT: 'real estate agent',
+    FINANCIAL_ADVISOR: 'financial advisor',
+    LAWYER: 'lawyer',
+    OTHER: 'professional',
+  };
+  return labels[vertical] || 'professional';
+}
+
+interface HookResult {
+  headlineText: string;
+  headlineClean: string;
+  accentWords: string[];
+  openingLine: string;
+  hookFormulaUsed: string;
+  hookStrengthNotes: string;
+}
+
+/**
+ * Generate a scroll-stopping hook using the specialist prompt.
+ * Returns structured hook data for both the video overlay and the opening script line.
+ */
+async function generateHook(
+  creatorContext: CreatorContext,
+  contentTopic: string,
+  vertical?: string,
+): Promise<HookResult> {
+  const hookPrompt = buildHookPrompt(creatorContext, contentTopic, vertical);
+
+  const message = await getAnthropicClient().messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1024,
+    temperature: 0.8,
+    messages: [{ role: 'user', content: hookPrompt }],
+  });
+
+  const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
+  const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+  const parsed = JSON.parse(jsonStr);
+
+  return {
+    headlineText: parsed.headline_text || '',
+    headlineClean: parsed.headline_clean || parsed.headline_text?.replace(/\*\*/g, '') || '',
+    accentWords: Array.isArray(parsed.accent_words) ? parsed.accent_words : [],
+    openingLine: parsed.opening_line || '',
+    hookFormulaUsed: parsed.hook_formula_used || '',
+    hookStrengthNotes: parsed.hook_strength_notes || '',
+  };
+}
+
 // ─── Script Generation ───────────────────────────────────────────────
 
 /**
  * Generate a teleprompter-ready script from a video idea.
+ * Includes an upgraded hook specialist prompt that generates scroll-stopping
+ * headline text and opening lines alongside the full script.
  */
 export async function generateScript(
   creatorContext: CreatorContext,
@@ -733,6 +917,18 @@ export async function generateScript(
           .map((s, i) => `Example ${i + 1}: "${s.slice(0, 1000)}"`)
           .join('\n')}`
       : '';
+
+  // Generate the hook in parallel with the script for efficiency
+  const hookPromise = generateHook(
+    creatorContext,
+    idea.title,
+    creatorContext.vertical,
+  ).catch((err) => {
+    logger.error('[ScriptGenerator] Hook generation failed, will use fallback', {
+      error: err instanceof Error ? { message: err.message } : err,
+    });
+    return null;
+  });
 
   const prompt = `You are an elite short-form video scriptwriter who understands what makes videos get views, followers, and leads. You write teleprompter-ready scripts optimized for RETENTION (keeping viewers watching) and ENGAGEMENT (driving saves, shares, comments).
 
@@ -830,12 +1026,15 @@ Return ONLY valid JSON (no markdown, no code fences):
   logger.debug(`[ScriptGenerator] Generating script for idea: "${idea.title}" (user ${userId})`);
 
   try {
-    const message = await getAnthropicClient().messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      temperature: 0.7,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const [message, hookResult] = await Promise.all([
+      getAnthropicClient().messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        temperature: 0.7,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      hookPromise,
+    ]);
 
     const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
     const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
@@ -851,7 +1050,34 @@ Return ONLY valid JSON (no markdown, no code fences):
     script.wordCount = spokenText.split(/\s+/).filter(Boolean).length;
     script.estimatedDuration = Math.round((script.wordCount / 150) * 60);
 
-    logger.debug(`[ScriptGenerator] Generated script: ${script.wordCount} words, ~${script.estimatedDuration}s`);
+    // Merge hook specialist output into the script
+    if (hookResult) {
+      script.headlineText = hookResult.headlineText;
+      script.headlineClean = hookResult.headlineClean;
+      script.accentWords = hookResult.accentWords;
+      script.openingLine = hookResult.openingLine;
+      script.hookFormulaUsed = hookResult.hookFormulaUsed;
+      script.hookStrengthNotes = hookResult.hookStrengthNotes;
+
+      // Replace the hook (spoken opening line) with the specialist-generated one
+      // The opening_line becomes the first line of the teleprompter script
+      if (hookResult.openingLine) {
+        script.hook = hookResult.openingLine;
+        // Update fullScript to use the new opening line
+        script.fullScript = `${hookResult.openingLine}\n\n${script.body}\n\n${script.cta}`;
+      }
+    } else {
+      // Fallback: no specialist hook available
+      script.headlineText = null;
+      script.headlineClean = null;
+      script.accentWords = [];
+      script.openingLine = null;
+      script.hookFormulaUsed = null;
+      script.hookStrengthNotes = null;
+    }
+
+    logger.debug(`[ScriptGenerator] Generated script: ${script.wordCount} words, ~${script.estimatedDuration}s` +
+      (hookResult ? `, hook: "${hookResult.headlineClean}"` : ', hook: fallback'));
     return script;
   } catch (error) {
     logger.error('[ScriptGenerator] Failed to generate script', {

@@ -61,6 +61,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
   const [hook, setHook] = useState(script.hook)
   const [body, setBody] = useState(script.body)
   const [cta, setCta] = useState(script.cta)
+  const [headlineClean, setHeadlineClean] = useState(script.headlineClean || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [currentRating, setCurrentRating] = useState<string | null>(script.rating)
@@ -72,6 +73,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
     setHook(script.hook)
     setBody(script.body)
     setCta(script.cta)
+    setHeadlineClean(script.headlineClean || '')
     setCurrentRating(script.rating)
   }, [script])
 
@@ -85,7 +87,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
   const wordCount = spokenText.split(/\s+/).filter(Boolean).length
   const estimatedDuration = Math.round((wordCount / 150) * 60)
 
-  const hasChanges = hook !== script.hook || body !== script.body || cta !== script.cta
+  const hasChanges = hook !== script.hook || body !== script.body || cta !== script.cta || headlineClean !== (script.headlineClean || '')
 
   async function handleSave() {
     setSaving(true)
@@ -93,7 +95,10 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       const res = await fetch(`/api/ideate/scripts/${script.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hook, body, cta, fullScript: fullText }),
+        body: JSON.stringify({
+          hook, body, cta, fullScript: fullText,
+          ...(headlineClean !== (script.headlineClean || '') ? { headlineClean } : {}),
+        }),
       })
 
       if (res.ok) {
@@ -192,11 +197,50 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
         )}
       </div>
 
+      {/* Headline Overlay Preview */}
+      {(script.headlineClean || headlineClean) && (
+        <div className="mb-6">
+          <div className="bg-[#0a0a0a] rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-[#8a8580] text-xs font-semibold uppercase tracking-wider">Video Headline Overlay</label>
+              {script.hookFormulaUsed && (
+                <span className="text-[#8a8580] text-[10px] uppercase tracking-wider">{script.hookFormulaUsed}</span>
+              )}
+            </div>
+            <div className="text-center py-3">
+              <p className="text-white text-xl font-bold leading-snug">
+                {(headlineClean || '').split(/\s+/).map((word, i) => {
+                  const normalizedWord = word.toLowerCase().replace(/[^a-z0-9]/g, '')
+                  const accentSet = new Set((script.accentWords || []).map((w: string) => w.toLowerCase().replace(/[^a-z0-9]/g, '')))
+                  const isAccent = accentSet.has(normalizedWord)
+                  return (
+                    <span key={i}>
+                      {i > 0 && ' '}
+                      <span className={isAccent ? 'text-[#e85d26]' : ''}>{word}</span>
+                    </span>
+                  )
+                })}
+              </p>
+            </div>
+            <input
+              type="text"
+              value={headlineClean}
+              onChange={(e) => setHeadlineClean(e.target.value)}
+              className="w-full bg-[#1a1a1a] border border-[#333] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] mt-2"
+              placeholder="Edit headline overlay text..."
+            />
+            {script.hookStrengthNotes && (
+              <p className="text-[#8a8580] text-xs mt-2 italic">{script.hookStrengthNotes}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Script Sections */}
       {style === 'classic' ? (
         <div className="space-y-4 mb-6">
           <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-            <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Hook</label>
+            <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Hook (Opening Line)</label>
             <textarea
               value={hook}
               onChange={(e) => setHook(e.target.value)}
@@ -228,7 +272,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       ) : (
         <div className="space-y-6 mb-6">
           <div>
-            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Hook</label>
+            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Hook (Opening Line)</label>
             <textarea
               value={hook}
               onChange={(e) => setHook(e.target.value)}
