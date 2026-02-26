@@ -100,8 +100,17 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
   const refinementConfig: RefinementConfig = {
     prePlosivePadMs: preset.prePadMs,
     postTrailingPadMs: preset.postPadMs,
-    mergeGapMs: preset.minRetainedGapMs,
+    // Small fixed merge distance — only combine segments that truly overlap or
+    // are adjacent after padding. Content-level gap decisions belong in Layer 3.
+    mergeGapMs: 80,
   };
+
+  // Word boundary refinement (Layer 2) extends segments by prePadMs/postPadMs,
+  // shrinking the gaps between them. Gap processing (Layer 3) must compensate
+  // for this shrinkage, otherwise the effective removal threshold becomes
+  // minSilenceToRemoveMs + prePadMs + postPadMs — far higher than intended.
+  const totalPaddingMs = preset.prePadMs + preset.postPadMs;
+  const compensatedMinSilence = Math.max(100, preset.minSilenceToRemoveMs - totalPaddingMs);
 
   const gapConfig: GapProcessingConfig = {
     minRetainedGapMs: preset.minRetainedGapMs,
@@ -110,7 +119,7 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
     midSentenceGapMs: Math.round(preset.minRetainedGapMs * 0.83),
     paragraphGapMs: Math.round(preset.sentenceGapMs * 1.33),
     maxGapMs: 2000,
-    minSilenceToRemoveMs: preset.minSilenceToRemoveMs,
+    minSilenceToRemoveMs: compensatedMinSilence,
     breathHandling: preset.breathHandling,
   };
 

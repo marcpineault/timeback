@@ -917,6 +917,15 @@ async function runHybridPipeline(
       }
     }
     refinedSegments = merged;
+
+    // Fallback padding is symmetric (fallbackPadMs on each side), which differs
+    // from the word-timestamp path (prePadMs + postPadMs). Re-compensate the
+    // gap config so the effective original-silence threshold stays correct.
+    const fallbackTotalPad = fallbackPadMs * 2;
+    gapConfig = {
+      ...gapConfig,
+      minSilenceToRemoveMs: Math.max(100, gapConfig.minSilenceToRemoveMs + (refinementConfig.prePlosivePadMs + refinementConfig.postTrailingPadMs) - fallbackTotalPad),
+    };
   }
 
   // Layer 3: Intelligent gap processing
