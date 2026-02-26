@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 // Railway build - ensure env vars are loaded
 const nextConfig: NextConfig = {
@@ -10,6 +11,17 @@ const nextConfig: NextConfig = {
   },
   // Increase timeout for video processing
   serverExternalPackages: ["fluent-ffmpeg", "onnxruntime-web", "@ricky0123/vad-node"],
+  // Teach Turbopack how to handle .onnx model files so the build does not
+  // fail with "Unknown module type". The stub loader returns an empty JS
+  // module; actual model files are read at runtime via fs.readFileSync.
+  turbopack: {
+    rules: {
+      '*.onnx': {
+        loaders: [path.resolve(__dirname, 'scripts/onnx-stub-loader.js')],
+        as: '*.js',
+      },
+    },
+  },
   // Skip type-checking during `next build` — the Railway build container is
   // memory-constrained and the TS checker alone pushes past the heap limit.
   // Types should be validated in CI (e.g. `tsc --noEmit`) instead.
