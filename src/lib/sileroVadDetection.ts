@@ -331,12 +331,14 @@ function applyPadding(
  * try __dirname-relative paths and require.resolve.
  */
 async function getSileroModelPath(): Promise<string | null> {
-  // NOTE: We intentionally avoid require.resolve() for the .onnx file because
-  // Turbopack/webpack will try to bundle it as a module, causing build failures.
-  // Instead, we resolve the package directory at runtime and construct the path.
+  // NOTE: We use createRequire() to resolve the package path at runtime,
+  // preventing Turbopack from statically tracing into @ricky0123/vad-node
+  // and encountering the .onnx file (which the bundler cannot handle).
   try {
-    // Resolve the package's main entry, then navigate to the dist directory
-    const pkgMain = require.resolve('@ricky0123/vad-node');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createRequire } = require('module');
+    const runtimeRequire = createRequire(__filename);
+    const pkgMain = runtimeRequire.resolve('@ricky0123/vad-node');
     const pkgDir = path.dirname(pkgMain);
     const onnxPath = path.join(pkgDir, 'silero_vad.onnx');
     if (fs.existsSync(onnxPath)) {
