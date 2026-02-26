@@ -7,7 +7,7 @@ import { logger } from './logger';
 import { runFFmpegCommand, runFFmpegWithRetry, runFFmpegSpawn, FFmpegProcessError, FFmpegProcessConfig, getMemoryEfficientOptions } from './ffmpegProcess';
 import { detectSilenceWithVad, isSileroVadAvailable, SpeechSegment, SileroVadConfig, DEFAULT_VAD_CONFIG } from './sileroVadDetection';
 import { refineWithWordBoundaries, refinedSegmentsToSilences, RefinedSpeechSegment, RefinementConfig, DEFAULT_REFINEMENT_CONFIG } from './hybridBoundaryRefinement';
-import { buildFinalSegments, buildSegmentsFromWords, GapProcessingConfig, DEFAULT_GAP_CONFIG } from './gapProcessing';
+import { buildFinalSegments, GapProcessingConfig, DEFAULT_GAP_CONFIG } from './gapProcessing';
 import { buildCrossfadeFilterComplex, BoundaryRefinementConfig, DEFAULT_BOUNDARY_CONFIG } from './boundaryRefinement';
 import { SilencePresetName, SILENCE_PRESETS, getConfigsFromPreset, validatePresetName } from './silencePresets';
 import type { TranscriptionWord } from './whisper';
@@ -633,14 +633,14 @@ export async function getVideoDuration(inputPath: string): Promise<number> {
 export function getNonSilentSegments(
   silences: SilenceInterval[],
   totalDuration: number,
-  options: { padding?: number; minSegmentDuration?: number; mergeGap?: number; timebackPadding?: number } = {}
+  options: { padding?: number; minSegmentDuration?: number; mergeGap?: number; timebackPadding?: number; timebackPaddingEnd?: number } = {}
 ): SilenceInterval[] {
   // Balanced padding: aggressive detection but natural-sounding cuts
   const padding = options.padding ?? 0.015; // 15ms trim into speech edges (minimal, detector boundaries are accurate)
   const minSegmentDuration = options.minSegmentDuration ?? 0.1; // Ignore segments shorter than 100ms
   const mergeGap = options.mergeGap ?? 0.075; // Merge segments less than 75ms apart (reduces choppiness)
   const timebackPadding = options.timebackPadding ?? 0.15; // 150ms breathing room before speech
-  const timebackPaddingEnd = 0.25; // 250ms after speech — slight buffer to avoid clipping sentence tails
+  const timebackPaddingEnd = options.timebackPaddingEnd ?? 0.25; // Post-speech padding — avoid clipping sentence tails
 
   let segments: SilenceInterval[] = [];
   let lastEnd = 0;
@@ -738,38 +738,40 @@ export async function removeSilence(
 
   const duration = await getVideoDuration(inputPath);
   const presetName = validatePresetName(options.silencePreset);
-  const { vadConfig, refinementConfig, gapConfig, boundaryConfig, fallbackPadMs } = getConfigsFromPreset(presetName);
+  const preset = SILENCE_PRESETS[presetName];
 
-  logger.info(`[Silence Removal] Starting hybrid pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
+  logger.info(`[Silence Removal] Starting FFmpeg pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
 
-  let segments: SilenceInterval[];
+  // Step 1: Detect silences with FFmpeg adaptive threshold
+  const minDuration = preset.minSilenceToRemoveMs / 1000;
+  let silences: SilenceInterval[];
 
-  // Try the hybrid pipeline (Silero VAD + word boundaries + gap processing)
   if (options.autoSilenceThreshold !== false) {
-    try {
-      segments = await runHybridPipeline(
-        inputPath,
-        duration,
-        vadConfig,
-        refinementConfig,
-        gapConfig,
-        boundaryConfig,
-        wordTimestamps,
-        fallbackPadMs
-      );
-    } catch (hybridErr) {
-      // Hybrid pipeline failed — fall back to legacy FFmpeg detection
-      logger.warn(`[Silence Removal] Hybrid pipeline failed, falling back to FFmpeg silencedetect`, {
-        error: hybridErr instanceof Error ? hybridErr.message : String(hybridErr),
-      });
-      segments = await runLegacyPipeline(inputPath, duration, options);
-    }
+    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
+    silences = adaptiveResult.silences;
+    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
   } else {
-    // Manual threshold mode — use legacy FFmpeg detection
-    segments = await runLegacyPipeline(inputPath, duration, options);
+    const threshold = options.silenceThreshold ?? -20;
+    silences = await detectSilence(inputPath, threshold, options.silenceDuration ?? minDuration);
+    logger.info(`[Silence Removal] Manual threshold: ${threshold}dB, found ${silences.length} silences`);
   }
 
-  logger.debug(`[Silence Removal] Final segments to keep: ${segments.length}`);
+  if (silences.length === 0) {
+    logger.debug(`[Silence Removal] No silences found, copying original file`);
+    fs.copyFileSync(inputPath, outputPath);
+    return outputPath;
+  }
+
+  // Step 2: Convert silences to keep-segments with preset-aware padding
+  const segments = getNonSilentSegments(silences, duration, {
+    padding: 0,                                // Don't trim into speech edges
+    minSegmentDuration: 0.1,                   // Ignore segments shorter than 100ms
+    mergeGap: 0.05,                            // Merge segments less than 50ms apart
+    timebackPadding: preset.prePadMs / 1000,   // Pre-speech padding from preset
+    timebackPaddingEnd: preset.postPadMs / 1000, // Post-speech padding from preset
+  });
+
+  logger.info(`[Silence Removal] ${segments.length} segments to keep from ${silences.length} silences`);
 
   // If no segments to keep, copy the original file
   if (segments.length === 0) {
@@ -778,11 +780,9 @@ export async function removeSilence(
     return outputPath;
   }
 
-  // Build FFmpeg filter complex with crossfades at splice points
-  const { filterComplex } = buildCrossfadeFilterComplex(
-    segments,
-    boundaryConfig.crossfadeMs
-  );
+  // Step 3: Build FFmpeg filter complex with crossfades at splice points
+  const crossfadeMs = presetName === 'jumpCut' ? 3 : 5;
+  const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs);
 
   if (!filterComplex) {
     logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
@@ -836,244 +836,6 @@ export async function removeSilence(
   }
 }
 
-/**
- * Run the hybrid three-layer silence detection pipeline:
- * Layer 1: Silero VAD (neural voice activity detection)
- * Layer 2: Transcription word boundary refinement
- * Layer 3: Gap processing with context-aware sizing
- *
- * Falls back to FFmpeg silencedetect if Silero VAD is not available.
- */
-async function runHybridPipeline(
-  inputPath: string,
-  duration: number,
-  vadConfig: SileroVadConfig,
-  refinementConfig: RefinementConfig,
-  gapConfig: GapProcessingConfig,
-  boundaryConfig: BoundaryRefinementConfig,
-  wordTimestamps?: TranscriptionWord[],
-  fallbackPadMs: number = 120
-): Promise<SilenceInterval[]> {
-  // ===== WORD-FIRST PATH (primary) =====
-  // When word timestamps are available, build segments directly from words.
-  // This skips VAD (Layer 1), word boundary refinement (Layer 2), and
-  // compensated gap processing (Layer 3), replacing all three with a single
-  // clean pass that aligns cut points precisely to word boundaries.
-  if (wordTimestamps && wordTimestamps.length > 0) {
-    logger.info(`[Silence Removal] Word-first path: building segments from ${wordTimestamps.length} word timestamps`);
-
-    // The gapConfig passed in has compensated minSilenceToRemoveMs (reduced by
-    // prePadMs + postPadMs to account for Layer 2 padding). Since we're skipping
-    // Layer 2, reverse the compensation to get the original preset value.
-    const wordFirstGapConfig: GapProcessingConfig = {
-      ...gapConfig,
-      minSilenceToRemoveMs: gapConfig.minSilenceToRemoveMs + refinementConfig.prePlosivePadMs + refinementConfig.postTrailingPadMs,
-    };
-
-    const segments = buildSegmentsFromWords(
-      wordTimestamps,
-      duration,
-      wordFirstGapConfig,
-      refinementConfig.prePlosivePadMs,
-      refinementConfig.postTrailingPadMs
-    );
-
-    const totalKept = segments.reduce((sum, s) => sum + (s.end - s.start), 0);
-    const removedSeconds = duration - totalKept;
-    const removedPercent = (removedSeconds / duration) * 100;
-    let totalGap = 0;
-    for (let i = 1; i < segments.length; i++) {
-      totalGap += segments[i].start - segments[i - 1].end;
-    }
-    const avgGapMs = segments.length > 1
-      ? (totalGap / (segments.length - 1)) * 1000
-      : 0;
-
-    logger.info(`[Silence Removal] Word-first result: ${segments.length} segments, removed ${removedSeconds.toFixed(1)}s (${removedPercent.toFixed(1)}%), avg gap: ${avgGapMs.toFixed(0)}ms`);
-
-    return segments;
-  }
-
-  // ===== VAD FALLBACK PATH =====
-  // No word timestamps — fall back to the existing three-layer pipeline
-  logger.info('[Silence Removal] No word timestamps, using VAD fallback pipeline');
-
-  // Layer 1: Silero VAD (primary detection) with graceful fallback to FFmpeg
-  const vadAvailable = await isSileroVadAvailable();
-
-  let speechSegments: SpeechSegment[] = [];
-  let silences: SilenceInterval[] = [];
-
-  if (vadAvailable) {
-    try {
-      logger.info('[Silence Removal] Layer 1: Using Silero VAD for speech detection');
-      const vadResult = await detectSilenceWithVad(inputPath, duration, vadConfig);
-      speechSegments = vadResult.speechSegments;
-      silences = vadResult.silences;
-      logger.info(`[Silence Removal] ${vadResult.analysisInfo}`);
-    } catch (vadErr) {
-      // VAD model loaded but inference failed — fall back to FFmpeg WITHIN
-      // the hybrid pipeline so Layer 2/3 processing still applies with tight configs
-      logger.warn('[Silence Removal] Layer 1: Silero VAD inference failed, falling back to FFmpeg silencedetect', {
-        error: vadErr instanceof Error ? vadErr.message : String(vadErr),
-      });
-    }
-  }
-
-  // FFmpeg fallback — used when VAD is unavailable OR when VAD inference failed
-  if (speechSegments.length === 0) {
-    logger.info('[Silence Removal] Layer 1: Using FFmpeg silencedetect fallback');
-    const minDuration = vadConfig.minSilenceDurationMs / 1000;
-    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
-    silences = adaptiveResult.silences;
-    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
-
-    // Convert silences to speech segments for Layer 2
-    speechSegments = silencesToSpeechSegments(silences, duration);
-  }
-
-  // If no speech detected at all, return empty (caller will copy original)
-  if (speechSegments.length === 0) {
-    logger.warn('[Silence Removal] No speech segments detected');
-    return [];
-  }
-
-  // Layer 2: Refine boundaries with word-level timestamps (if available)
-  let refinedSegments: RefinedSpeechSegment[];
-
-  if (wordTimestamps && wordTimestamps.length > 0) {
-    logger.info(`[Silence Removal] Layer 2: Refining with ${wordTimestamps.length} word timestamps`);
-    refinedSegments = refineWithWordBoundaries(
-      speechSegments,
-      wordTimestamps,
-      duration,
-      refinementConfig
-    );
-  } else {
-    // No word timestamps — apply fallback padding since VAD speechPadMs is 0
-    const fallbackPadSec = fallbackPadMs / 1000;
-    logger.info(`[Silence Removal] Layer 2: No word timestamps, applying fallback padding (${fallbackPadMs}ms)`);
-    const padded = speechSegments.map(seg => ({
-      ...seg,
-      start: Math.max(0, seg.start - fallbackPadSec),
-      end: Math.min(duration, seg.end + fallbackPadSec),
-      words: [] as TranscriptionWord[],
-      isNonVerbal: false,
-    }));
-    // Re-merge overlapping segments after padding
-    const merged: RefinedSpeechSegment[] = [];
-    for (const seg of padded) {
-      if (merged.length === 0 || seg.start > merged[merged.length - 1].end) {
-        merged.push(seg);
-      } else {
-        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, seg.end);
-        merged[merged.length - 1].confidence = (merged[merged.length - 1].confidence + seg.confidence) / 2;
-      }
-    }
-    refinedSegments = merged;
-
-    // Fallback padding is symmetric (fallbackPadMs on each side), which differs
-    // from the word-timestamp path (prePadMs + postPadMs). Re-compensate the
-    // gap config so the effective original-silence threshold stays correct.
-    const fallbackTotalPad = fallbackPadMs * 2;
-    gapConfig = {
-      ...gapConfig,
-      minSilenceToRemoveMs: Math.max(20, gapConfig.minSilenceToRemoveMs + (refinementConfig.prePlosivePadMs + refinementConfig.postTrailingPadMs) - fallbackTotalPad),
-    };
-  }
-
-  // Layer 3: Intelligent gap processing
-  logger.info('[Silence Removal] Layer 3: Processing gaps with context-aware sizing');
-  const finalSegments = buildFinalSegments(refinedSegments, duration, gapConfig);
-
-  const totalKept = finalSegments.reduce((sum, s) => sum + (s.end - s.start), 0);
-  const removedSeconds = duration - totalKept;
-  const removedPercent = (removedSeconds / duration) * 100;
-
-  // Compute average gap between consecutive kept segments
-  let totalGap = 0;
-  for (let i = 1; i < finalSegments.length; i++) {
-    totalGap += finalSegments[i].start - finalSegments[i - 1].end;
-  }
-  const avgGapMs = finalSegments.length > 1
-    ? (totalGap / (finalSegments.length - 1)) * 1000
-    : 0;
-
-  logger.info(`[Silence Removal] Final result: ${finalSegments.length} segments, removed ${removedSeconds.toFixed(1)}s of silence (${removedPercent.toFixed(1)}%), avg gap: ${avgGapMs.toFixed(0)}ms`);
-
-  return finalSegments;
-}
-
-/**
- * Run the legacy FFmpeg-based silence detection pipeline
- * Used as fallback when hybrid pipeline fails or manual threshold is set.
- *
- * Uses preset-aware gap processing (buildFinalSegments) instead of the old
- * getNonSilentSegments which had 400ms of padding that swallowed silence cuts.
- */
-async function runLegacyPipeline(
-  inputPath: string,
-  duration: number,
-  options: ProcessingOptions
-): Promise<SilenceInterval[]> {
-  let threshold = options.silenceThreshold ?? -20;
-  const minDuration = options.silenceDuration ?? 0.35;
-  let silences: SilenceInterval[];
-
-  if (options.autoSilenceThreshold) {
-    logger.info(`[Silence Removal] Using adaptive silence detection (legacy)...`);
-    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
-    silences = adaptiveResult.silences;
-    threshold = adaptiveResult.threshold;
-    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
-  } else {
-    silences = await detectSilence(inputPath, threshold, minDuration);
-  }
-
-  logger.debug(`[Silence Removal] Found ${silences.length} silent intervals (threshold: ${threshold}dB)`);
-
-  if (silences.length === 0) {
-    logger.debug(`[Silence Removal] No silences found`);
-    return [];
-  }
-
-  // Convert silences to speech segments and use preset-aware gap processing
-  // instead of getNonSilentSegments (which had 400ms padding that kept most gaps)
-  const speechSegments = silencesToSpeechSegments(silences, duration);
-
-  if (speechSegments.length === 0) {
-    logger.debug(`[Silence Removal] No speech segments found`);
-    return [];
-  }
-
-  // Build gap config from preset — use UNCOMPENSATED threshold since
-  // there's no Layer 2 word-boundary padding in the legacy path
-  const presetName = validatePresetName(options.silencePreset);
-  const preset = SILENCE_PRESETS[presetName];
-  const legacyGapConfig: GapProcessingConfig = {
-    minRetainedGapMs: preset.minRetainedGapMs,
-    sentenceGapMs: preset.sentenceGapMs,
-    clauseGapMs: Math.round(preset.sentenceGapMs * 0.67),
-    midSentenceGapMs: Math.round(preset.minRetainedGapMs * 0.83),
-    paragraphGapMs: Math.round(preset.sentenceGapMs * 1.33),
-    maxGapMs: 2000,
-    minSilenceToRemoveMs: preset.minSilenceToRemoveMs, // Uncompensated — no Layer 2 padding
-    breathHandling: preset.breathHandling,
-  };
-
-  // Convert to RefinedSpeechSegments (no words available in legacy path)
-  const refinedSegments: RefinedSpeechSegment[] = speechSegments.map(seg => ({
-    ...seg,
-    words: [],
-    isNonVerbal: false,
-  }));
-
-  const segments = buildFinalSegments(refinedSegments, duration, legacyGapConfig);
-
-  logger.info(`[Silence Removal] Legacy pipeline: ${segments.length} segments from ${silences.length} silences (preset: ${presetName})`);
-
-  return segments;
-}
 
 /**
  * Convert silence intervals to speech segments (inverse operation)
