@@ -128,7 +128,7 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
 
   const boundaryConfig: BoundaryRefinementConfig = {
     ...DEFAULT_BOUNDARY_CONFIG,
-    crossfadeMs: presetName === 'jumpCut' ? 10 : 20,
+    crossfadeMs: presetName === 'jumpCut' ? 3 : 5,
   };
 
   return { vadConfig, refinementConfig, gapConfig, boundaryConfig, fallbackPadMs: preset.speechPadMs };

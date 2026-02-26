@@ -1,6 +1,7 @@
 import { logger } from './logger';
 import { SilenceInterval } from './ffmpeg';
 import { RefinedSpeechSegment } from './hybridBoundaryRefinement';
+import type { TranscriptionWord } from './whisper';
 
 /**
  * Configuration for intelligent gap processing
@@ -256,6 +257,118 @@ export function buildFinalSegments(
   }
 
   logger.info(`[Gap Processing] Built ${merged.length} final segments from ${speechSegments.length} speech segments`);
+
+  return merged;
+}
+
+/**
+ * Build "keep" segments directly from word timestamps, bypassing VAD and
+ * word-boundary refinement entirely. This is the primary path when Whisper
+ * word timestamps are available — it produces millisecond-precise cut points
+ * anchored to actual speech.
+ *
+ * Algorithm:
+ * 1. Sort words by start time
+ * 2. Group consecutive words where inter-word gap < minSilenceToRemoveMs
+ * 3. Apply prePadMs/postPadMs around each group
+ * 4. Size gaps contextually based on trailing punctuation
+ * 5. Merge overlapping segments, clamp to bounds
+ */
+export function buildSegmentsFromWords(
+  words: TranscriptionWord[],
+  totalDuration: number,
+  config: GapProcessingConfig,
+  prePadMs: number,
+  postPadMs: number
+): SilenceInterval[] {
+  if (words.length === 0) return [];
+
+  const sorted = [...words].sort((a, b) => a.start - b.start);
+  const groupThreshold = config.minSilenceToRemoveMs / 1000;
+  const prePadSec = prePadMs / 1000;
+  const postPadSec = postPadMs / 1000;
+  const minRetainedGap = config.minRetainedGapMs / 1000;
+  const maxGap = config.maxGapMs / 1000;
+
+  // Group consecutive words into speech chunks
+  interface WordGroup {
+    words: TranscriptionWord[];
+    start: number;
+    end: number;
+  }
+
+  const groups: WordGroup[] = [];
+  let current: WordGroup = {
+    words: [sorted[0]],
+    start: sorted[0].start,
+    end: sorted[0].end,
+  };
+
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = sorted[i].start - current.end;
+    if (gap >= groupThreshold) {
+      groups.push(current);
+      current = {
+        words: [sorted[i]],
+        start: sorted[i].start,
+        end: sorted[i].end,
+      };
+    } else {
+      current.words.push(sorted[i]);
+      current.end = Math.max(current.end, sorted[i].end);
+    }
+  }
+  groups.push(current);
+
+  logger.info(`[Gap Processing] Word-first: ${sorted.length} words → ${groups.length} speech groups (threshold: ${config.minSilenceToRemoveMs}ms)`);
+
+  // Build keep segments from groups
+  const keepSegments: SilenceInterval[] = [];
+
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+    const segStart = Math.max(0, group.start - prePadSec);
+    let segEnd = Math.min(totalDuration, group.end + postPadSec);
+
+    // Add contextual gap after this group (before the next one)
+    if (i < groups.length - 1) {
+      const nextGroup = groups[i + 1];
+      const originalGap = nextGroup.start - group.end;
+      const lastWord = group.words[group.words.length - 1].word;
+
+      let targetGap = getContextualGapDuration(lastWord, config);
+      targetGap = Math.max(targetGap, minRetainedGap);
+      targetGap = Math.min(targetGap, maxGap);
+      targetGap = Math.min(targetGap, originalGap); // never extend beyond original
+
+      // Extend segment end to include the retained gap
+      segEnd = Math.min(totalDuration, group.end + postPadSec + targetGap);
+
+      const removed = originalGap - targetGap;
+      logger.debug(`[Gap Processing] Word group ${i}: gap ${(originalGap * 1000).toFixed(0)}ms → ${(targetGap * 1000).toFixed(0)}ms (removed ${(removed * 1000).toFixed(0)}ms)`);
+    }
+
+    keepSegments.push({ start: segStart, end: segEnd });
+  }
+
+  // Merge overlapping segments
+  const merged: SilenceInterval[] = [];
+  for (const seg of keepSegments) {
+    if (merged.length === 0 || seg.start > merged[merged.length - 1].end) {
+      merged.push({ ...seg });
+    } else {
+      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, seg.end);
+    }
+  }
+
+  // Clamp to total duration
+  for (const seg of merged) {
+    seg.start = Math.max(0, seg.start);
+    seg.end = Math.min(totalDuration, seg.end);
+  }
+
+  const totalKept = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
+  logger.info(`[Gap Processing] Word-first: ${merged.length} final segments, keeping ${totalKept.toFixed(1)}s of ${totalDuration.toFixed(1)}s`);
 
   return merged;
 }
