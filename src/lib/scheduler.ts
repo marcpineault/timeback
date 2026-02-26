@@ -13,9 +13,11 @@ import { logger } from './logger';
 
 const PUBLISH_INTERVAL_MS = 60 * 1000; // Every 1 minute
 const TOKEN_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // Every 24 hours
+const VIDEO_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // Every 6 hours
 
 let publishIntervalId: ReturnType<typeof setInterval> | null = null;
 let tokenRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
+let videoCleanupIntervalId: ReturnType<typeof setInterval> | null = null;
 let isRunning = false;
 
 async function runPublishCycle(): Promise<void> {
@@ -42,6 +44,18 @@ async function runTokenRefresh(): Promise<void> {
   }
 }
 
+async function runVideoCleanup(): Promise<void> {
+  try {
+    const { cleanupPublishedVideoStorage } = await import('./cleanup');
+    const result = await cleanupPublishedVideoStorage();
+    if (result.deleted > 0 || result.errors > 0) {
+      logger.info('Video storage cleanup cycle completed', result);
+    }
+  } catch (error) {
+    logger.error('Video storage cleanup cycle failed', { error: error instanceof Error ? error.message : error });
+  }
+}
+
 export function startScheduler(): void {
   if (isRunning) {
     logger.warn('Scheduler already running, skipping duplicate start');
@@ -52,6 +66,7 @@ export function startScheduler(): void {
   logger.info('Starting internal cron scheduler', {
     publishInterval: `${PUBLISH_INTERVAL_MS / 1000}s`,
     tokenRefreshInterval: `${TOKEN_REFRESH_INTERVAL_MS / 1000 / 3600}h`,
+    videoCleanupInterval: `${VIDEO_CLEANUP_INTERVAL_MS / 1000 / 3600}h`,
   });
 
   // Delay first publish run by 30 seconds to let the server fully start
@@ -63,13 +78,20 @@ export function startScheduler(): void {
   setTimeout(() => runTokenRefresh(), 5 * 60_000);
 
   tokenRefreshIntervalId = setInterval(() => runTokenRefresh(), TOKEN_REFRESH_INTERVAL_MS);
+
+  // Delay first video cleanup by 10 minutes
+  setTimeout(() => runVideoCleanup(), 10 * 60_000);
+
+  videoCleanupIntervalId = setInterval(() => runVideoCleanup(), VIDEO_CLEANUP_INTERVAL_MS);
 }
 
 export function stopScheduler(): void {
   if (publishIntervalId) clearInterval(publishIntervalId);
   if (tokenRefreshIntervalId) clearInterval(tokenRefreshIntervalId);
+  if (videoCleanupIntervalId) clearInterval(videoCleanupIntervalId);
   publishIntervalId = null;
   tokenRefreshIntervalId = null;
+  videoCleanupIntervalId = null;
   isRunning = false;
   logger.info('Internal cron scheduler stopped');
 }
