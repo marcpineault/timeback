@@ -35,9 +35,9 @@ export interface SileroVadConfig {
 export const DEFAULT_VAD_CONFIG: SileroVadConfig = {
   threshold: 0.35,
   negThreshold: 0.15,
-  minSpeechDurationMs: 150,
-  minSilenceDurationMs: 150,
-  speechPadMs: 200,
+  minSpeechDurationMs: 100,
+  minSilenceDurationMs: 80,
+  speechPadMs: 0,
 };
 
 /**

@@ -25,14 +25,14 @@ export interface GapProcessingConfig {
 }
 
 export const DEFAULT_GAP_CONFIG: GapProcessingConfig = {
-  minRetainedGapMs: 300,
-  sentenceGapMs: 600,
-  clauseGapMs: 400,
-  midSentenceGapMs: 250,
-  paragraphGapMs: 800,
-  maxGapMs: 2000,
-  minSilenceToRemoveMs: 800,
-  breathHandling: 'reduce',
+  minRetainedGapMs: 8,
+  sentenceGapMs: 25,
+  clauseGapMs: 17,
+  midSentenceGapMs: 7,
+  paragraphGapMs: 35,
+  maxGapMs: 500,
+  minSilenceToRemoveMs: 80,
+  breathHandling: 'remove',
 };
 
 /**
