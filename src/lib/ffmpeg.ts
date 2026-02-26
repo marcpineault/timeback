@@ -924,7 +924,7 @@ async function runHybridPipeline(
     const fallbackTotalPad = fallbackPadMs * 2;
     gapConfig = {
       ...gapConfig,
-      minSilenceToRemoveMs: Math.max(50, gapConfig.minSilenceToRemoveMs + (refinementConfig.prePlosivePadMs + refinementConfig.postTrailingPadMs) - fallbackTotalPad),
+      minSilenceToRemoveMs: Math.max(20, gapConfig.minSilenceToRemoveMs + (refinementConfig.prePlosivePadMs + refinementConfig.postTrailingPadMs) - fallbackTotalPad),
     };
   }
 
