@@ -72,13 +72,10 @@ COPY --from=deps /app/node_modules/@img ./node_modules/@img
 COPY --from=deps /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
 COPY --from=deps /app/node_modules/openai ./node_modules/openai
 
-# Silero VAD: ONNX runtime (native addon) and VAD model
-COPY --from=deps /app/node_modules/onnxruntime-node ./node_modules/onnxruntime-node
+# Silero VAD: ONNX runtime (WASM backend — no native/glibc dependency) and VAD model
+COPY --from=deps /app/node_modules/onnxruntime-web ./node_modules/onnxruntime-web
+COPY --from=deps /app/node_modules/onnxruntime-common ./node_modules/onnxruntime-common
 COPY --from=deps /app/node_modules/@ricky0123 ./node_modules/@ricky0123
-
-# LD_LIBRARY_PATH so the dynamic linker finds libonnxruntime.so.1
-# (shipped alongside the native .node binding in onnxruntime-node)
-ENV LD_LIBRARY_PATH="/app/node_modules/onnxruntime-node/bin/napi-v6/linux/x64:${LD_LIBRARY_PATH}"
 
 EXPOSE 3000
 

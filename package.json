@@ -31,7 +31,7 @@
     "googleapis": "^170.1.0",
     "jszip": "^3.10.1",
     "next": "^16.1.6",
-    "onnxruntime-node": "^1.24.2",
+    "onnxruntime-web": "^1.24.2",
     "openai": "^6.16.0",
     "puppeteer-core": "^24.36.1",
     "react": "19.2.3",
