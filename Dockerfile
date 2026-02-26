@@ -3,7 +3,8 @@ FROM node:20-alpine AS build-base
 
 # ── Runtime base: includes system packages needed for media processing ─
 FROM node:20-alpine AS runtime-base
-RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu vips chromium nss freetype harfbuzz ca-certificates
+RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu vips chromium nss freetype harfbuzz ca-certificates \
+    gcompat libstdc++
 ENV CHROME_PATH=/usr/bin/chromium-browser
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
@@ -70,6 +71,14 @@ COPY --from=deps /app/node_modules/sharp ./node_modules/sharp
 COPY --from=deps /app/node_modules/@img ./node_modules/@img
 COPY --from=deps /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
 COPY --from=deps /app/node_modules/openai ./node_modules/openai
+
+# Silero VAD: ONNX runtime (native addon) and VAD model
+COPY --from=deps /app/node_modules/onnxruntime-node ./node_modules/onnxruntime-node
+COPY --from=deps /app/node_modules/@ricky0123 ./node_modules/@ricky0123
+
+# LD_LIBRARY_PATH so the dynamic linker finds libonnxruntime.so.1
+# (shipped alongside the native .node binding in onnxruntime-node)
+ENV LD_LIBRARY_PATH="/app/node_modules/onnxruntime-node/bin/napi-v6/linux/x64:${LD_LIBRARY_PATH}"
 
 EXPOSE 3000
 
