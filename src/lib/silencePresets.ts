@@ -38,39 +38,39 @@ export interface SilencePreset {
 export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
   jumpCut: {
     name: 'Jump Cut',
-    description: 'Fast-paced, TikTok/YouTube style',
-    speechPadMs: 80,
-    prePadMs: 60,
-    postPadMs: 80,
-    minSilenceToRemoveMs: 300,
-    minRetainedGapMs: 100,
-    sentenceGapMs: 250,
+    description: 'Fast-paced, TikTok/YouTube style — removes virtually all dead space',
+    speechPadMs: 50,
+    prePadMs: 40,
+    postPadMs: 50,
+    minSilenceToRemoveMs: 120,
+    minRetainedGapMs: 30,
+    sentenceGapMs: 60,
     breathHandling: 'remove',
-    vadThreshold: 0.45,
+    vadThreshold: 0.5,
   },
   natural: {
     name: 'Natural',
-    description: 'Conversational, podcast style (default)',
-    speechPadMs: 120,
-    prePadMs: 100,
-    postPadMs: 120,
-    minSilenceToRemoveMs: 500,
-    minRetainedGapMs: 200,
-    sentenceGapMs: 400,
-    breathHandling: 'reduce',
-    vadThreshold: 0.4,
+    description: 'Conversational, podcast style (default) — tight cuts, minimal dead space',
+    speechPadMs: 80,
+    prePadMs: 50,
+    postPadMs: 70,
+    minSilenceToRemoveMs: 200,
+    minRetainedGapMs: 50,
+    sentenceGapMs: 120,
+    breathHandling: 'remove',
+    vadThreshold: 0.45,
   },
   gentle: {
     name: 'Gentle',
     description: 'Minimal editing, presentations/lectures',
-    speechPadMs: 180,
-    prePadMs: 200,
-    postPadMs: 250,
-    minSilenceToRemoveMs: 700,
-    minRetainedGapMs: 300,
-    sentenceGapMs: 600,
-    breathHandling: 'keep',
-    vadThreshold: 0.35,
+    speechPadMs: 120,
+    prePadMs: 100,
+    postPadMs: 130,
+    minSilenceToRemoveMs: 350,
+    minRetainedGapMs: 100,
+    sentenceGapMs: 250,
+    breathHandling: 'reduce',
+    vadThreshold: 0.40,
   },
 };
 
@@ -94,7 +94,9 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
     ...DEFAULT_VAD_CONFIG,
     threshold: preset.vadThreshold,
     speechPadMs: 0,
-    minSilenceDurationMs: Math.min(preset.minSilenceToRemoveMs, 300),
+    // VAD must report gaps shorter than the removal threshold, otherwise they
+    // get bridged before gap processing ever sees them.
+    minSilenceDurationMs: Math.min(preset.minSilenceToRemoveMs, 200),
   };
 
   const refinementConfig: RefinementConfig = {
@@ -102,7 +104,7 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
     postTrailingPadMs: preset.postPadMs,
     // Small fixed merge distance — only combine segments that truly overlap or
     // are adjacent after padding. Content-level gap decisions belong in Layer 3.
-    mergeGapMs: 80,
+    mergeGapMs: 50,
   };
 
   // Word boundary refinement (Layer 2) extends segments by prePadMs/postPadMs,
@@ -110,7 +112,7 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
   // for this shrinkage, otherwise the effective removal threshold becomes
   // minSilenceToRemoveMs + prePadMs + postPadMs — far higher than intended.
   const totalPaddingMs = preset.prePadMs + preset.postPadMs;
-  const compensatedMinSilence = Math.max(100, preset.minSilenceToRemoveMs - totalPaddingMs);
+  const compensatedMinSilence = Math.max(50, preset.minSilenceToRemoveMs - totalPaddingMs);
 
   const gapConfig: GapProcessingConfig = {
     minRetainedGapMs: preset.minRetainedGapMs,
