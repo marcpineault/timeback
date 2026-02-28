@@ -9,18 +9,20 @@ import ScriptTemplates from '@/components/ideate/ScriptTemplates'
 import ContentCalendar from '@/components/ideate/ContentCalendar'
 import Teleprompter from '@/components/ideate/Teleprompter'
 import SwipeFile from '@/components/ideate/SwipeFile'
+import Research from '@/components/ideate/Research'
 import { useCreatorProfile, useScripts, useScript, type ScriptData } from '@/hooks/useIdeate'
 
-type Tab = 'ideas' | 'templates' | 'scripts' | 'calendar' | 'swipefile' | 'teleprompter' | 'profile'
+type Tab = 'ideas' | 'templates' | 'scripts' | 'calendar' | 'research' | 'swipefile' | 'teleprompter' | 'profile'
 
 interface DashboardProps {
   ideateUsed: number
   ideateLimit: number | null
   plan: string
   vertical?: string | null
+  hasInstagram: boolean
 }
 
-export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertical }: DashboardProps) {
+export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertical, hasInstagram }: DashboardProps) {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useCreatorProfile()
   const { scripts, loading: scriptsLoading, refetch: refetchScripts } = useScripts()
   const [activeTab, setActiveTab] = useState<Tab>('ideas')
@@ -68,6 +70,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
     { id: 'templates', label: 'Templates' },
     { id: 'scripts', label: 'Scripts' },
     { id: 'calendar', label: 'Calendar' },
+    { id: 'research', label: 'Research' },
     { id: 'swipefile', label: 'Inspiration' },
     { id: 'teleprompter', label: 'Teleprompter' },
     { id: 'profile', label: 'Profile' },
@@ -300,6 +303,37 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
                 setActiveTab('ideas')
               }}
             />
+          )}
+
+          {activeTab === 'research' && (
+            profile?.isComplete ? (
+              <Research
+                onUseAsIdea={() => {
+                  setActiveTab('ideas')
+                }}
+                hasInstagram={hasInstagram}
+              />
+            ) : (
+              <div className="bg-white border border-[#e0dbd4] rounded-2xl p-8 sm:p-12 text-center">
+                <div className="w-20 h-20 mx-auto mb-6 bg-[rgba(232,93,38,0.08)] rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-[#e85d26]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif" }}>
+                  Research top-performing videos
+                </h2>
+                <p className="text-[#8a8580] text-sm mb-6 max-w-md mx-auto">
+                  Complete your creator profile first so we can analyze competitor videos and adapt their hooks for your niche.
+                </p>
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
+                >
+                  Set Up Profile
+                </button>
+              </div>
+            )
           )}
 
           {activeTab === 'swipefile' && (

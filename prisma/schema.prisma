@@ -48,6 +48,10 @@ model User {
   ideas               Idea[]
   scripts             Script[]
   swipeEntries        SwipeEntry[]
+
+  // Research: top performing video discovery
+  topVideoSearches    TopVideoSearch[]
+  topVideos           TopVideo[]
 }
 
 model UserProcessingPreferences {
@@ -500,4 +504,76 @@ model ContentCalendar {
 
   @@index([vertical])
   @@index([vertical, month])
+}
+
+// ─── Research: Top Performing Video Discovery ────────────────────────
+
+model TopVideoSearch {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  searchType  String   // 'creator' | 'hashtag'
+  query       String   // Instagram handle or hashtag
+  platform    String   @default("instagram")
+
+  // Creator info (populated for creator searches)
+  creatorUsername    String?
+  creatorFollowers   Int?
+  creatorBio         String?
+
+  videos      TopVideo[]
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, searchType])
+}
+
+model TopVideo {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  searchId    String
+  search      TopVideoSearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+
+  // Real Instagram data
+  igMediaId         String?
+  permalink         String
+  caption           String   @default("")
+  mediaType         String   @default("VIDEO")
+  likeCount         Int      @default(0)
+  commentsCount     Int      @default(0)
+  videoTimestamp     DateTime?
+  creatorUsername    String?
+  creatorFollowers  Int?
+
+  // AI analysis fields
+  hook               String   @default("")
+  hookFormula        String   @default("")
+  hookAnalysis       String   @default("")
+  hookStrength       Int      @default(0)    // 1-10
+  contentStructure   String   @default("")
+  viralPattern       String   @default("")
+  whyItWorks         String   @default("")
+  targetEmotion      String   @default("")
+  engagementDriver   String   @default("")
+  adaptedHook        String   @default("")
+  adaptedHookVariations String[]
+  adaptationNotes    String   @default("")
+  tags               String[]
+  contentType        String   @default("")
+  format             String   @default("")
+
+  // User interaction
+  isSaved            Boolean  @default(false)
+  isUsedAsIdea       Boolean  @default(false)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isSaved])
+  @@index([searchId])
 }
