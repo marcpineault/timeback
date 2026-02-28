@@ -67,7 +67,7 @@ export async function lookupCreator(
     'media.limit(50){id,caption,like_count,comments_count,media_type,permalink,timestamp}',
   ].join(',');
 
-  const url = `${GRAPH_API_BASE}/${igUserId}?fields=business_discovery.param(username,${encodeURIComponent(username)}).fields(${fields})&access_token=${accessToken}`;
+  const url = `${GRAPH_API_BASE}/${igUserId}?fields=business_discovery.username(${encodeURIComponent(username)}){${fields}}&access_token=${accessToken}`;
 
   const res = await fetch(url);
 

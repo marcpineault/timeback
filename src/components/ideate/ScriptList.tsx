@@ -6,7 +6,6 @@ interface Props {
   scripts: ScriptData[]
   loading: boolean
   onViewScript: (script: ScriptData) => void
-  onOpenTeleprompter: (script: ScriptData) => void
   onRefresh: () => void
 }
 
@@ -17,7 +16,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   ARCHIVED: { bg: 'bg-gray-500/20', text: 'text-gray-500' },
 }
 
-export default function ScriptList({ scripts, loading, onViewScript, onOpenTeleprompter, onRefresh }: Props) {
+export default function ScriptList({ scripts, loading, onViewScript, onRefresh }: Props) {
   async function handleRate(e: React.MouseEvent, script: ScriptData, rating: 'up' | 'down') {
     e.stopPropagation()
     const newRating = script.rating === rating ? null : rating
@@ -104,15 +103,6 @@ export default function ScriptList({ scripts, loading, onViewScript, onOpenTelep
                 </button>
 
                 {/* Actions */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenTeleprompter(script)
-                  }}
-                  className="px-3 py-1.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full text-xs font-medium transition-colors"
-                >
-                  Teleprompter
-                </button>
                 <button
                   onClick={(e) => handleDelete(e, script)}
                   className="p-1.5 text-[#8a8580] hover:text-red-400 transition-colors"

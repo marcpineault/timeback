@@ -7,14 +7,12 @@ import ScriptList from '@/components/ideate/ScriptList'
 import ScriptView from '@/components/ideate/ScriptView'
 import ScriptTemplates from '@/components/ideate/ScriptTemplates'
 import ContentCalendar from '@/components/ideate/ContentCalendar'
-import Teleprompter from '@/components/ideate/Teleprompter'
-import SwipeFile from '@/components/ideate/SwipeFile'
 import Research from '@/components/ideate/Research'
-import { useCreatorProfile, useScripts, useScript, type ScriptData } from '@/hooks/useIdeate'
+import { useCreatorProfile, useScripts, type ScriptData } from '@/hooks/useIdeate'
 import UpgradeBanner from '@/components/upgrade/UpgradeBanner'
 import UsageWarningBanner from '@/components/upgrade/UsageWarningBanner'
 
-type Tab = 'ideas' | 'templates' | 'scripts' | 'calendar' | 'research' | 'swipefile' | 'teleprompter' | 'profile'
+type Tab = 'ideas' | 'templates' | 'scripts' | 'calendar' | 'research' | 'profile'
 
 interface DashboardProps {
   ideateUsed: number
@@ -28,9 +26,7 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
   const { profile, loading: profileLoading, refetch: refetchProfile } = useCreatorProfile()
   const { scripts, loading: scriptsLoading, refetch: refetchScripts } = useScripts()
   const [activeTab, setActiveTab] = useState<Tab>('ideas')
-  const [activeScriptId, setActiveScriptId] = useState<string | null>(null)
   const [viewingScript, setViewingScript] = useState<ScriptData | null>(null)
-  const { script: teleprompterScript, loading: scriptLoading } = useScript(activeScriptId)
 
   // Force profile tab if profile is incomplete
   useEffect(() => {
@@ -39,24 +35,9 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
     }
   }, [profile, profileLoading])
 
-  // Track a direct script object for teleprompter (used by templates)
-  const [directTeleprompterScript, setDirectTeleprompterScript] = useState<ScriptData | null>(null)
-
   // Cross-tab navigation state (calendar → templates with category, calendar → ideas with topic)
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState<string | null>(null)
   const [initialIdeaTopic, setInitialIdeaTopic] = useState<string | null>(null)
-
-  function handleOpenTeleprompter(script: ScriptData) {
-    // Templates pass a synthetic script object with template- prefix
-    if (script.id.startsWith('template-')) {
-      setDirectTeleprompterScript(script)
-      setActiveScriptId(null)
-    } else {
-      setDirectTeleprompterScript(null)
-      setActiveScriptId(script.id)
-    }
-    setActiveTab('teleprompter')
-  }
 
   function handleViewScript(script: ScriptData) {
     setViewingScript(script)
@@ -73,8 +54,6 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
     { id: 'scripts', label: 'Scripts' },
     { id: 'calendar', label: 'Calendar' },
     { id: 'research', label: 'Research' },
-    { id: 'swipefile', label: 'Inspiration' },
-    { id: 'teleprompter', label: 'Teleprompter' },
     { id: 'profile', label: 'Profile' },
   ]
 
@@ -285,8 +264,8 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
                         <span className="text-[#e85d26] text-xs font-bold">3</span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-[#0a0a0a]">Built-in teleprompter</p>
-                        <p className="text-xs text-[#8a8580]">Read your script while recording</p>
+                        <p className="text-sm font-medium text-[#0a0a0a]">Content calendar</p>
+                        <p className="text-xs text-[#8a8580]">Plan and schedule your content</p>
                       </div>
                     </div>
                   </div>
@@ -297,7 +276,6 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
 
           {activeTab === 'templates' && (
             <ScriptTemplates
-              onOpenTeleprompter={handleOpenTeleprompter}
               onScriptSaved={refetchScripts}
               initialCategory={templateCategoryFilter}
             />
@@ -308,7 +286,6 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
               <ScriptView
                 script={viewingScript}
                 onBack={handleBackToList}
-                onOpenTeleprompter={handleOpenTeleprompter}
                 onScriptUpdated={(updated) => setViewingScript(updated)}
               />
             ) : (
@@ -316,7 +293,6 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
                 scripts={scripts}
                 loading={scriptsLoading}
                 onViewScript={handleViewScript}
-                onOpenTeleprompter={handleOpenTeleprompter}
                 onRefresh={refetchScripts}
               />
             )
@@ -362,72 +338,6 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
                 >
                   Set Up Profile
                 </button>
-              </div>
-            )
-          )}
-
-          {activeTab === 'swipefile' && (
-            profile?.isComplete ? (
-              <SwipeFile
-                onUseAsIdea={() => {
-                  setActiveTab('ideas')
-                }}
-              />
-            ) : (
-              <div className="bg-white border border-[#e0dbd4] rounded-2xl p-8 sm:p-12 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 bg-[rgba(232,93,38,0.08)] rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-[#e85d26]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-semibold text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif" }}>
-                  Build your inspiration library
-                </h2>
-                <p className="text-[#8a8580] text-sm mb-6 max-w-md mx-auto">
-                  We need your niche and audience info to find relevant content patterns and trending topics.
-                </p>
-                <button
-                  onClick={() => setActiveTab('profile')}
-                  className="px-6 py-2.5 bg-[#e85d26] hover:bg-[#d14d1a] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
-                >
-                  Set Up Profile
-                </button>
-              </div>
-            )
-          )}
-
-          {activeTab === 'teleprompter' && (
-            (teleprompterScript || directTeleprompterScript) ? (
-              <Teleprompter
-                script={(directTeleprompterScript || teleprompterScript)!}
-                onClose={() => {
-                  setActiveScriptId(null)
-                  setDirectTeleprompterScript(null)
-                  setActiveTab('scripts')
-                }}
-              />
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-[#8a8580] mb-2">No script selected</p>
-                <p className="text-[#8a8580] text-sm mb-4">
-                  Generate a script from the Ideas tab, then open it in the teleprompter.
-                </p>
-                {scripts.length > 0 && (
-                  <div className="mt-6">
-                    <p className="text-[#8a8580] text-sm mb-3">Or pick a recent script:</p>
-                    <div className="flex flex-col items-center gap-2">
-                      {scripts.slice(0, 3).map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => handleOpenTeleprompter(s)}
-                          className="text-[#e85d26] hover:text-[#d14d1a] text-sm"
-                        >
-                          {s.title}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )
           )}
