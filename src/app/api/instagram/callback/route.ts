@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       if (!tokenScopes.includes('pages_show_list') || !tokenScopes.includes('pages_read_engagement')) {
         return redirectToSchedule('/dashboard/schedule?error=missing_page_permissions');
       }
-      if (!tokenScopes.includes('instagram_basic')) {
+      if (!tokenScopes.includes('instagram_manage_insights')) {
         return redirectToSchedule('/dashboard/schedule?error=missing_instagram_permissions');
       }
       if (pagesFound === 0) {

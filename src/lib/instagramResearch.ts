@@ -60,7 +60,7 @@ export async function lookupCreator(
 
   // Check token permissions before making the API call so we can give
   // precise error messages: "missing scope → reconnect" vs "app not approved"
-  let tokenHasInstagramBasic = false;
+  let tokenHasRequiredScope = false;
   try {
     const { appId, appSecret } = getInstagramConfig();
     const appAccessToken = `${appId}|${appSecret}`;
@@ -70,7 +70,9 @@ export async function lookupCreator(
     if (debugRes.ok) {
       const debugData = await debugRes.json();
       const scopes: string[] = debugData.data?.scopes || [];
-      tokenHasInstagramBasic = scopes.includes('instagram_basic');
+      // instagram_basic was deprecated (Dec 2024); instagram_manage_insights is its replacement
+      tokenHasRequiredScope =
+        scopes.includes('instagram_manage_insights') || scopes.includes('instagram_basic');
       logger.info('Business Discovery token debug', {
         type: debugData.data?.type,
         isValid: debugData.data?.is_valid,
@@ -78,11 +80,11 @@ export async function lookupCreator(
         appId: debugData.data?.app_id,
         expiresAt: debugData.data?.expires_at,
         granularScopes: debugData.data?.granular_scopes,
-        tokenHasInstagramBasic,
+        tokenHasRequiredScope,
       });
 
-      // Token is missing instagram_basic — reconnection will fix this
-      if (!tokenHasInstagramBasic) {
+      // Token is missing required scope — reconnection will fix this
+      if (!tokenHasRequiredScope) {
         throw new Error(
           'Your Instagram connection is missing required permissions. Please disconnect and reconnect your Instagram account to grant the necessary access.'
         );
@@ -121,13 +123,13 @@ export async function lookupCreator(
 
     // Permission error — distinguish between missing token scope and app not approved
     if (err.error?.code === 10) {
-      if (!tokenHasInstagramBasic) {
+      if (!tokenHasRequiredScope) {
         throw new Error(
-          'Your Instagram connection is missing the "instagram_basic" permission. Please disconnect and reconnect your Instagram account.'
+          'Your Instagram connection is missing required permissions. Please disconnect and reconnect your Instagram account.'
         );
       }
       throw new Error(
-        'Unable to search other creators. Your Facebook App needs "instagram_basic" approved through App Review before regular users can use this feature. In the meantime, only Facebook App admins, developers, and testers can search creators.'
+        'Unable to search other creators. Your Facebook App needs "instagram_manage_insights" approved through App Review before regular users can use this feature. In the meantime, only Facebook App admins, developers, and testers can search creators.'
       );
     }
 
