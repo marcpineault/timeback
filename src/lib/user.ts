@@ -1,6 +1,7 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { prisma } from './db'
 import { PLANS, PlanType } from './plans'
+import { fireEmailEvent } from './emailEvents'
 
 export async function getOrCreateUser() {
   const clerkUser = await currentUser()
@@ -72,6 +73,17 @@ export async function canProcessVideo(userId: string): Promise<{ allowed: boolea
   }
 
   if (user.videosThisMonth >= plan.videosPerMonth) {
+    // Fire email event for limit reached
+    fireEmailEvent({
+      email: user.email,
+      userId: user.id,
+      eventName: 'limit_reached',
+      properties: {
+        resource: 'videos',
+        plan: user.plan,
+      },
+    })
+
     return {
       allowed: false,
       reason: `You've reached your monthly limit of ${plan.videosPerMonth} videos. Upgrade your plan to process more videos.`,
@@ -82,12 +94,41 @@ export async function canProcessVideo(userId: string): Promise<{ allowed: boolea
 }
 
 export async function incrementVideoCount(userId: string) {
-  await prisma.user.update({
+  const user = await prisma.user.update({
     where: { id: userId },
     data: {
       videosThisMonth: { increment: 1 },
     },
   })
+
+  const plan = PLANS[user.plan as PlanType]
+  const newCount = user.videosThisMonth
+
+  // Fire email event for first video processed
+  if (newCount === 1) {
+    fireEmailEvent({
+      email: user.email,
+      userId: user.id,
+      eventName: 'first_video_processed',
+    })
+  }
+
+  // Fire email event when crossing 80% usage threshold
+  if (plan.videosPerMonth !== null) {
+    const threshold = Math.ceil(plan.videosPerMonth * 0.8)
+    if (newCount === threshold) {
+      fireEmailEvent({
+        email: user.email,
+        userId: user.id,
+        eventName: 'usage_80_percent',
+        properties: {
+          resource: 'videos',
+          used: newCount,
+          limit: plan.videosPerMonth,
+        },
+      })
+    }
+  }
 }
 
 export async function canGenerateIdeate(userId: string): Promise<{ allowed: boolean; reason?: string }> {

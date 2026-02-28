@@ -3,6 +3,7 @@ import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/db'
 import Stripe from 'stripe'
 import { logger } from '@/lib/logger'
+import { fireEmailEvent } from '@/lib/emailEvents'
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -31,11 +32,22 @@ export async function POST(req: Request) {
           const plan = session.metadata?.plan as 'PRO' | 'CREATOR'
 
           if (userId && plan) {
-            await prisma.user.update({
+            const updatedUser = await prisma.user.update({
               where: { id: userId },
               data: {
                 plan,
                 stripeSubscriptionId: session.subscription as string,
+              },
+            })
+
+            // Fire Loops event for welcome-to-paid email
+            fireEmailEvent({
+              email: updatedUser.email,
+              userId: updatedUser.id,
+              eventName: 'subscription_started',
+              properties: {
+                plan,
+                upgradeSource: session.metadata?.upgradeSource || 'unknown',
               },
             })
           }
@@ -138,6 +150,18 @@ export async function POST(req: Request) {
               stripeSubscriptionId: null,
             },
           })
+
+          // Fire Loops events for win-back drip sequence
+          for (const u of affectedUsers) {
+            fireEmailEvent({
+              email: u.email,
+              userId: u.id,
+              eventName: 'subscription_cancelled',
+              properties: {
+                previousPlan: u.plan,
+              },
+            })
+          }
         } else {
           logger.warn('Subscription deleted but no users found with customer ID', {
             customerId,

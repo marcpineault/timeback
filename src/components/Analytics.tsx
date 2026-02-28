@@ -78,6 +78,38 @@ type AnalyticsEventParams = {
 
   // Dashboard suggestion events
   dashboard_suggestion_clicked: { suggestion_type: string; category?: string };
+
+  // Upgrade/conversion events
+  upgrade_prompt_shown: {
+    prompt_type: string;    // 'banner' | 'modal' | 'nav_pill'
+    context: string;        // 'usage_warning' | 'watermark' | 'resolution' | 'limit_reached' | 'general'
+    current_plan: string;
+    location: string;       // 'dashboard' | 'ideate' | 'editor' | 'nav'
+  };
+  upgrade_prompt_clicked: {
+    prompt_type: string;
+    context: string;
+    current_plan: string;
+    target_plan: string;
+    location: string;
+  };
+  upgrade_prompt_dismissed: {
+    prompt_type: string;
+    context: string;
+    current_plan: string;
+    location: string;
+  };
+  limit_warning_shown: {
+    resource: string;       // 'videos' | 'ideate_generations'
+    used: number;
+    limit: number;
+    percentage: number;
+    current_plan: string;
+  };
+  limit_reached: {
+    resource: string;
+    current_plan: string;
+  };
 };
 
 type AnalyticsEvent = keyof AnalyticsEventParams;
@@ -183,4 +215,16 @@ export const analytics = {
   // Dashboard suggestions
   trackDashboardSuggestionClicked: (suggestionType: string, category?: string) =>
     trackEvent('dashboard_suggestion_clicked', { suggestion_type: suggestionType, category }),
+
+  // Upgrade funnel
+  trackUpgradePromptShown: (promptType: string, context: string, currentPlan: string, location: string) =>
+    trackEvent('upgrade_prompt_shown', { prompt_type: promptType, context, current_plan: currentPlan, location }),
+  trackUpgradePromptClicked: (promptType: string, context: string, currentPlan: string, targetPlan: string, location: string) =>
+    trackEvent('upgrade_prompt_clicked', { prompt_type: promptType, context, current_plan: currentPlan, target_plan: targetPlan, location }),
+  trackUpgradePromptDismissed: (promptType: string, context: string, currentPlan: string, location: string) =>
+    trackEvent('upgrade_prompt_dismissed', { prompt_type: promptType, context, current_plan: currentPlan, location }),
+  trackLimitWarningShown: (resource: string, used: number, limit: number, currentPlan: string) =>
+    trackEvent('limit_warning_shown', { resource, used, limit, percentage: Math.round((used / limit) * 100), current_plan: currentPlan }),
+  trackLimitReached: (resource: string, currentPlan: string) =>
+    trackEvent('limit_reached', { resource, current_plan: currentPlan }),
 };

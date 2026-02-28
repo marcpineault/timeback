@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     const text = await req.text()
     const params = new URLSearchParams(text)
     const plan = params.get('plan') as 'PRO' | 'CREATOR'
+    const source = params.get('source') || 'pricing_page'
 
     if (!plan || !['PRO', 'CREATOR'].includes(plan)) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
@@ -126,6 +127,7 @@ export async function POST(req: Request) {
       metadata: {
         userId: user.id,
         plan,
+        upgradeSource: source,
       },
       subscription_data: {
         description: `TimeBack ${planDetails.name} Plan: ${planDescription}`,
