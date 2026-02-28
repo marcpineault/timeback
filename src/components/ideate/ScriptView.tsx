@@ -3,91 +3,30 @@
 import { useState, useEffect } from 'react'
 import { rateScript, type ScriptData } from '@/hooks/useIdeate'
 
-type HeadlineStyle = 'classic' | 'minimal'
-
 interface Props {
   script: ScriptData
   onBack: () => void
-  onOpenTeleprompter: (script: ScriptData) => void
   onScriptUpdated: (script: ScriptData) => void
-  headlineStyle?: HeadlineStyle
 }
 
-function renderScriptWithNotes(text: string) {
-  const parts = text.split(/(\[TEXT OVERLAY:[^\]]*\]|\[B-ROLL:[^\]]*\]|\[ENERGY SHIFT:[^\]]*\]|\[PATTERN INTERRUPT\]|\[PAUSE\])/)
-
-  return parts.map((part, i) => {
-    if (part.startsWith('[TEXT OVERLAY:')) {
-      const content = part.replace('[TEXT OVERLAY:', '').replace(']', '').trim().replace(/^"|"$/g, '')
-      return (
-        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded text-xs font-medium mx-0.5">
-          TEXT: {content}
-        </span>
-      )
-    }
-    if (part.startsWith('[B-ROLL:')) {
-      const content = part.replace('[B-ROLL:', '').replace(']', '').trim()
-      return (
-        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-500/15 text-gray-400 rounded text-xs italic mx-0.5">
-          B-Roll: {content}
-        </span>
-      )
-    }
-    if (part.startsWith('[ENERGY SHIFT:')) {
-      const content = part.replace('[ENERGY SHIFT:', '').replace(']', '').trim()
-      return (
-        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500/15 text-yellow-400 rounded text-xs mx-0.5">
-          Energy: {content}
-        </span>
-      )
-    }
-    if (part === '[PATTERN INTERRUPT]') {
-      return (
-        <span key={i} className="block my-2 border-t border-dashed border-orange-500/40 pt-1 text-orange-400 text-[10px] uppercase tracking-wider">
-          pattern interrupt — cut/zoom/angle change
-        </span>
-      )
-    }
-    if (part === '[PAUSE]') {
-      return (
-        <span key={i} className="text-[#8a8580] text-xs mx-0.5">||</span>
-      )
-    }
-    return <span key={i} className="text-[#0a0a0a]">{part}</span>
-  })
-}
-
-export default function ScriptView({ script, onBack, onOpenTeleprompter, onScriptUpdated, headlineStyle: initialStyle = 'classic' }: Props) {
-  const [hook, setHook] = useState(script.hook)
-  const [body, setBody] = useState(script.body)
-  const [cta, setCta] = useState(script.cta)
+export default function ScriptView({ script, onBack, onScriptUpdated }: Props) {
+  const [fullScript, setFullScript] = useState(script.fullScript)
   const [headlineClean, setHeadlineClean] = useState(script.headlineClean || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [currentRating, setCurrentRating] = useState<string | null>(script.rating)
   const [showSpcl, setShowSpcl] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const [style, setStyle] = useState<HeadlineStyle>(initialStyle)
 
   useEffect(() => {
-    setHook(script.hook)
-    setBody(script.body)
-    setCta(script.cta)
+    setFullScript(script.fullScript)
     setHeadlineClean(script.headlineClean || '')
     setCurrentRating(script.rating)
   }, [script])
 
-  const fullText = `${hook}\n\n${body}\n\n${cta}`
-  const spokenText = fullText
-    .replace(/\[PAUSE\]/g, '')
-    .replace(/\[TEXT OVERLAY:[^\]]*\]/g, '')
-    .replace(/\[B-ROLL:[^\]]*\]/g, '')
-    .replace(/\[ENERGY SHIFT:[^\]]*\]/g, '')
-    .replace(/\[PATTERN INTERRUPT\]/g, '')
-  const wordCount = spokenText.split(/\s+/).filter(Boolean).length
+  const wordCount = fullScript.split(/\s+/).filter(Boolean).length
   const estimatedDuration = Math.round((wordCount / 150) * 60)
 
-  const hasChanges = hook !== script.hook || body !== script.body || cta !== script.cta || headlineClean !== (script.headlineClean || '')
+  const hasChanges = fullScript !== script.fullScript || headlineClean !== (script.headlineClean || '')
 
   async function handleSave() {
     setSaving(true)
@@ -96,7 +35,7 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          hook, body, cta, fullScript: fullText,
+          fullScript,
           ...(headlineClean !== (script.headlineClean || '') ? { headlineClean } : {}),
         }),
       })
@@ -137,14 +76,6 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Style toggle */}
-          <button
-            onClick={() => setStyle(style === 'classic' ? 'minimal' : 'classic')}
-            className="text-[#8a8580] hover:text-[#0a0a0a] text-xs transition-colors px-2 py-1 rounded-md border border-[#e0dbd4] hover:border-[#8a8580]"
-            title={`Switch to ${style === 'classic' ? 'minimal' : 'classic'} style`}
-          >
-            {style === 'classic' ? 'Minimal' : 'Classic'}
-          </button>
           {/* Rating */}
           <button
             onClick={() => handleRate('up')}
@@ -236,91 +167,15 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
         </div>
       )}
 
-      {/* Script Sections */}
-      {style === 'classic' ? (
-        <div className="space-y-4 mb-6">
-          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-            <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Hook (Opening Line)</label>
-            <textarea
-              value={hook}
-              onChange={(e) => setHook(e.target.value)}
-              rows={2}
-              className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
-            />
-          </div>
-
-          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-            <label className="block text-[#e85d26] text-xs font-semibold uppercase tracking-wider mb-2">Body</label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={10}
-              className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
-            />
-          </div>
-
-          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-            <label className="block text-green-400 text-xs font-semibold uppercase tracking-wider mb-2">Call to Action</label>
-            <textarea
-              value={cta}
-              onChange={(e) => setCta(e.target.value)}
-              rows={2}
-              className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6 mb-6">
-          <div>
-            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Hook (Opening Line)</label>
-            <textarea
-              value={hook}
-              onChange={(e) => setHook(e.target.value)}
-              rows={2}
-              className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Body</label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={10}
-              className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.1rem' }}>Call to Action</label>
-            <textarea
-              value={cta}
-              onChange={(e) => setCta(e.target.value)}
-              rows={2}
-              className="w-full bg-transparent border-b border-[#e0dbd4] text-[#0a0a0a] px-0 py-3 text-sm focus:outline-none focus:border-[#0a0a0a] resize-none transition-colors"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Script Preview with Production Notes */}
-      {(fullText.includes('[TEXT OVERLAY:') || fullText.includes('[PATTERN INTERRUPT]') || fullText.includes('[B-ROLL:') || fullText.includes('[ENERGY SHIFT:')) && (
-        <div className="mb-6">
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className="text-[#8a8580] hover:text-[#0a0a0a] text-sm transition-colors flex items-center gap-1 mb-3"
-          >
-            <span>{showPreview ? '▼' : '▶'}</span> Production Notes Preview
-          </button>
-          {showPreview && (
-            <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5">
-              <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                {renderScriptWithNotes(fullText)}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Script */}
+      <div className="bg-white border border-[#e0dbd4] rounded-2xl p-5 mb-6">
+        <textarea
+          value={fullScript}
+          onChange={(e) => setFullScript(e.target.value)}
+          rows={16}
+          className="w-full bg-[#f5f0e8] border border-[#e0dbd4] text-[#0a0a0a] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e85d26] focus:border-[#e85d26] resize-none"
+        />
+      </div>
 
       {/* SPCL Breakdown */}
       {spcl && (
@@ -363,8 +218,8 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
       )}
 
       {/* Actions */}
-      <div className="flex flex-wrap items-center gap-3">
-        {hasChanges && (
+      {hasChanges && (
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleSave}
             disabled={saving}
@@ -372,14 +227,8 @@ export default function ScriptView({ script, onBack, onOpenTeleprompter, onScrip
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
           </button>
-        )}
-        <button
-          onClick={() => onOpenTeleprompter({ ...script, hook, body, cta, fullScript: fullText })}
-          className="px-5 py-2.5 bg-[#f5f0e8] hover:bg-[#e0dbd4] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors"
-        >
-          Open in Teleprompter
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
