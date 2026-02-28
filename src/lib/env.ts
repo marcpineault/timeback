@@ -43,6 +43,9 @@ const ENV_VARS: EnvVar[] = [
   { name: 'SENTRY_DSN', required: false, description: 'Sentry DSN for server-side error tracking' },
   { name: 'NEXT_PUBLIC_SENTRY_DSN', required: false, description: 'Sentry DSN for client-side error tracking' },
 
+  // Email marketing (Loops)
+  { name: 'LOOPS_API_KEY', required: false, description: 'Loops.so API key for email marketing events' },
+
   // App config
   { name: 'NEXT_PUBLIC_APP_URL', required: false, description: 'Public URL of the application' },
 ];

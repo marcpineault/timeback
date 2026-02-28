@@ -11,6 +11,8 @@ import Teleprompter from '@/components/ideate/Teleprompter'
 import SwipeFile from '@/components/ideate/SwipeFile'
 import Research from '@/components/ideate/Research'
 import { useCreatorProfile, useScripts, useScript, type ScriptData } from '@/hooks/useIdeate'
+import UpgradeBanner from '@/components/upgrade/UpgradeBanner'
+import UsageWarningBanner from '@/components/upgrade/UsageWarningBanner'
 
 type Tab = 'ideas' | 'templates' | 'scripts' | 'calendar' | 'research' | 'swipefile' | 'teleprompter' | 'profile'
 
@@ -137,7 +139,12 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
               </div>
               <div className="w-full bg-[#e0dbd4] rounded-full h-1.5">
                 <div
-                  className="bg-[#e85d26] h-1.5 rounded-full transition-all"
+                  className={`h-1.5 rounded-full transition-all ${
+                    genUsagePercent >= 100 ? 'bg-red-500' :
+                    genUsagePercent >= 80 ? 'bg-amber-500' :
+                    genUsagePercent >= 60 ? 'bg-[#e85d26]' :
+                    'bg-green-500'
+                  }`}
                   style={{ width: `${genUsagePercent}%` }}
                 />
               </div>
@@ -160,6 +167,29 @@ export default function IdeateDashboard({ ideateUsed, ideateLimit, plan, vertica
             )}
           </div>
         </div>
+      )}
+
+      {/* Usage warning for FREE users approaching limit */}
+      {plan === 'FREE' && ideateLimit !== null && genUsagePercent >= 80 && genUsagePercent < 100 && genRemaining !== null && (
+        <UsageWarningBanner
+          remaining={genRemaining}
+          resource="ideate_generations"
+          used={ideateUsed}
+          limit={ideateLimit}
+          plan={plan}
+        />
+      )}
+
+      {/* Upgrade banner at 80%+ usage */}
+      {plan === 'FREE' && ideateLimit !== null && genUsagePercent >= 80 && (
+        <UpgradeBanner
+          context="usage_warning"
+          plan={plan}
+          ideateUsed={ideateUsed}
+          ideateLimit={ideateLimit}
+          location="ideate"
+          dismissKey="tb_upgrade_dismissed_ideate_usage"
+        />
       )}
 
       {/* Tabs */}

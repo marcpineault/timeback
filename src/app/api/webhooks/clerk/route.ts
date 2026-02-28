@@ -2,6 +2,7 @@ import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import { WebhookEvent } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/db'
+import { fireEmailEvent } from '@/lib/emailEvents'
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET
@@ -48,6 +49,17 @@ export async function POST(req: Request) {
           clerkId: id,
           email,
           name: [first_name, last_name].filter(Boolean).join(' ') || null,
+        },
+      })
+
+      // Fire Loops event for welcome drip sequence
+      fireEmailEvent({
+        email,
+        userId: id,
+        eventName: 'user_signed_up',
+        properties: {
+          firstName: first_name || '',
+          lastName: last_name || '',
         },
       })
     }

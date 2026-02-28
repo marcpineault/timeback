@@ -10,6 +10,7 @@ import GoogleDriveUpload from '@/components/GoogleDriveUpload'
 import GoogleDriveImport from '@/components/GoogleDriveImport'
 import ScheduleModal from '@/components/schedule/ScheduleModal'
 import Link from 'next/link'
+import UpgradeBanner from '@/components/upgrade/UpgradeBanner'
 
 interface EnabledFeatures {
   speechCorrection: boolean
@@ -1237,6 +1238,18 @@ export default function VideoProcessor({
               url: v.downloadUrl!,
             }))}
           />
+
+          {/* Watermark upgrade prompt for FREE users */}
+          {hasWatermark && (
+            <div className="mt-4">
+              <UpgradeBanner
+                context="watermark"
+                plan="FREE"
+                location="editor"
+                showDismiss={false}
+              />
+            </div>
+          )}
 
           {/* Instagram Scheduling - only for beta users */}
           {enabledFeatures.instagramScheduling && completedVideos.filter(v => v.videoId).length > 0 && (

@@ -62,6 +62,14 @@ export default async function IdeatePage() {
             Tutorials
           </a>
           <Link href="/account/subscription">Subscription</Link>
+          {usage?.plan === 'FREE' && (
+            <Link
+              href="/pricing?source=nav_pill"
+              className="px-3 py-1 bg-[rgba(232,93,38,0.1)] text-[#e85d26] text-xs font-semibold rounded-full border border-[#e85d26]/30 hover:bg-[rgba(232,93,38,0.2)] transition-colors"
+            >
+              Upgrade
+            </Link>
+          )}
           <UserButton afterSignOutUrl="/" />
         </div>
       </nav>

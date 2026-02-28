@@ -10,6 +10,8 @@ import OnboardingBanner from '@/components/OnboardingBanner'
 import DashboardSuggestions from '@/components/DashboardSuggestions'
 import Link from 'next/link'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
+import UpgradeBanner from '@/components/upgrade/UpgradeBanner'
+import UsageWarningBanner from '@/components/upgrade/UsageWarningBanner'
 
 export default async function DashboardPage() {
   let user
@@ -107,6 +109,14 @@ export default async function DashboardPage() {
             Tutorials
           </a>
           <Link href="/account/subscription">Subscription</Link>
+          {usage.plan === 'FREE' && (
+            <Link
+              href="/pricing?source=nav_pill"
+              className="px-3 py-1 bg-[rgba(232,93,38,0.1)] text-[#e85d26] text-xs font-semibold rounded-full border border-[#e85d26]/30 hover:bg-[rgba(232,93,38,0.2)] transition-colors"
+            >
+              Upgrade
+            </Link>
+          )}
           <UserButton afterSignOutUrl="/" />
         </div>
       </nav>
@@ -156,16 +166,77 @@ export default async function DashboardPage() {
           </div>
           <div className="w-full bg-[#e0dbd4] rounded-full h-2">
             <div
-              className="bg-[#e85d26] h-2 rounded-full transition-all"
+              className={`h-2 rounded-full transition-all ${
+                usagePercentage >= 100 ? 'bg-red-500' :
+                usagePercentage >= 80 ? 'bg-amber-500' :
+                usagePercentage >= 60 ? 'bg-[#e85d26]' :
+                'bg-green-500'
+              }`}
               style={{ width: `${Math.min(usagePercentage, 100)}%` }}
             />
           </div>
-          {usage.videosRemaining !== null && usage.videosRemaining <= 0 && (
-            <p className="text-amber-600 text-sm mt-2">
-              You&apos;ve reached your monthly limit. Upgrade to process more videos.
+          {usage.videosRemaining !== null && (
+            <p className={`text-sm mt-2 ${
+              usage.videosRemaining <= 0 ? 'text-red-500 font-semibold' :
+              usage.videosRemaining <= 1 ? 'text-red-500' :
+              usage.videosRemaining <= 2 ? 'text-amber-500' :
+              'text-[#8a8580]'
+            }`}>
+              {usage.videosRemaining <= 0
+                ? "You've reached your monthly limit. Upgrade to process more videos."
+                : `${usage.videosRemaining} video${usage.videosRemaining !== 1 ? 's' : ''} remaining this month`}
             </p>
           )}
+          {/* AI generation usage for FREE users */}
+          {usage.plan === 'FREE' && usage.ideateRemaining !== null && usage.planDetails.ideateGenerationsPerMonth && (
+            <div className="mt-3 pt-3 border-t border-[#e0dbd4]">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[#8a8580] text-xs">
+                  {usage.ideateUsed} of {usage.planDetails.ideateGenerationsPerMonth} AI generations used
+                </p>
+                <span className={`text-xs ${
+                  usage.ideateRemaining <= 0 ? 'text-red-500 font-semibold' :
+                  usage.ideateRemaining <= 1 ? 'text-amber-500' :
+                  'text-[#8a8580]'
+                }`}>
+                  {usage.ideateRemaining} remaining
+                </span>
+              </div>
+              <div className="w-full bg-[#e0dbd4] rounded-full h-1.5">
+                <div
+                  className={`h-1.5 rounded-full transition-all ${
+                    usage.ideateRemaining <= 0 ? 'bg-red-500' :
+                    usage.ideateRemaining <= 1 ? 'bg-amber-500' :
+                    'bg-[#e85d26]'
+                  }`}
+                  style={{ width: `${Math.min((usage.ideateUsed / usage.planDetails.ideateGenerationsPerMonth) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Usage Warning Banner — shows at 80%+ usage for FREE users */}
+        {usage.plan === 'FREE' && usage.videosRemaining !== null && usage.planDetails.videosPerMonth && usagePercentage >= 80 && usagePercentage < 100 && (
+          <UsageWarningBanner
+            remaining={usage.videosRemaining}
+            resource="videos"
+            used={usage.videosUsed}
+            limit={usage.planDetails.videosPerMonth}
+            plan={usage.plan}
+          />
+        )}
+
+        {/* Upgrade Banner — shows at 80%+ for contextual upgrade prompt */}
+        {usage.plan === 'FREE' && usagePercentage >= 80 && (
+          <UpgradeBanner
+            context="usage_warning"
+            plan={usage.plan}
+            videosUsed={usage.videosUsed}
+            videosLimit={usage.planDetails.videosPerMonth}
+            location="dashboard"
+          />
+        )}
 
         {/* Quick Stats Cards */}
         <div className="flex gap-3 mb-6 sm:mb-8">
