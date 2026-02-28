@@ -43,6 +43,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!igAccount.userAccessToken) {
+      return NextResponse.json(
+        { error: 'Please reconnect your Instagram account to enable hashtag research' },
+        { status: 400 }
+      );
+    }
+
     // Require creator profile
     const profile = await prisma.creatorProfile.findUnique({
       where: { userId: user.id },
@@ -56,9 +63,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Search hashtag on Instagram
+    // Instagram research APIs require a User Access Token, not a Page Access Token
     const { hashtag: cleanTag, videos } = await searchHashtagTopMedia(
       igAccount.instagramUserId,
-      igAccount.accessToken,
+      igAccount.userAccessToken,
       hashtag
     );
 

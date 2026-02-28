@@ -43,6 +43,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!igAccount.userAccessToken) {
+      return NextResponse.json(
+        { error: 'Please reconnect your Instagram account to enable creator research' },
+        { status: 400 }
+      );
+    }
+
     // Require creator profile
     const profile = await prisma.creatorProfile.findUnique({
       where: { userId: user.id },
@@ -56,9 +63,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up the creator on Instagram
+    // Business Discovery API requires a User Access Token, not a Page Access Token
     const { creator, videos } = await lookupCreator(
       igAccount.instagramUserId,
-      igAccount.accessToken,
+      igAccount.userAccessToken,
       username
     );
 
