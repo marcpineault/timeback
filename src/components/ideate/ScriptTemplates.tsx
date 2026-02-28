@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import type { ScriptData } from '@/hooks/useIdeate'
 import { analytics } from '@/components/Analytics'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -19,7 +18,6 @@ interface ScriptTemplate {
 }
 
 interface Props {
-  onOpenTeleprompter: (script: ScriptData) => void
   onScriptSaved: () => void
   initialCategory?: string | null
 }
@@ -104,7 +102,7 @@ function applyMarketReplace(text: string, market: string | null): string {
 
 // ─── Component ──────────────────────────────────────────────────────
 
-export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, initialCategory }: Props) {
+export default function ScriptTemplates({ onScriptSaved, initialCategory }: Props) {
   const [templates, setTemplates] = useState<ScriptTemplate[]>([])
   const [vertical, setVertical] = useState<string | null>(null)
   const [market, setMarket] = useState<string | null>(null)
@@ -175,37 +173,6 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleOpenInTeleprompter = () => {
-    if (!selectedTemplate) return
-    analytics.trackTemplateOpenedInTeleprompter(selectedTemplate.id)
-    const text = applyMarketReplace(selectedTemplate.scriptBody, market)
-    // Create a temporary ScriptData-compatible object for the teleprompter
-    const tempScript: ScriptData = {
-      id: `template-${selectedTemplate.id}`,
-      ideaId: null,
-      title: selectedTemplate.title,
-      hook: '',
-      body: text,
-      cta: '',
-      fullScript: text,
-      estimatedDuration: Math.round((selectedTemplate.wordCount / 150) * 60),
-      wordCount: selectedTemplate.wordCount,
-      spclBreakdown: null,
-      headlineText: null,
-      headlineClean: null,
-      accentWords: [],
-      openingLine: null,
-      hookFormulaUsed: null,
-      hookStrengthNotes: null,
-      isEdited: false,
-      version: 1,
-      rating: null,
-      status: 'DRAFT',
-      createdAt: new Date().toISOString(),
-    }
-    onOpenTeleprompter(tempScript)
   }
 
   // ─── Empty / Fallback States ──────────────────────────────────
@@ -400,15 +367,6 @@ export default function ScriptTemplates({ onOpenTeleprompter, onScriptSaved, ini
               )}
             </button>
 
-            <button
-              onClick={handleOpenInTeleprompter}
-              className="flex-1 px-4 py-2.5 border border-[#e0dbd4] hover:border-[#8a8580] text-[#0a0a0a] rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              Open in Teleprompter
-            </button>
           </div>
         </div>
       </div>
