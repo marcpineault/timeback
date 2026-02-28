@@ -6,7 +6,7 @@
  * Business/Creator account for API access.
  */
 
-import { GRAPH_API_BASE, classifyFacebookError } from './instagram';
+import { GRAPH_API_BASE, classifyFacebookError, getInstagramConfig } from './instagram';
 import { logger } from './logger';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -58,6 +58,28 @@ export async function lookupCreator(
     throw new Error('Please enter an Instagram username');
   }
 
+  // Debug: log token type and permissions to diagnose code 10 errors
+  try {
+    const { appId, appSecret } = getInstagramConfig();
+    const appAccessToken = `${appId}|${appSecret}`;
+    const debugRes = await fetch(
+      `${GRAPH_API_BASE}/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(appAccessToken)}`
+    );
+    if (debugRes.ok) {
+      const debugData = await debugRes.json();
+      logger.info('Business Discovery token debug', {
+        type: debugData.data?.type,
+        isValid: debugData.data?.is_valid,
+        scopes: debugData.data?.scopes,
+        appId: debugData.data?.app_id,
+        expiresAt: debugData.data?.expires_at,
+        granularScopes: debugData.data?.granular_scopes,
+      });
+    }
+  } catch (e) {
+    logger.warn('Failed to debug token for business discovery', { error: e });
+  }
+
   const fields = [
     'username',
     'name',
@@ -75,8 +97,6 @@ export async function lookupCreator(
     const err = await res.json().catch(() => ({}));
     logger.error('Business Discovery API failed', { error: err, username });
 
-    const classification = classifyFacebookError(err);
-
     // Specific error for non-business accounts or not found
     if (err.error?.code === 100 || err.error?.error_subcode === 2207013) {
       throw new Error(
@@ -84,6 +104,14 @@ export async function lookupCreator(
       );
     }
 
+    // Permission error - likely App Review or token type issue
+    if (err.error?.code === 10) {
+      throw new Error(
+        'Unable to search other creators. Your Facebook App may need "instagram_basic" approved through App Review, or your Instagram connection needs to be refreshed. Try disconnecting and reconnecting your Instagram account.'
+      );
+    }
+
+    const classification = classifyFacebookError(err);
     throw new Error(classification.userMessage);
   }
 
