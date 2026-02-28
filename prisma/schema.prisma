@@ -43,6 +43,15 @@ model User {
   googleDriveTokenExpiry  DateTime?
   googleDriveConnected Boolean @default(false)
 
+  // Attribution / source tracking (first-touch)
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+  referrer    String?
+  landingPage String?
+
   // Ideate: AI script generation
   creatorProfile      CreatorProfile?
   ideas               Idea[]
