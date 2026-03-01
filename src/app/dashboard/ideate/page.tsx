@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getOrCreateUser, getUserUsage } from '@/lib/user'
 import { getEnabledFeatures } from '@/lib/featureFlags'
-import { prisma } from '@/lib/db'
 import Link from 'next/link'
 import { UserButton } from '@clerk/nextjs'
 import IdeateDashboard from './IdeateDashboard'
@@ -27,11 +26,6 @@ export default async function IdeatePage() {
   }
 
   const usage = await getUserUsage(user.id)
-
-  // Check if user has a connected Instagram account (for Research tab)
-  const igAccountCount = await prisma.instagramAccount.count({
-    where: { userId: user.id, isActive: true },
-  })
 
   return (
     <div className="landing-page min-h-screen">
@@ -85,7 +79,6 @@ export default async function IdeatePage() {
           ideateLimit={usage?.planDetails.ideateGenerationsPerMonth ?? null}
           plan={usage?.plan ?? 'FREE'}
           vertical={user.vertical}
-          hasInstagram={igAccountCount > 0}
         />
       </div>
     </div>
