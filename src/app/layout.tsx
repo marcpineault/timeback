@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 // At build time this may be undefined (no .env); at runtime on Railway it
 // will be set, and dynamic (SSR) pages will pick it up from process.env.
 const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
 const headLinks = (
   <>
@@ -52,7 +53,7 @@ export default function RootLayout({
       <html lang="en">
         <head>{headLinks}</head>
         <body className="font-sans antialiased">
-          <GoogleAnalytics />
+          <GoogleAnalytics gaId={gaMeasurementId} />
           <FacebookPixel />
           <UtmCapture />
           <ErrorBoundary>
@@ -70,7 +71,7 @@ export default function RootLayout({
       <html lang="en">
         <head>{headLinks}</head>
         <body className="font-sans antialiased">
-          <GoogleAnalytics />
+          <GoogleAnalytics gaId={gaMeasurementId} />
           <FacebookPixel />
           <UtmCapture />
           <SourceTracker />

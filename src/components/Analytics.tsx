@@ -1,26 +1,39 @@
 'use client';
 
 import Script from 'next/script';
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
-export function GoogleAnalytics() {
-  if (!GA_MEASUREMENT_ID) {
+export function GoogleAnalytics({ gaId }: { gaId?: string } = {}) {
+  const measurementId = gaId || GA_MEASUREMENT_ID;
+  const pathname = usePathname();
+
+  // Track route changes for client-side navigation
+  useEffect(() => {
+    if (!measurementId || !pathname || !window.gtag) return;
+    window.gtag('config', measurementId, {
+      page_path: pathname,
+    });
+  }, [pathname, measurementId]);
+
+  if (!measurementId) {
     return null;
   }
 
   return (
     <>
       <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+        src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
         strategy="afterInteractive"
       />
       <Script id="google-analytics" strategy="afterInteractive">
         {`
           window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', '${GA_MEASUREMENT_ID}', {
+          window.gtag = function(){window.dataLayer.push(arguments);};
+          window.gtag('js', new Date());
+          window.gtag('config', '${measurementId}', {
             page_path: window.location.pathname,
           });
         `}
@@ -129,7 +142,7 @@ export function trackEvent<T extends AnalyticsEvent>(
   eventName: T,
   params: AnalyticsEventParams[T]
 ): void {
-  if (typeof window === 'undefined' || !window.gtag || !GA_MEASUREMENT_ID) {
+  if (typeof window === 'undefined' || !window.gtag) {
     return;
   }
 
