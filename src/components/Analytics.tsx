@@ -2,17 +2,25 @@
 
 import Script from 'next/script';
 
-const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+// NEXT_PUBLIC_* env vars are replaced at build time. When building on Railway
+// without .env present, the value is baked in as undefined.  To work around
+// this, the server-side layout passes the measurement ID as a prop at runtime.
+// We also store it in a module-level variable so trackEvent() can use it.
+let runtimeGaId: string | undefined;
 
-export function GoogleAnalytics() {
-  if (!GA_MEASUREMENT_ID) {
+export function GoogleAnalytics({ gaId }: { gaId?: string }) {
+  if (gaId) {
+    runtimeGaId = gaId;
+  }
+
+  if (!gaId) {
     return null;
   }
 
   return (
     <>
       <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+        src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
         strategy="afterInteractive"
       />
       <Script id="google-analytics" strategy="afterInteractive">
@@ -20,7 +28,7 @@ export function GoogleAnalytics() {
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', '${GA_MEASUREMENT_ID}', {
+          gtag('config', '${gaId}', {
             page_path: window.location.pathname,
           });
         `}
@@ -129,7 +137,7 @@ export function trackEvent<T extends AnalyticsEvent>(
   eventName: T,
   params: AnalyticsEventParams[T]
 ): void {
-  if (typeof window === 'undefined' || !window.gtag || !GA_MEASUREMENT_ID) {
+  if (typeof window === 'undefined' || !window.gtag || !runtimeGaId) {
     return;
   }
 

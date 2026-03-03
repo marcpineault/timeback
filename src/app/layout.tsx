@@ -52,7 +52,7 @@ export default function RootLayout({
       <html lang="en">
         <head>{headLinks}</head>
         <body className="font-sans antialiased">
-          <GoogleAnalytics />
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
           <FacebookPixel />
           <UtmCapture />
           <ErrorBoundary>
@@ -70,7 +70,7 @@ export default function RootLayout({
       <html lang="en">
         <head>{headLinks}</head>
         <body className="font-sans antialiased">
-          <GoogleAnalytics />
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
           <FacebookPixel />
           <UtmCapture />
           <SourceTracker />
