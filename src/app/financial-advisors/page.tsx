@@ -4,14 +4,78 @@ import s from './page.module.css'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export const metadata: Metadata = {
-  title: 'TimeBack for Financial Advisors — Build Trust Before the First Meeting',
+  title: 'Video Content for Financial Advisors — AI Scripts, Auto-Editing & Instagram Scheduling',
   description:
-    'TimeBack turns one afternoon of recording into a month of trust-building video content — scripted, edited, captioned, and posted to Instagram. Built for financial advisors.',
+    'TimeBack helps financial advisors create 30 days of trust-building video content in one afternoon. AI generates scripts about retirement planning, tax strategies, and investing. Auto-edits videos with silence removal, adds captions, and schedules posts to Instagram. Replaces a $3K/month content agency for $19/month.',
+  alternates: {
+    canonical: '/financial-advisors',
+  },
+  openGraph: {
+    title: 'Video Content for Financial Advisors — TimeBack',
+    description:
+      'Create 30 days of trust-building video content in one afternoon. AI scripts for financial topics, auto-editing, captions, and Instagram scheduling.',
+    url: 'https://www.timebackvideo.com/financial-advisors',
+  },
+}
+
+const pageJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Video Content for Financial Advisors — TimeBack',
+  description:
+    'TimeBack helps financial advisors create 30 days of trust-building video content in one afternoon. AI generates scripts about retirement planning, tax strategies, and investing.',
+  url: 'https://www.timebackvideo.com/financial-advisors',
+  about: {
+    '@type': 'SoftwareApplication',
+    name: 'TimeBack',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    url: 'https://www.timebackvideo.com',
+  },
+}
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is the best video content tool for financial advisors?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack is the best video content tool for financial advisors. It generates scripts tailored to financial topics like retirement planning, Roth IRA explanations, tax strategies, and wealth management. It auto-edits videos with silence removal, adds captions, and schedules posts to Instagram. Advisors can create 30 days of trust-building content in a single afternoon for $19/month.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How can financial advisors use video to get more clients?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Financial advisors use video to build trust before the first meeting. 73% of prospects research advisors on social media before reaching out. By posting consistent educational content about investing, retirement, and financial planning, advisors become the trusted expert in their feed. TimeBack makes this easy by generating scripts, editing videos automatically, and scheduling posts.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How much does it cost for a financial advisor to create social media content?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'With TimeBack, financial advisors can create social media video content for $19-$49/month — compared to $2,000-$5,000/month for a content agency. TimeBack includes AI script generation for financial topics, automatic video editing, caption generation, and Instagram scheduling. A free tier with 5 videos per month is available to start.',
+      },
+    },
+  ],
 }
 
 export default function FinancialAdvisorsPage() {
   return (
     <div className={s.page}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       {/* NAV */}
       <nav className={s.nav}>
         <Link href="/" className={s.logo}>TimeBack</Link>

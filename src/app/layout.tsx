@@ -17,14 +17,79 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "TimeBack — A Month of Content in One Afternoon",
-  description: "TimeBack writes your scripts, edits your videos, and posts to Instagram — all on autopilot. Upload a batch, walk away with a full content calendar.",
+  title: {
+    default: "TimeBack — AI Video Content Platform for Professionals",
+    template: "%s | TimeBack",
+  },
+  description: "TimeBack is a video content creation platform that helps financial advisors, real estate agents, mortgage brokers, and lawyers create 30 days of social media video content in under an hour. AI writes scripts, auto-edits videos with silence removal and captions, and schedules posts to Instagram.",
+  metadataBase: new URL("https://www.timebackvideo.com"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://www.timebackvideo.com",
+    siteName: "TimeBack",
+    title: "TimeBack — AI Video Content Platform for Professionals",
+    description: "Create 30 days of social media video content in under an hour. TimeBack writes scripts, auto-edits videos, adds captions, and schedules posts to Instagram. Built for financial advisors, real estate agents, mortgage brokers, and lawyers.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TimeBack — AI Video Content Platform for Professionals",
+    description: "Create 30 days of social media video content in under an hour. AI scripts, auto-editing, captions, and Instagram scheduling for professionals.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  keywords: [
+    "video content creation",
+    "social media video tool",
+    "AI video editing",
+    "video content for financial advisors",
+    "video content for real estate agents",
+    "video content for mortgage brokers",
+    "video content for lawyers",
+    "Instagram video scheduling",
+    "auto caption videos",
+    "silence removal",
+    "batch video editing",
+    "content creation platform",
+    "video marketing for professionals",
+  ],
 };
 
 // Read at module level so it's available during both build and runtime.
 // At build time this may be undefined (no .env); at runtime on Railway it
 // will be set, and dynamic (SSR) pages will pick it up from process.env.
 const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "TimeBack",
+  url: "https://www.timebackvideo.com",
+  logo: "https://www.timebackvideo.com/logo.svg",
+  description:
+    "TimeBack is a video content creation platform that helps professionals — financial advisors, real estate agents, mortgage brokers, lawyers, and other service professionals — create 30 days of social media video content in under an hour. It combines AI script generation, automatic video editing with silence removal, auto-captioning, and Instagram scheduling into a single tool.",
+  foundingDate: "2025",
+  contactPoint: {
+    "@type": "ContactPoint",
+    email: "support@timebackvideo.com",
+    contactType: "customer support",
+  },
+  sameAs: [
+    "https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7",
+  ],
+}
 
 const headLinks = (
   <>
@@ -33,6 +98,10 @@ const headLinks = (
     <link
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
       rel="stylesheet"
+    />
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
     />
   </>
 )

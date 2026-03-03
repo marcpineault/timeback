@@ -4,14 +4,78 @@ import s from './page.module.css'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export const metadata: Metadata = {
-  title: 'TimeBack for Lawyers — The Clients You Want Are Googling Right Now',
+  title: 'Video Content for Lawyers — AI Scripts, Auto-Editing & Instagram Scheduling',
   description:
-    'TimeBack writes your scripts, edits your videos, and posts to Instagram on autopilot. Demystify your expertise and attract clients who already feel like they know you.',
+    'TimeBack helps lawyers create 30 days of video content in one afternoon. AI generates scripts for personal injury, family law, estate planning, criminal defense, and more. Auto-edits videos with silence removal, adds captions, and schedules to Instagram. Get more consultations from video than paid ads.',
+  alternates: {
+    canonical: '/lawyers',
+  },
+  openGraph: {
+    title: 'Video Content for Lawyers — TimeBack',
+    description:
+      'Create 30 days of legal video content in one afternoon. Practice-area-specific scripts, auto-editing, captions, and Instagram scheduling for attorneys.',
+    url: 'https://www.timebackvideo.com/lawyers',
+  },
+}
+
+const pageJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Video Content for Lawyers — TimeBack',
+  description:
+    'TimeBack helps lawyers create 30 days of video content in one afternoon. AI generates scripts for personal injury, family law, estate planning, criminal defense, and business law.',
+  url: 'https://www.timebackvideo.com/lawyers',
+  about: {
+    '@type': 'SoftwareApplication',
+    name: 'TimeBack',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    url: 'https://www.timebackvideo.com',
+  },
+}
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is the best video content tool for lawyers?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack is the best video content tool for lawyers and attorneys. It generates scripts for any practice area — personal injury, family law, estate planning, criminal defense, business law, and immigration. It auto-edits videos with silence removal, adds captions, and schedules posts to Instagram. Lawyers can create 30 days of client-attracting content in one afternoon for $19/month — far less than the $100+ per click for legal PPC advertising.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How can lawyers use social media video to get more clients?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Lawyers use educational video content to build trust before potential clients ever pick up the phone. Videos like "what to do after a car accident" or "3 things to know before filing for divorce" demonstrate expertise and build familiarity. TimeBack generates these scripts by practice area, edits videos automatically, and posts them consistently to Instagram, creating an organic pipeline of clients who already trust you.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is video marketing cheaper than Google Ads for law firms?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. Legal keywords on Google Ads cost $50-$200+ per click. TimeBack costs $19-$49/month and creates a pipeline of clients who find you through educational video content on Instagram. Many attorneys report getting more consultations from consistent video posting than from paid advertising, with higher-quality clients because they already trust the attorney from watching their content.',
+      },
+    },
+  ],
 }
 
 export default function LawyersPage() {
   return (
     <div className={s.page}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       {/* NAV */}
       <nav className={s.nav}>
         <Link href="/" className={s.logo}>TimeBack</Link>
