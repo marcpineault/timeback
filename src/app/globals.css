@@ -121,17 +121,18 @@ body {
 }
 
 .nav-cta {
-  background: var(--lp-black) !important;
-  color: var(--lp-white) !important;
+  background: var(--lp-accent) !important;
+  color: white !important;
   padding: 0.6rem 1.4rem !important;
   border-radius: 100px;
   font-weight: 600 !important;
-  transition: transform 0.2s, box-shadow 0.2s !important;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s !important;
 }
 
 .nav-cta:hover {
+  background: var(--lp-accent-hover) !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 20px rgba(232, 93, 38, 0.3);
 }
 
 /* ── HERO ── */
@@ -159,7 +160,7 @@ body {
 
 .lp-hero h1 em {
   font-style: italic;
-  color: var(--lp-muted);
+  color: var(--lp-accent);
 }
 
 .hero-sub {
