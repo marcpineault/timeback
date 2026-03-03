@@ -25,7 +25,6 @@ const DEFAULT_CONFIG: ProcessingConfig = {
     intensity: 'medium',
     maxMoments: 3,
   },
-  normalizeAudio: true,
   aspectRatio: 'original',
   speechCorrection: false,
   speechCorrectionConfig: {
@@ -100,7 +99,6 @@ export function useProcessingPreferences(): UseProcessingPreferencesReturn {
             autoSilenceThreshold: data.preferences.autoSilenceThreshold,
             useHookAsHeadline: data.preferences.useHookAsHeadline,
             generateAIHeadline: data.preferences.generateAIHeadline,
-            normalizeAudio: data.preferences.normalizeAudio,
             aspectRatio: data.preferences.aspectRatio,
             speechCorrection: data.preferences.speechCorrection,
             speechCorrectionConfig: {

@@ -45,7 +45,6 @@ export async function GET() {
         silenceDuration: preferences.silenceDuration,
         autoSilenceThreshold: preferences.autoSilenceThreshold,
         silencePreset: preferences.silencePreset,
-        normalizeAudio: preferences.normalizeAudio,
         aspectRatio: preferences.aspectRatio,
         speechCorrection: preferences.speechCorrection,
         speechCorrectionConfig: {
@@ -93,7 +92,7 @@ export async function PATCH(request: Request) {
     // SECURITY: Validate input types before passing to Prisma
     const booleanFields = [
       'autoProcessOnUpload', 'generateCaptions', 'useHookAsHeadline',
-      'generateAIHeadline', 'autoSilenceThreshold', 'normalizeAudio',
+      'generateAIHeadline', 'autoSilenceThreshold',
       'speechCorrection', 'generateBRoll',
     ] as const;
     const stringFields = [
@@ -133,7 +132,6 @@ export async function PATCH(request: Request) {
     if (body.silenceDuration !== undefined) updateData.silenceDuration = body.silenceDuration;
     if (body.autoSilenceThreshold !== undefined) updateData.autoSilenceThreshold = body.autoSilenceThreshold;
     if (body.silencePreset !== undefined) updateData.silencePreset = body.silencePreset;
-    if (body.normalizeAudio !== undefined) updateData.normalizeAudio = body.normalizeAudio;
     if (body.aspectRatio !== undefined) updateData.aspectRatio = body.aspectRatio;
     if (body.speechCorrection !== undefined) updateData.speechCorrection = body.speechCorrection;
     if (body.generateBRoll !== undefined) updateData.generateBRoll = body.generateBRoll;
@@ -189,7 +187,6 @@ export async function PUT(request: Request) {
       silenceDuration: body.silenceDuration ?? 0.5,
       autoSilenceThreshold: body.autoSilenceThreshold ?? true,
       silencePreset: body.silencePreset ?? 'natural',
-      normalizeAudio: body.normalizeAudio ?? true,
       aspectRatio: body.aspectRatio ?? 'original',
       speechCorrection: body.speechCorrection ?? false,
       removeFillerWords: body.speechCorrectionConfig?.removeFillerWords ?? true,
@@ -232,7 +229,6 @@ export async function PUT(request: Request) {
         silenceDuration: preferences.silenceDuration,
         autoSilenceThreshold: preferences.autoSilenceThreshold,
         silencePreset: preferences.silencePreset,
-        normalizeAudio: preferences.normalizeAudio,
         aspectRatio: preferences.aspectRatio,
         speechCorrection: preferences.speechCorrection,
         speechCorrectionConfig: {

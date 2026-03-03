@@ -361,7 +361,6 @@ export default function VideoProcessor({
           intensity: 'medium',
           maxMoments: 3,
         },
-        normalizeAudio: true,
         aspectRatio: 'original',
         speechCorrection: false,
         speechCorrectionConfig: {
@@ -395,7 +394,6 @@ export default function VideoProcessor({
           generateAIHeadline: (prefs.generateAIHeadline as boolean) ?? defaultConfig.generateAIHeadline,
           generateBRoll: (prefs.generateBRoll as boolean) ?? defaultConfig.generateBRoll,
           bRollConfig: defaultConfig.bRollConfig,
-          normalizeAudio: (prefs.normalizeAudio as boolean) ?? defaultConfig.normalizeAudio,
           aspectRatio: (prefs.aspectRatio as ProcessingConfig['aspectRatio']) ?? defaultConfig.aspectRatio,
           speechCorrection: (prefs.speechCorrection as boolean) ?? defaultConfig.speechCorrection,
           speechCorrectionConfig: (prefs.speechCorrectionConfig as ProcessingConfig['speechCorrectionConfig']) ?? defaultConfig.speechCorrectionConfig,
