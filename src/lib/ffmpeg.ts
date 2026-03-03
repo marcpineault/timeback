@@ -1438,46 +1438,6 @@ async function overlayAnimationOnVideo(
 }
 
 /**
- * Normalize audio levels using EBU R128 loudness standard
- * Target: -14 LUFS (optimal for social media platforms)
- */
-export async function normalizeAudio(
-  inputPath: string,
-  outputPath: string
-): Promise<string> {
-  validateFileExists(inputPath, 'normalize audio');
-  logger.debug(`[Audio] Normalizing audio levels...`);
-
-  const processConfig: FFmpegProcessConfig = {
-    timeout: 3 * 60 * 1000,
-    maxRetries: 1,
-    context: 'Audio Normalization',
-  };
-
-  try {
-    await runFFmpegWithRetry(() => {
-      return ffmpeg(inputPath)
-        .audioFilters('loudnorm=I=-14:TP=-1:LRA=11')
-        .outputOptions([
-          '-c:v', 'copy',
-          '-c:a', 'aac',
-          '-b:a', '128k',
-        ])
-        .output(outputPath);
-    }, processConfig);
-
-    logger.debug(`[Audio] Normalization complete!`);
-    return outputPath;
-  } catch (err) {
-    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
-      throw new Error('Audio normalization failed due to memory constraints.');
-    }
-    logger.error(`[Audio] Normalization error:`, err instanceof Error ? err : new Error(String(err)));
-    throw err;
-  }
-}
-
-/**
  * Aspect ratio presets for different platforms
  */
 export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';

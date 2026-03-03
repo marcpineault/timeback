@@ -48,7 +48,6 @@ export interface ProcessingConfig {
   generateAIHeadline: boolean;  // Use AI to generate engaging headline
   generateBRoll: boolean;
   bRollConfig: BRollConfig;
-  normalizeAudio: boolean;
   aspectRatio: AspectRatioPreset;
   // Speech correction options
   speechCorrection: boolean;
@@ -89,7 +88,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       aspectRatio: '9:16',
       generateCaptions: true,
       captionStyle: 'instagram',
-      normalizeAudio: true,
+
       autoSilenceThreshold: true,
       silenceDuration: 0.4,
     },
@@ -101,7 +100,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       aspectRatio: '9:16',
       generateCaptions: true,
       captionStyle: 'instagram',
-      normalizeAudio: true,
+
       autoSilenceThreshold: true,
       silenceDuration: 0.3,
     },
@@ -113,7 +112,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       aspectRatio: '16:9',
       generateCaptions: true,
       captionStyle: 'instagram',
-      normalizeAudio: true,
+
       autoSilenceThreshold: true,
       silenceDuration: 0.5,
     },
@@ -125,7 +124,7 @@ const PRESETS: Record<PresetKey, Preset> = {
       aspectRatio: '1:1',
       generateCaptions: true,
       captionStyle: 'instagram',
-      normalizeAudio: true,
+
       autoSilenceThreshold: true,
     },
   },
@@ -204,7 +203,6 @@ const DEFAULT_CONFIG: ProcessingConfig = {
     intensity: 'medium',
     maxMoments: 3,
   },
-  normalizeAudio: true,
   aspectRatio: 'original',
   speechCorrection: true,
   speechCorrectionConfig: {
@@ -437,23 +435,6 @@ export default function ProcessingOptions({
             </div>
           </div>
         )}
-      </div>
-
-      {/* Audio Enhancement Settings */}
-      <div className="space-y-3 sm:space-y-4">
-        <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Audio Enhancement</h3>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={config.normalizeAudio}
-            onChange={(e) => setConfig({ ...config, normalizeAudio: e.target.checked })}
-            className="w-5 h-5 rounded bg-[#e0dbd4] border-[#e0dbd4] text-[#e85d26] focus:ring-[#e85d26]"
-          />
-          <span className="text-[#8a8580]">Normalize audio levels</span>
-        </label>
-        <p className="text-xs text-[#8a8580]">
-          Ensures consistent volume throughout the video (-14 LUFS, optimal for social media)
-        </p>
       </div>
 
       {/* Speech Correction Settings */}

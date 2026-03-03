@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, normalizeAudio, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
+import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
 import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
 import { correctSpeechMistakes, SpeechCorrectionConfig, DEFAULT_SPEECH_CORRECTION_CONFIG } from '@/lib/speechCorrection';
 import { auth } from '@clerk/nextjs/server';
@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
       generateAIHeadline: shouldGenerateAIHeadline,
       generateBRoll,
       bRollConfig,
-      normalizeAudio: shouldNormalizeAudio,
       aspectRatio,
       speechCorrection: _speechCorrection,
       speechCorrectionConfig,
@@ -296,7 +295,6 @@ export async function POST(request: NextRequest) {
 
     // Calculate total processing steps for progress reporting
     let totalSteps = 1; // Step 1: Silence removal (always)
-    if (shouldNormalizeAudio) totalSteps++;
     if (needsTranscription) totalSteps++; // Transcription
     if (speechCorrection) totalSteps++; // Speech correction
     // Captions and headline are now combined into a single step when both are present
@@ -356,22 +354,6 @@ export async function POST(request: NextRequest) {
       if (idx > -1) intermediateFiles.splice(idx, 1);
     }
     currentInput = stepOutput;
-
-    // Step 1.5: Normalize audio levels if enabled
-    if (shouldNormalizeAudio) {
-      reportProgress('Normalizing audio...');
-      logger.info('Step 1.5: Normalizing audio levels');
-      stepOutput = path.join(processedDir, `${baseName}_normalized.mp4`);
-      intermediateFiles.push(stepOutput); // Track for cleanup on error
-      await normalizeAudio(currentInput, stepOutput);
-      // Clean up intermediate file (and remove from tracking)
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {});
-        const idx = intermediateFiles.indexOf(currentInput);
-        if (idx > -1) intermediateFiles.splice(idx, 1);
-      }
-      currentInput = stepOutput;
-    }
 
     // Get early transcription result if we started one (may already be resolved from hybrid mode)
     let earlyTranscription: { text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] } | null = null;
