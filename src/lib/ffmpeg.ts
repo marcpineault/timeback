@@ -287,7 +287,7 @@ function calculateAdaptiveThreshold(
   // Method 1: Traditional max - offset (primary method for noisy audio)
   // For noisy audio: use smaller offset since speech-noise gap is small
   // For clean audio: use 14dB offset to preserve soft consonants and trailing syllables
-  const peakOffset = isNoisyAudio ? 9 : (isModerateNoise ? 10 : 12);
+  const peakOffset = isNoisyAudio ? 9 : (isModerateNoise ? 11 : 14);
   const traditionalThreshold = medianMax - peakOffset;
   thresholds.push(traditionalThreshold);
   // Higher weight for noisy audio since mean/RMS are less reliable
@@ -343,7 +343,7 @@ function calculateAdaptiveThreshold(
 
   // Clamp to bounds (-50 to -16 dB) to prevent threshold from getting too close to speech levels
   // For noisy audio, allow higher threshold (up to -11dB) since speech-noise gap is smaller
-  const upperLimit = isNoisyAudio ? -11 : -16;
+  const upperLimit = isNoisyAudio ? -14 : -20;
   threshold = Math.min(upperLimit, Math.max(-50, threshold));
 
   // Enhanced logging for debugging
@@ -396,7 +396,7 @@ async function dualPassSilenceDetection(
 
   // AGGRESSIVE: If primary found less than 40% silence and sensitive found more (>1.15x)
   // Much more willing to use the sensitive (higher threshold) results
-  if (primarySilencePercent < 40 && sensitiveSilencePercent > primarySilencePercent * 1.15) {
+  if (primarySilencePercent < 25 && sensitiveSilencePercent > primarySilencePercent * 1.3) {
     logger.debug(`[Dual-Pass] Using more aggressive sensitive results for better silence removal`);
     finalSilences = sensitiveSilences;
     finalThreshold = sensitiveThreshold;
@@ -560,7 +560,7 @@ export async function detectNoiseFloor(
 export async function detectSilence(
   inputPath: string,
   threshold: number = -20,
-  minDuration: number = 0.35,  // Slightly relaxed from 0.3 to avoid cutting sentence endings
+  minDuration: number = 0.4,  // Relaxed from 0.35 to avoid cutting sentence endings and short natural pauses
   useSpeechBandFilter: boolean = true  // Filter to speech frequencies for noise rejection
 ): Promise<SilenceInterval[]> {
   return new Promise((resolve, reject) => {
