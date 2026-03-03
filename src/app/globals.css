@@ -1906,3 +1906,61 @@ input[type="checkbox"] {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
+
+/* ── WHAT IS TIMEBACK (LLM-readable about section) ── */
+.lp-about {
+  padding: 2rem 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.lp-about h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 1.5rem;
+}
+
+.about-content {
+  text-align: left;
+}
+
+.about-content p {
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: var(--lp-muted);
+  margin-bottom: 1rem;
+}
+
+/* ── VERTICAL INDUSTRY PAGES SECTION ── */
+.lp-verticals {
+  padding: 2rem 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.lp-verticals h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+
+.lp-verticals > p {
+  color: var(--lp-muted);
+  font-size: 1.05rem;
+  max-width: 600px;
+  margin: 0 auto 1.5rem;
+}
+
+.audience-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.audience-card-link:hover {
+  border-color: var(--lp-accent);
+}

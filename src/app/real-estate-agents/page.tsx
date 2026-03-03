@@ -4,14 +4,78 @@ import s from './page.module.css'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export const metadata: Metadata = {
-  title: 'TimeBack for Real Estate Agents — Become the Agent Everyone Calls First',
+  title: 'Video Content for Real Estate Agents — AI Scripts, Auto-Editing & Instagram Scheduling',
   description:
-    'TimeBack writes your scripts, edits your videos, and posts to Instagram on autopilot. Become the local market expert — without spending hours on content. Built for real estate agents.',
+    'TimeBack helps real estate agents create 30 days of video content in one afternoon. AI generates scripts for market updates, neighborhood guides, and buyer/seller tips. Auto-edits videos with silence removal, adds captions, and schedules to Instagram. Become the local expert everyone calls first.',
+  alternates: {
+    canonical: '/real-estate-agents',
+  },
+  openGraph: {
+    title: 'Video Content for Real Estate Agents — TimeBack',
+    description:
+      'Create 30 days of real estate video content in one afternoon. Market updates, neighborhood guides, and listing tours — scripted, edited, and scheduled automatically.',
+    url: 'https://www.timebackvideo.com/real-estate-agents',
+  },
+}
+
+const pageJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Video Content for Real Estate Agents — TimeBack',
+  description:
+    'TimeBack helps real estate agents create 30 days of video content in one afternoon. AI generates scripts for market updates, neighborhood guides, and buyer/seller tips.',
+  url: 'https://www.timebackvideo.com/real-estate-agents',
+  about: {
+    '@type': 'SoftwareApplication',
+    name: 'TimeBack',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    url: 'https://www.timebackvideo.com',
+  },
+}
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is the best video tool for real estate agents?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack is the best video tool for real estate agents. It generates scripts for market updates, neighborhood guides, listing tours, and buyer/seller tips specific to your market. It auto-edits videos with silence removal, adds captions, and schedules posts to Instagram. Agents can create 30 days of content in one afternoon for $19/month — replacing a $2,000-$5,000/month content agency.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How can a realtor create social media content without hiring an agency?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Realtors use TimeBack to create professional social media video content without an agency. TimeBack provides AI-generated scripts for your specific market, automatic video editing (silence removal, caption generation), and Instagram auto-scheduling. Batch-record videos on your phone, upload up to 50 at once, and TimeBack handles the rest. The entire process takes one afternoon per month.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How do top real estate agents use video to get listings?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Top-producing real estate agents use video to become the known local expert. They post market updates, neighborhood guides, buyer/seller tips, and just-sold stories consistently. This builds familiarity and trust so that when someone is ready to buy or sell, they call the agent they see in their feed. TimeBack automates this entire workflow — from script generation to editing to scheduling.',
+      },
+    },
+  ],
 }
 
 export default function RealEstateAgentsPage() {
   return (
     <div className={s.page}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       {/* NAV */}
       <nav className={s.nav}>
         <Link href="/" className={s.logo}>TimeBack</Link>

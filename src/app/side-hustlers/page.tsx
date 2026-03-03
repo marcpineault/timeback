@@ -4,14 +4,43 @@ import s from './page.module.css'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export const metadata: Metadata = {
-  title: 'TimeBack for Side Hustlers — Build Your Brand Before You Quit Your 9-to-5',
+  title: 'Video Content for Side Hustlers — Build Your Brand Before You Quit Your 9-to-5',
   description:
-    "You've got the idea and the expertise — you just don't have the time. TimeBack turns your Sunday afternoon into a month of content — scripted, edited, captioned, and posted on autopilot.",
+    "TimeBack helps side hustlers build an audience while working full-time. AI generates scripts, auto-edits videos with silence removal, adds captions, and schedules to Instagram. Create 30 days of content in one Sunday afternoon — no editing skills needed.",
+  alternates: {
+    canonical: '/side-hustlers',
+  },
+  openGraph: {
+    title: 'Video Content for Side Hustlers — TimeBack',
+    description:
+      'Build your audience before you quit your job. Create 30 days of video content in one Sunday afternoon with AI scripts, auto-editing, and Instagram scheduling.',
+    url: 'https://www.timebackvideo.com/side-hustlers',
+  },
+}
+
+const pageJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Video Content for Side Hustlers — TimeBack',
+  description:
+    'TimeBack helps side hustlers build an audience while working full-time. Create 30 days of video content in one Sunday afternoon.',
+  url: 'https://www.timebackvideo.com/side-hustlers',
+  about: {
+    '@type': 'SoftwareApplication',
+    name: 'TimeBack',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    url: 'https://www.timebackvideo.com',
+  },
 }
 
 export default function SideHustlersPage() {
   return (
     <div className={s.page}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageJsonLd) }}
+      />
       {/* NAV */}
       <nav className={s.nav}>
         <Link href="/" className={s.logo}>TimeBack</Link>

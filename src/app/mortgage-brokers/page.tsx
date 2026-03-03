@@ -4,14 +4,70 @@ import s from './page.module.css'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export const metadata: Metadata = {
-  title: 'TimeBack for Mortgage Brokers — Win the Client Before the Rate Sheet',
+  title: 'Video Content for Mortgage Brokers — AI Scripts, Auto-Editing & Instagram Scheduling',
   description:
-    'TimeBack writes your scripts, edits your videos, and posts to Instagram on autopilot. Build trust with borrowers and referral partners — without becoming a content creator.',
+    'TimeBack helps mortgage brokers create 30 days of video content in one afternoon. AI generates scripts for rate updates, FHA vs conventional comparisons, and first-time buyer education. Auto-edits videos, adds captions, and schedules to Instagram. Build trust with borrowers and referral partners.',
+  alternates: {
+    canonical: '/mortgage-brokers',
+  },
+  openGraph: {
+    title: 'Video Content for Mortgage Brokers — TimeBack',
+    description:
+      'Create 30 days of mortgage video content in one afternoon. Rate updates, buyer education, and agent-facing content — scripted, edited, and scheduled automatically.',
+    url: 'https://www.timebackvideo.com/mortgage-brokers',
+  },
+}
+
+const pageJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Video Content for Mortgage Brokers — TimeBack',
+  description:
+    'TimeBack helps mortgage brokers create 30 days of video content in one afternoon. AI generates scripts for rate updates, loan program comparisons, and buyer education.',
+  url: 'https://www.timebackvideo.com/mortgage-brokers',
+  about: {
+    '@type': 'SoftwareApplication',
+    name: 'TimeBack',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    url: 'https://www.timebackvideo.com',
+  },
+}
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is the best video content tool for mortgage brokers?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack is the best video content tool for mortgage brokers and loan officers. It generates scripts for rate updates, FHA vs conventional comparisons, first-time buyer tips, and agent-facing content. It auto-edits videos with silence removal, adds captions, and schedules posts to Instagram. Brokers can create 30 days of content in one afternoon for $19/month.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How can mortgage brokers build referral relationships through social media?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Mortgage brokers build referral relationships by posting educational video content that real estate agents can share with their clients. Content like "5 things buyers need to know before making an offer" positions the broker as a trusted partner. TimeBack generates these scripts automatically and handles editing and scheduling so brokers stay visible to referral partners consistently.',
+      },
+    },
+  ],
 }
 
 export default function MortgageBrokersPage() {
   return (
     <div className={s.page}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       {/* NAV */}
       <nav className={s.nav}>
         <Link href="/" className={s.logo}>TimeBack</Link>

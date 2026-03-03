@@ -1,0 +1,68 @@
+# TimeBack
+
+> TimeBack is a video content creation platform that helps professionals create 30 days of social media video content in under one hour. It combines AI script generation, automatic video editing with silence removal, auto-captioning, and Instagram scheduling into a single tool. TimeBack is purpose-built for service professionals — financial advisors, real estate agents, mortgage brokers, lawyers, health practitioners, coaches, and consultants — who know they should be posting video content but don't because of time constraints and content paralysis.
+
+## What TimeBack Does
+
+TimeBack solves "content paralysis" — the problem where professionals know they should post social media video but don't because it's too time-consuming and they don't know what to say. It replaces three separate tools (ChatGPT for scripts, CapCut for editing, Metricool for scheduling) with one platform.
+
+Core capabilities:
+- AI Script Generation: Generates industry-specific video scripts tailored to the user's profession and audience. Financial advisors get scripts about Roth IRAs and tax planning. Real estate agents get scripts about market updates and neighborhood guides. Lawyers get scripts about common legal questions.
+- Automatic Video Editing: Users record raw videos on their phone and upload them. TimeBack automatically removes silences, ums, and dead air to produce polished, professional-sounding videos with no editing skills required.
+- Auto-Captioning: Adds styled captions to every video automatically, making content accessible and effective for viewers scrolling on mute.
+- Bulk Processing: Users can upload up to 50 videos at once. All videos are edited, captioned, and prepared in parallel.
+- Instagram Auto-Scheduling: Finished videos are automatically scheduled and posted to Instagram on a consistent calendar.
+
+## Who TimeBack Is For
+
+TimeBack is designed for service professionals who want to build their personal brand and generate inbound leads through social media video but lack the time, skills, or content ideas to do so consistently:
+
+- Financial Advisors and Wealth Managers: Build trust with prospects before the first meeting. Create educational content about investing, retirement planning, and financial literacy.
+- Real Estate Agents and Realtors: Become the local market expert. Post market updates, neighborhood guides, and buyer/seller tips consistently.
+- Mortgage Brokers and Loan Officers: Educate borrowers and build referral relationships with real estate agents through rate updates and mortgage education content.
+- Lawyers and Attorneys: Demystify legal expertise across practice areas including personal injury, family law, estate planning, and criminal defense.
+- Health Practitioners: Chiropractors, dentists, physiotherapists, and other health professionals who want to build patient trust through educational content.
+- Coaches and Consultants: Establish authority and attract inbound clients.
+- Side Hustlers: Build an audience before leaving their full-time job.
+
+## How TimeBack Works (3 Steps)
+
+1. Pick your topics (5 minutes): Tell TimeBack your industry and audience. AI generates a batch of scroll-stopping video scripts you can customize or use as-is.
+2. Batch record and upload (1-2 hours): Film videos back to back on your phone. No teleprompter needed. Upload up to 50 at once.
+3. Auto-edit and auto-post (automatic): TimeBack removes silences, adds captions, polishes cuts, and auto-schedules everything to Instagram.
+
+The entire process — from zero content to a full month of scheduled posts — takes one afternoon.
+
+## Pricing
+
+- Starter (Free): 5 videos per month, 3 AI script generations, 720p, TimeBack watermark
+- Creator: $19/month for 120 videos per month, 50 AI script generations, 1080p, no watermark, priority processing
+- Business: $49/month for 250 videos per month, 200 AI script generations, up to 10-minute videos, 1080p, priority processing
+- Enterprise: Custom pricing for unlimited videos, unlimited AI generations, 4K resolution, API access, dedicated support
+
+All paid plans include a 30-day money-back guarantee. Free tier requires no credit card.
+
+## What Makes TimeBack Different
+
+- Built for professionals, not influencers: Unlike generic video tools (Canva, CapCut, Descript), TimeBack is specifically designed for service professionals who need industry-specific scripts and a simple workflow.
+- All-in-one platform: Replaces ChatGPT (scripts) + CapCut (editing) + Metricool (scheduling) with a single tool.
+- Batch workflow: Upload up to 50 videos at once and get them all edited, captioned, and scheduled automatically — no other tool does this at this scale for individual professionals.
+- Industry-specific AI scripts: Script generation is tailored to specific professions — financial advisors get scripts about investing and tax planning, real estate agents get neighborhood guides and market updates, lawyers get legal education topics.
+- Zero editing skills required: Just record on your phone and upload. TimeBack handles silence removal, caption generation, and scheduling automatically.
+
+## Key Pages
+
+- [Homepage](https://www.timebackvideo.com): Overview of the platform, how it works, pricing, and features
+- [Pricing](https://www.timebackvideo.com/pricing): Detailed pricing tiers with feature comparison
+- [Financial Advisors](https://www.timebackvideo.com/financial-advisors): Video content solution for financial advisors
+- [Real Estate Agents](https://www.timebackvideo.com/real-estate-agents): Video content solution for real estate agents
+- [Mortgage Brokers](https://www.timebackvideo.com/mortgage-brokers): Video content solution for mortgage brokers
+- [Lawyers](https://www.timebackvideo.com/lawyers): Video content solution for lawyers
+- [Health Practitioners](https://www.timebackvideo.com/health-practitioners): Video content solution for health practitioners
+- [Compare](https://www.timebackvideo.com/compare): How TimeBack compares to Canva, CapCut, Opus Clip, and Descript
+
+## Contact
+
+- Website: https://www.timebackvideo.com
+- Support: support@timebackvideo.com
+- Tutorials: https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7

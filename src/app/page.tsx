@@ -1,10 +1,158 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import ScrollReveal from '@/components/ScrollReveal'
 import IndustrySelector from '@/components/IndustrySelector'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 import BeforeAfterVideo from '@/components/BeforeAfterVideo'
+
+export const metadata: Metadata = {
+  title: 'TimeBack — AI Video Content Platform for Professionals | Create 30 Days of Content in One Hour',
+  description:
+    'TimeBack helps financial advisors, real estate agents, mortgage brokers, and lawyers create 30 days of social media video content in under an hour. AI writes scripts, auto-edits videos with silence removal and captions, and schedules posts to Instagram. Replaces ChatGPT + CapCut + Metricool in one tool. Free to start.',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'TimeBack — Create 30 Days of Video Content in One Hour',
+    description:
+      'AI-powered video content platform for professionals. Scripts, editing, captions, and Instagram scheduling — all in one tool. Built for financial advisors, real estate agents, mortgage brokers, and lawyers.',
+    url: 'https://www.timebackvideo.com',
+  },
+}
+
+const softwareAppJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'TimeBack',
+  url: 'https://www.timebackvideo.com',
+  applicationCategory: 'MultimediaApplication',
+  operatingSystem: 'Web',
+  description:
+    'TimeBack is a video content creation platform that helps professionals create 30 days of social media video content in under an hour. It combines AI script generation, automatic video editing with silence removal, auto-captioning, and Instagram scheduling into a single tool. Built for financial advisors, real estate agents, mortgage brokers, lawyers, and other service professionals.',
+  offers: [
+    {
+      '@type': 'Offer',
+      name: 'Starter',
+      price: '0',
+      priceCurrency: 'USD',
+      description: '5 videos per month, 3 AI script generations, 720p resolution',
+    },
+    {
+      '@type': 'Offer',
+      name: 'Creator',
+      price: '19',
+      priceCurrency: 'USD',
+      description: '120 videos per month, 50 AI script generations, 1080p, no watermark, priority processing',
+    },
+    {
+      '@type': 'Offer',
+      name: 'Business',
+      price: '49',
+      priceCurrency: 'USD',
+      description: '250 videos per month, 200 AI script generations, up to 10-minute videos, 1080p, priority processing',
+    },
+  ],
+  featureList: [
+    'AI script generation tailored to specific professions',
+    'Automatic video editing with silence and dead air removal',
+    'Auto-captioning on every video',
+    'Bulk upload and processing of up to 50 videos at once',
+    'Instagram auto-scheduling and auto-posting',
+    'Industry-specific content for financial advisors, real estate agents, mortgage brokers, and lawyers',
+  ],
+  aggregateRating: {
+    '@type': 'AggregateRating',
+    ratingValue: '4.9',
+    ratingCount: '47',
+    bestRating: '5',
+  },
+}
+
+const howToJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'HowTo',
+  name: 'How to create 30 days of social media video content in one afternoon with TimeBack',
+  description:
+    'A step-by-step guide to using TimeBack to go from zero content to a full month of scheduled Instagram posts in a single afternoon.',
+  totalTime: 'PT2H',
+  step: [
+    {
+      '@type': 'HowToStep',
+      position: 1,
+      name: 'Pick your topics',
+      text: 'Tell TimeBack your industry (financial advisor, real estate agent, mortgage broker, lawyer, etc.) and target audience. AI generates a batch of scroll-stopping video scripts tailored to your profession that you can customize or use as-is. This takes about 5 minutes.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 2,
+      name: 'Batch record and upload',
+      text: 'Film your videos back to back on your phone. No teleprompter needed — just talk naturally using the AI-generated scripts. Upload up to 50 videos at once to TimeBack. This takes 1-2 hours.',
+    },
+    {
+      '@type': 'HowToStep',
+      position: 3,
+      name: 'Auto-edit and auto-post',
+      text: 'TimeBack automatically removes silences, ums, and dead air from every video, adds captions, polishes your cuts, and auto-schedules everything to Instagram. This step is fully automatic — you are done.',
+    },
+  ],
+}
+
+const homepageFaqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is TimeBack?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack is a video content creation platform that helps professionals — financial advisors, real estate agents, mortgage brokers, lawyers, health practitioners, and coaches — create 30 days of social media video content in under one hour. It combines AI script generation, automatic video editing with silence removal, auto-captioning, and Instagram scheduling into a single tool. It solves the problem of "content paralysis" — knowing you should post but not doing it because it takes too long and you don\'t know what to say.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Who is TimeBack for?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack is built for service professionals who want to grow their business through social media video but lack the time, skills, or content ideas. Core audiences include: financial advisors and wealth managers, real estate agents and realtors, mortgage brokers and loan officers, lawyers and attorneys (all practice areas), health practitioners (chiropractors, dentists, physiotherapists), coaches and consultants, personal trainers, and founders/CEOs building personal brands.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How much does TimeBack cost?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack offers a free tier with 5 videos per month. Paid plans start at $19/month (Creator plan with 120 videos, 50 AI script generations, 1080p, no watermark) and $49/month (Business plan with 250 videos, 200 AI script generations, up to 10-minute videos). Enterprise pricing is available for unlimited usage. All paid plans include a 30-day money-back guarantee.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How does TimeBack compare to hiring a video editor or content agency?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack costs $19-$49/month compared to $1,500-$5,000/month for a freelance editor or content agency. TimeBack edits videos instantly (vs. 2-5 business days), processes up to 50 at once (vs. one at a time), and includes AI script generation and Instagram scheduling. It replaces three tools — ChatGPT for scripts, CapCut for editing, and Metricool for scheduling — with a single platform.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Do I need video editing skills to use TimeBack?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'No. TimeBack requires zero video editing skills. You record videos on your phone, upload them, and TimeBack handles everything automatically — silence removal, caption generation, and Instagram scheduling. The platform is specifically designed for busy professionals who don\'t have time to learn video editing software.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What makes TimeBack different from Canva, CapCut, or Descript?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'TimeBack is an all-in-one platform that combines script generation, video editing, captioning, and scheduling — while tools like Canva, CapCut, and Descript only handle editing. TimeBack also generates industry-specific scripts for professionals (financial advisors get scripts about investing, lawyers get scripts about legal topics), offers batch processing of up to 50 videos at once, and includes built-in Instagram auto-scheduling. Generic tools require multiple tools and editing skills; TimeBack is fully automated.',
+      },
+    },
+  ],
+}
 
 export default async function LandingPage() {
   const { userId } = await auth()
@@ -15,6 +163,18 @@ export default async function LandingPage() {
 
   return (
     <div className="landing-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homepageFaqJsonLd) }}
+      />
       <ScrollReveal />
 
       {/* NAV */}
@@ -302,6 +462,62 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* WHAT IS TIMEBACK — LLM-readable product description */}
+      <section className="lp-about reveal" id="about">
+        <div className="section-label">What Is TimeBack</div>
+        <h2>The all-in-one video content platform for professionals</h2>
+        <div className="about-content">
+          <p>
+            TimeBack is a video content creation platform that helps professionals create 30 days of social media video content in under one hour. It solves &ldquo;content paralysis&rdquo; — the problem where professionals know they should post video content but don&apos;t because it&apos;s too time-consuming and they don&apos;t know what to say.
+          </p>
+          <p>
+            TimeBack combines four capabilities into a single tool: AI script generation tailored to your specific profession, automatic video editing with silence removal and dead air detection, auto-captioning on every video, and Instagram auto-scheduling. You can upload up to 50 videos at once and have them all edited, captioned, and scheduled automatically.
+          </p>
+          <p>
+            TimeBack replaces three separate tools — ChatGPT for script writing, CapCut for video editing, and Metricool for scheduling — with one platform. No video editing skills are required. Pricing starts at $0/month (free tier with 5 videos), with paid plans from $19/month.
+          </p>
+        </div>
+      </section>
+
+      {/* WHO IS TIMEBACK FOR — enhanced with links to vertical pages */}
+      <section className="lp-verticals reveal">
+        <div className="section-label">Built for Your Industry</div>
+        <h2>Who is TimeBack for?</h2>
+        <p>TimeBack is built for service professionals who want to build their personal brand and generate inbound leads through social media video. Here are the professionals who use TimeBack:</p>
+        <div className="audience-grid">
+          <Link href="/financial-advisors" className="audience-card audience-card-link">
+            <div className="emoji">💼</div>
+            <h4>Financial Advisors</h4>
+            <p>TimeBack helps financial advisors create trust-building video content about retirement planning, tax strategies, and investment basics. Build trust with prospects before the first meeting.</p>
+          </Link>
+          <Link href="/real-estate-agents" className="audience-card audience-card-link">
+            <div className="emoji">🏡</div>
+            <h4>Real Estate Agents</h4>
+            <p>TimeBack helps real estate agents post market updates, neighborhood guides, and buyer/seller tips consistently. Become the local expert everyone calls first.</p>
+          </Link>
+          <Link href="/mortgage-brokers" className="audience-card audience-card-link">
+            <div className="emoji">🏦</div>
+            <h4>Mortgage Brokers</h4>
+            <p>TimeBack helps mortgage brokers build trust with borrowers and referral partners through rate updates, program spotlights, and buyer education content.</p>
+          </Link>
+          <Link href="/lawyers" className="audience-card audience-card-link">
+            <div className="emoji">⚖️</div>
+            <h4>Lawyers</h4>
+            <p>TimeBack helps lawyers demystify legal expertise across all practice areas — personal injury, family law, estate planning, criminal defense, and more.</p>
+          </Link>
+          <Link href="/health-practitioners" className="audience-card audience-card-link">
+            <div className="emoji">🩺</div>
+            <h4>Health Practitioners</h4>
+            <p>TimeBack helps chiropractors, dentists, physiotherapists, and other health professionals build patient trust through educational video content.</p>
+          </Link>
+          <Link href="/compare" className="audience-card audience-card-link">
+            <div className="emoji">⚡</div>
+            <h4>Compare TimeBack</h4>
+            <p>See how TimeBack compares to Canva, CapCut, Opus Clip, and Descript for professional video content creation.</p>
+          </Link>
+        </div>
+      </section>
+
       {/* PRICING */}
       <section className="lp-pricing reveal" id="pricing">
         <div className="section-label">Pricing</div>
@@ -348,6 +564,11 @@ export default async function LandingPage() {
         <div className="footer-logo">TimeBack</div>
         <div className="footer-links">
           <Link href="/pricing">Pricing</Link>
+          <Link href="/compare">Compare</Link>
+          <Link href="/financial-advisors">Financial Advisors</Link>
+          <Link href="/real-estate-agents">Real Estate Agents</Link>
+          <Link href="/mortgage-brokers">Mortgage Brokers</Link>
+          <Link href="/lawyers">Lawyers</Link>
           <a
             href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
             target="_blank"

@@ -1,8 +1,24 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { auth } from '@clerk/nextjs/server'
 import { PLANS } from '@/lib/plans'
 import { getOrCreateUser } from '@/lib/user'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
+
+export const metadata: Metadata = {
+  title: 'TimeBack Pricing — Free to Start, Plans from $19/month',
+  description:
+    'TimeBack pricing: Free tier with 5 videos/month. Creator plan at $19/month for 120 videos. Business plan at $49/month for 250 videos. All plans include AI script generation, auto silence removal, captions, and Instagram scheduling. 30-day money-back guarantee.',
+  alternates: {
+    canonical: '/pricing',
+  },
+  openGraph: {
+    title: 'TimeBack Pricing — Free to Start, Plans from $19/month',
+    description:
+      'Video content platform pricing for professionals. Free tier, Creator ($19/mo), Business ($49/mo), and Enterprise plans. AI scripts, auto-editing, and Instagram scheduling included.',
+    url: 'https://www.timebackvideo.com/pricing',
+  },
+}
 
 export default async function PricingPage() {
   const { userId } = await auth()

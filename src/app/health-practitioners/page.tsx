@@ -4,14 +4,43 @@ import s from './page.module.css'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 
 export const metadata: Metadata = {
-  title: 'TimeBack for Health Practitioners — Become the Provider Patients Trust Before They Book',
+  title: 'Video Content for Health Practitioners — AI Scripts, Auto-Editing & Instagram Scheduling',
   description:
-    'TimeBack writes your scripts, edits your videos, and posts to Instagram on autopilot. Build patient trust through educational content — without spending hours on social media. Built for chiropractors, dentists, physios, and health practitioners.',
+    'TimeBack helps chiropractors, dentists, physiotherapists, and health practitioners create 30 days of patient education video content in one afternoon. AI generates health-specific scripts, auto-edits videos with silence removal, adds captions, and schedules to Instagram.',
+  alternates: {
+    canonical: '/health-practitioners',
+  },
+  openGraph: {
+    title: 'Video Content for Health Practitioners — TimeBack',
+    description:
+      'Create 30 days of patient education video content in one afternoon. Health-specific scripts, auto-editing, captions, and Instagram scheduling.',
+    url: 'https://www.timebackvideo.com/health-practitioners',
+  },
+}
+
+const pageJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Video Content for Health Practitioners — TimeBack',
+  description:
+    'TimeBack helps chiropractors, dentists, physiotherapists, and health practitioners create 30 days of patient education video content in one afternoon.',
+  url: 'https://www.timebackvideo.com/health-practitioners',
+  about: {
+    '@type': 'SoftwareApplication',
+    name: 'TimeBack',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    url: 'https://www.timebackvideo.com',
+  },
 }
 
 export default function HealthPractitionersPage() {
   return (
     <div className={s.page}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pageJsonLd) }}
+      />
       {/* NAV */}
       <nav className={s.nav}>
         <Link href="/" className={s.logo}>TimeBack</Link>
