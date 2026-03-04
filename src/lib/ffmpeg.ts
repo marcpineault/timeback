@@ -739,6 +739,7 @@ export async function removeSilence(
   const duration = await getVideoDuration(inputPath);
   const presetName = validatePresetName(options.silencePreset);
   const preset = SILENCE_PRESETS[presetName];
+  const { refinementConfig, gapConfig } = getConfigsFromPreset(presetName);
 
   logger.info(`[Silence Removal] Starting FFmpeg pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
 
@@ -762,14 +763,45 @@ export async function removeSilence(
     return outputPath;
   }
 
-  // Step 2: Convert silences to keep-segments with preset-aware padding
-  const segments = getNonSilentSegments(silences, duration, {
-    padding: 0,                                // Don't trim into speech edges
-    minSegmentDuration: 0.1,                   // Ignore segments shorter than 100ms
-    mergeGap: 0.05,                            // Merge segments less than 50ms apart
-    timebackPadding: preset.prePadMs / 1000,   // Pre-speech padding from preset
-    timebackPaddingEnd: preset.postPadMs / 1000, // Post-speech padding from preset
-  });
+  // Step 2: Convert silences to keep-segments
+  let segments: SilenceInterval[];
+
+  if (wordTimestamps && wordTimestamps.length > 0) {
+    // --- Hybrid pipeline: transcript-aware editing ---
+    // Uses word-level timestamps to snap cut boundaries to word edges,
+    // preventing clipped words or truncated sentences.
+
+    // 2a: Convert detected silences to speech segments (inverse)
+    const speechSegments = silencesToSpeechSegments(silences, duration);
+    logger.info(`[Silence Removal] Hybrid pipeline: ${speechSegments.length} speech segments from ${silences.length} silences`);
+
+    // 2b: Refine boundaries using word timestamps (Layer 2)
+    //     Snaps cut points to word edges with plosive/trailing padding
+    const refinedSegments = refineWithWordBoundaries(
+      speechSegments,
+      wordTimestamps,
+      duration,
+      refinementConfig
+    );
+    logger.info(`[Silence Removal] Refined to ${refinedSegments.length} segments using ${wordTimestamps.length} word timestamps`);
+
+    // 2c: Apply context-aware gap sizing (Layer 3)
+    //     Uses punctuation to determine pause durations between segments
+    segments = buildFinalSegments(refinedSegments, duration, gapConfig);
+
+    // 2d: Validate transcript coverage - warn about any words that would be cut
+    validateTranscriptCoverage(segments, wordTimestamps);
+  } else {
+    // --- Fallback: audio-only pipeline (current behavior) ---
+    logger.info(`[Silence Removal] No word timestamps available, using audio-only pipeline`);
+    segments = getNonSilentSegments(silences, duration, {
+      padding: 0,                                // Don't trim into speech edges
+      minSegmentDuration: 0.1,                   // Ignore segments shorter than 100ms
+      mergeGap: 0.05,                            // Merge segments less than 50ms apart
+      timebackPadding: preset.prePadMs / 1000,   // Pre-speech padding from preset
+      timebackPaddingEnd: preset.postPadMs / 1000, // Post-speech padding from preset
+    });
+  }
 
   logger.info(`[Silence Removal] ${segments.length} segments to keep from ${silences.length} silences`);
 
@@ -873,6 +905,49 @@ function silencesToSpeechSegments(
   }
 
   return segments;
+}
+
+/**
+ * Validate that every transcription word falls within a kept segment.
+ * Logs warnings for any words that would be cut by the current segment list.
+ * This is a safety net — it does NOT modify segments, only reports problems.
+ */
+function validateTranscriptCoverage(
+  segments: SilenceInterval[],
+  words: TranscriptionWord[]
+): void {
+  if (words.length === 0 || segments.length === 0) return;
+
+  const cutWords: TranscriptionWord[] = [];
+
+  for (const word of words) {
+    // A word is "covered" if any segment contains the word's midpoint.
+    // Using midpoint avoids false positives from Whisper timestamp inaccuracies
+    // at word boundaries.
+    const wordMid = (word.start + word.end) / 2;
+    const isCovered = segments.some(seg => seg.start <= wordMid && wordMid <= seg.end);
+
+    if (!isCovered) {
+      cutWords.push(word);
+    }
+  }
+
+  if (cutWords.length > 0) {
+    const percentage = ((cutWords.length / words.length) * 100).toFixed(1);
+    logger.warn(
+      `[Transcript Validation] ${cutWords.length}/${words.length} words (${percentage}%) fall outside kept segments:`
+    );
+    for (const word of cutWords.slice(0, 10)) {
+      logger.warn(
+        `[Transcript Validation]   "${word.word}" at ${word.start.toFixed(2)}s-${word.end.toFixed(2)}s`
+      );
+    }
+    if (cutWords.length > 10) {
+      logger.warn(`[Transcript Validation]   ... and ${cutWords.length - 10} more`);
+    }
+  } else {
+    logger.info(`[Transcript Validation] All ${words.length} words are covered by kept segments`);
+  }
 }
 
 /**
