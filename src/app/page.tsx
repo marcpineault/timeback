@@ -184,6 +184,7 @@ export default async function LandingPage() {
         <div className="nav-links">
           <a href="#how-it-works">How It Works</a>
           <a href="#pricing">Pricing</a>
+          <Link href="/blog">Blog</Link>
           <a
             href="https://www.youtube.com/playlist?list=PLhATaQNX0bxMeX0e8AA-TSk8L0g3t-QX7"
             target="_blank"
