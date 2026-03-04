@@ -20,6 +20,59 @@ export const metadata: Metadata = {
   },
 }
 
+const pricingJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'TimeBack Pricing',
+  description:
+    'Pricing plans for TimeBack video content platform. Free tier, Creator, Business, and Enterprise plans.',
+  url: 'https://www.timebackvideo.com/pricing',
+  mainEntity: {
+    '@type': 'SoftwareApplication',
+    name: 'TimeBack',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Web',
+    offers: [
+      {
+        '@type': 'Offer',
+        name: 'Starter',
+        price: '0',
+        priceCurrency: 'USD',
+        description: '5 videos per month, 3 AI script generations, 720p resolution',
+        availability: 'https://schema.org/InStock',
+      },
+      {
+        '@type': 'Offer',
+        name: 'Creator',
+        price: '19',
+        priceCurrency: 'USD',
+        priceSpecification: {
+          '@type': 'UnitPriceSpecification',
+          price: '19',
+          priceCurrency: 'USD',
+          billingDuration: 'P1M',
+        },
+        description: '120 videos per month, 50 AI script generations, 1080p, no watermark, priority processing',
+        availability: 'https://schema.org/InStock',
+      },
+      {
+        '@type': 'Offer',
+        name: 'Business',
+        price: '49',
+        priceCurrency: 'USD',
+        priceSpecification: {
+          '@type': 'UnitPriceSpecification',
+          price: '49',
+          priceCurrency: 'USD',
+          billingDuration: 'P1M',
+        },
+        description: '250 videos per month, 200 AI script generations, up to 10-minute videos, 1080p, priority processing',
+        availability: 'https://schema.org/InStock',
+      },
+    ],
+  },
+}
+
 export default async function PricingPage() {
   const { userId } = await auth()
   let currentPlan = 'FREE'
@@ -33,6 +86,10 @@ export default async function PricingPage() {
 
   return (
     <div className="landing-page min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }}
+      />
       {/* Header */}
       <nav className="lp-nav">
         <Link href="/" className="nav-logo">TimeBack</Link>

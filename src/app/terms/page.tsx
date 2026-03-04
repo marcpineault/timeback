@@ -1,6 +1,22 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { auth } from '@clerk/nextjs/server'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
+
+export const metadata: Metadata = {
+  title: 'Terms and Conditions',
+  description:
+    'TimeBack terms and conditions. Review the rules, guidelines, and agreements governing your use of the TimeBack video content platform.',
+  alternates: {
+    canonical: '/terms',
+  },
+  openGraph: {
+    title: 'Terms and Conditions | TimeBack',
+    description:
+      'Review the rules, guidelines, and agreements governing your use of the TimeBack video content platform.',
+    url: 'https://www.timebackvideo.com/terms',
+  },
+}
 
 export default async function TermsPage() {
   const { userId } = await auth()

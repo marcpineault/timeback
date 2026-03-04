@@ -5,7 +5,6 @@ import { PLANS } from '@/lib/plans'
 import { getEnabledFeatures } from '@/lib/featureFlags'
 import VideoProcessor from './VideoProcessor'
 import WelcomeOverlay from '@/components/WelcomeOverlay'
-import RecentVideosTable from '@/components/RecentVideosTable'
 import OnboardingBanner from '@/components/OnboardingBanner'
 import DashboardSuggestions from '@/components/DashboardSuggestions'
 import Link from 'next/link'
@@ -67,15 +66,6 @@ export default async function DashboardPage() {
   const hour = today.getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const displayName = usage.userName?.split(' ')[0] || ''
-
-  // Serialize videos for client component
-  const serializedVideos = usage.recentVideos.map(v => ({
-    id: v.id,
-    originalName: v.originalName,
-    status: v.status,
-    createdAt: v.createdAt.toISOString(),
-    processedUrl: v.processedUrl,
-  }))
 
   return (
     <div className="landing-page min-h-screen">
@@ -291,11 +281,6 @@ export default async function DashboardPage() {
           enabledFeatures={features}
           videosProcessed={usage.videosUsed}
         />
-
-        {/* Recent Videos */}
-        {serializedVideos.length > 0 && (
-          <RecentVideosTable videos={serializedVideos} />
-        )}
       </div>
     </div>
   )

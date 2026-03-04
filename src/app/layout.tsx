@@ -33,11 +33,20 @@ export const metadata: Metadata = {
     siteName: "TimeBack",
     title: "TimeBack — AI Video Content Platform for Professionals",
     description: "Create 30 days of social media video content in under an hour. TimeBack writes scripts, auto-edits videos, adds captions, and schedules posts to Instagram. Built for financial advisors, real estate agents, mortgage brokers, and lawyers.",
+    images: [
+      {
+        url: "https://www.timebackvideo.com/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "TimeBack — AI Video Content Platform for Professionals",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "TimeBack — AI Video Content Platform for Professionals",
     description: "Create 30 days of social media video content in under an hour. AI scripts, auto-editing, captions, and Instagram scheduling for professionals.",
+    images: ["https://www.timebackvideo.com/og-image.png"],
   },
   robots: {
     index: true,

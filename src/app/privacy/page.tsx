@@ -1,6 +1,22 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { auth } from '@clerk/nextjs/server'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy',
+  description:
+    'TimeBack privacy policy. Learn how we collect, use, and protect your personal data, video content, and account information.',
+  alternates: {
+    canonical: '/privacy',
+  },
+  openGraph: {
+    title: 'Privacy Policy | TimeBack',
+    description:
+      'Learn how TimeBack collects, uses, and protects your personal data, video content, and account information.',
+    url: 'https://www.timebackvideo.com/privacy',
+  },
+}
 
 export default async function PrivacyPage() {
   const { userId } = await auth()
