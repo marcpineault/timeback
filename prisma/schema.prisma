@@ -89,7 +89,7 @@ model UserProcessingPreferences {
   silenceThreshold     Float   @default(-25)
   silenceDuration      Float   @default(0.5)
   autoSilenceThreshold Boolean @default(true)
-  silencePreset        String  @default("natural")  // 'jumpCut' | 'natural' | 'gentle'
+  silencePreset        String  @default("natural")  // 'natural' | 'gentle'
   normalizeAudio       Boolean @default(true)
 
   // Video Settings

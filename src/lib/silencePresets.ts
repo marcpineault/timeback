@@ -6,7 +6,7 @@ import { BoundaryRefinementConfig, DEFAULT_BOUNDARY_CONFIG } from './boundaryRef
 /**
  * Silence removal preset names
  */
-export type SilencePresetName = 'jumpCut' | 'natural' | 'gentle';
+export type SilencePresetName = 'natural' | 'gentle';
 
 /**
  * Complete silence removal preset configuration
@@ -33,21 +33,9 @@ export interface SilencePreset {
 }
 
 /**
- * The three editing presets that control silence removal aggressiveness
+ * The editing presets that control silence removal aggressiveness
  */
 export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
-  jumpCut: {
-    name: 'Jump Cut',
-    description: 'Fast-paced, TikTok/YouTube style — zero dead space',
-    speechPadMs: 30,
-    prePadMs: 60,
-    postPadMs: 120,
-    minSilenceToRemoveMs: 300,
-    minRetainedGapMs: 12,
-    sentenceGapMs: 30,
-    breathHandling: 'remove',
-    vadThreshold: 0.55,
-  },
   natural: {
     name: 'Natural',
     description: 'Conversational, podcast style (default) — tight editing',
@@ -128,7 +116,7 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
 
   const boundaryConfig: BoundaryRefinementConfig = {
     ...DEFAULT_BOUNDARY_CONFIG,
-    crossfadeMs: presetName === 'jumpCut' ? 3 : 5,
+    crossfadeMs: 5,
   };
 
   return { vadConfig, refinementConfig, gapConfig, boundaryConfig, fallbackPadMs: preset.speechPadMs };
