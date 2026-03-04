@@ -739,7 +739,6 @@ export async function removeSilence(
   const duration = await getVideoDuration(inputPath);
   const presetName = validatePresetName(options.silencePreset);
   const preset = SILENCE_PRESETS[presetName];
-  const { refinementConfig, gapConfig } = getConfigsFromPreset(presetName);
 
   logger.info(`[Silence Removal] Starting FFmpeg pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
 
@@ -763,44 +762,19 @@ export async function removeSilence(
     return outputPath;
   }
 
-  // Step 2: Convert silences to keep-segments
-  let segments: SilenceInterval[];
+  // Step 2: Convert silences to keep-segments using FFmpeg-based approach
+  let segments = getNonSilentSegments(silences, duration, {
+    padding: 0,                                // Don't trim into speech edges
+    minSegmentDuration: 0.1,                   // Ignore segments shorter than 100ms
+    mergeGap: 0.05,                            // Merge segments less than 50ms apart
+    timebackPadding: preset.prePadMs / 1000,   // Pre-speech padding from preset
+    timebackPaddingEnd: preset.postPadMs / 1000, // Post-speech padding from preset
+  });
 
+  // Step 2b: When transcript is available, protect sentence endings from being clipped
   if (wordTimestamps && wordTimestamps.length > 0) {
-    // --- Hybrid pipeline: transcript-aware editing ---
-    // Uses word-level timestamps to snap cut boundaries to word edges,
-    // preventing clipped words or truncated sentences.
-
-    // 2a: Convert detected silences to speech segments (inverse)
-    const speechSegments = silencesToSpeechSegments(silences, duration);
-    logger.info(`[Silence Removal] Hybrid pipeline: ${speechSegments.length} speech segments from ${silences.length} silences`);
-
-    // 2b: Refine boundaries using word timestamps (Layer 2)
-    //     Snaps cut points to word edges with plosive/trailing padding
-    const refinedSegments = refineWithWordBoundaries(
-      speechSegments,
-      wordTimestamps,
-      duration,
-      refinementConfig
-    );
-    logger.info(`[Silence Removal] Refined to ${refinedSegments.length} segments using ${wordTimestamps.length} word timestamps`);
-
-    // 2c: Apply context-aware gap sizing (Layer 3)
-    //     Uses punctuation to determine pause durations between segments
-    segments = buildFinalSegments(refinedSegments, duration, gapConfig);
-
-    // 2d: Validate transcript coverage - warn about any words that would be cut
+    segments = protectWordsFromClipping(segments, wordTimestamps, duration, preset.postPadMs / 1000);
     validateTranscriptCoverage(segments, wordTimestamps);
-  } else {
-    // --- Fallback: audio-only pipeline (current behavior) ---
-    logger.info(`[Silence Removal] No word timestamps available, using audio-only pipeline`);
-    segments = getNonSilentSegments(silences, duration, {
-      padding: 0,                                // Don't trim into speech edges
-      minSegmentDuration: 0.1,                   // Ignore segments shorter than 100ms
-      mergeGap: 0.05,                            // Merge segments less than 50ms apart
-      timebackPadding: preset.prePadMs / 1000,   // Pre-speech padding from preset
-      timebackPaddingEnd: preset.postPadMs / 1000, // Post-speech padding from preset
-    });
   }
 
   logger.info(`[Silence Removal] ${segments.length} segments to keep from ${silences.length} silences`);
@@ -908,9 +882,113 @@ function silencesToSpeechSegments(
 }
 
 /**
+ * Protect words from being clipped by extending the nearest segment to cover them.
+ * Focuses on sentence-ending words (trailing punctuation) which are most noticeable
+ * when clipped, but also catches any other words that fall outside segments.
+ *
+ * This keeps the FFmpeg silence-detection approach as primary — the transcript
+ * is only used as a safety net to extend segments where speech got misclassified
+ * as silence.
+ */
+function protectWordsFromClipping(
+  segments: SilenceInterval[],
+  words: TranscriptionWord[],
+  totalDuration: number,
+  postPadSec: number
+): SilenceInterval[] {
+  if (words.length === 0 || segments.length === 0) return segments;
+
+  // Work on a mutable copy
+  const result = segments.map(s => ({ ...s }));
+  let extended = 0;
+
+  for (const word of words) {
+    const wordEnd = word.end;
+    const wordStart = word.start;
+
+    // Find the segment that contains or is closest to this word
+    let bestIdx = -1;
+    let bestDist = Infinity;
+
+    for (let i = 0; i < result.length; i++) {
+      const seg = result[i];
+
+      // Word is fully inside this segment — no action needed
+      if (seg.start <= wordStart && wordEnd <= seg.end) {
+        bestIdx = -1;
+        break;
+      }
+
+      // Word overlaps the end of this segment (partially clipped) or
+      // falls just after it — this is the sentence-ending clipping case
+      if (wordStart < seg.end + 0.3 && wordEnd > seg.end) {
+        bestIdx = i;
+        break;
+      }
+
+      // Word overlaps the start of this segment (partially clipped) or
+      // falls just before it
+      if (wordEnd > seg.start - 0.3 && wordStart < seg.start) {
+        bestIdx = i;
+        break;
+      }
+
+      // Track closest segment for words that fall in gaps
+      const dist = Math.min(
+        Math.abs(wordStart - seg.end),
+        Math.abs(seg.start - wordEnd)
+      );
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+
+    // Only extend if the word is reasonably close to a segment (within 0.5s)
+    // Words far from any segment are likely transcription artifacts
+    if (bestIdx >= 0 && bestDist <= 0.5) {
+      const seg = result[bestIdx];
+      const newStart = Math.max(0, Math.min(seg.start, wordStart - 0.03));
+      const newEnd = Math.min(totalDuration, Math.max(seg.end, wordEnd + postPadSec));
+
+      if (newStart < seg.start || newEnd > seg.end) {
+        extended++;
+        const trimmedWord = word.word.trim();
+        const isSentenceEnd = /[.!?]$/.test(trimmedWord);
+        logger.debug(
+          `[Word Protection] Extended segment to cover "${trimmedWord}" at ${wordStart.toFixed(2)}s-${wordEnd.toFixed(2)}s` +
+          (isSentenceEnd ? ' (sentence ending)' : '')
+        );
+        seg.start = newStart;
+        seg.end = newEnd;
+      }
+    }
+  }
+
+  if (extended > 0) {
+    logger.info(`[Word Protection] Extended ${extended} segment boundaries to protect words from clipping`);
+
+    // Re-merge any segments that now overlap after extension
+    result.sort((a, b) => a.start - b.start);
+    const merged: SilenceInterval[] = [result[0]];
+    for (let i = 1; i < result.length; i++) {
+      const prev = merged[merged.length - 1];
+      const curr = result[i];
+      if (curr.start <= prev.end) {
+        prev.end = Math.max(prev.end, curr.end);
+      } else {
+        merged.push(curr);
+      }
+    }
+    return merged;
+  }
+
+  return result;
+}
+
+/**
  * Validate that every transcription word falls within a kept segment.
- * Logs warnings for any words that would be cut by the current segment list.
- * This is a safety net — it does NOT modify segments, only reports problems.
+ * Logs warnings for any words that still got cut after protection.
  */
 function validateTranscriptCoverage(
   segments: SilenceInterval[],
@@ -921,12 +999,8 @@ function validateTranscriptCoverage(
   const cutWords: TranscriptionWord[] = [];
 
   for (const word of words) {
-    // A word is "covered" if any segment contains the word's midpoint.
-    // Using midpoint avoids false positives from Whisper timestamp inaccuracies
-    // at word boundaries.
     const wordMid = (word.start + word.end) / 2;
     const isCovered = segments.some(seg => seg.start <= wordMid && wordMid <= seg.end);
-
     if (!isCovered) {
       cutWords.push(word);
     }
@@ -935,7 +1009,7 @@ function validateTranscriptCoverage(
   if (cutWords.length > 0) {
     const percentage = ((cutWords.length / words.length) * 100).toFixed(1);
     logger.warn(
-      `[Transcript Validation] ${cutWords.length}/${words.length} words (${percentage}%) fall outside kept segments:`
+      `[Transcript Validation] ${cutWords.length}/${words.length} words (${percentage}%) still outside kept segments:`
     );
     for (const word of cutWords.slice(0, 10)) {
       logger.warn(
