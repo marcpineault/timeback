@@ -15,6 +15,7 @@ const isPublicRoute = createRouteMatcher([
   '/health-practitioners',
   '/privacy',
   '/terms',
+  '/blog(.*)',
   '/sitemap.xml',
   '/robots.txt',
   '/api/webhooks(.*)',
