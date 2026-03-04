@@ -54,7 +54,7 @@ export default function BeforeAfterVideo() {
   return (
     <section className="lp-before-after reveal">
       <div className="section-label">See the Difference</div>
-      <h2>Raw footage in. Polished video out.</h2>
+      <h2>Hours of editing. Gone in seconds.</h2>
       <p>Upload your unedited recording — TimeBack removes silences, tightens cuts, and adds captions automatically.</p>
 
       <div className="ba-container">

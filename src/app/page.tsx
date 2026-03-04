@@ -8,16 +8,16 @@ import MobileMenuToggle from '@/components/MobileMenuToggle'
 import BeforeAfterVideo from '@/components/BeforeAfterVideo'
 
 export const metadata: Metadata = {
-  title: 'TimeBack — AI Video Content Platform for Professionals | Create 30 Days of Content in One Hour',
+  title: 'TimeBack — Stop Editing Videos. Auto-Remove Silence, Add Captions, and Post.',
   description:
-    'TimeBack helps financial advisors, real estate agents, mortgage brokers, and lawyers create 30 days of social media video content in under an hour. AI writes scripts, auto-edits videos with silence removal and captions, and schedules posts to Instagram. Replaces ChatGPT + CapCut + Metricool in one tool. Free to start.',
+    'TimeBack edits your videos in seconds — silence removal, captions, clean cuts — so you skip the editing entirely. Upload raw footage, download polished posts. No editing skills required. Free to start.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'TimeBack — Create 30 Days of Video Content in One Hour',
+    title: 'TimeBack — Stop Editing Videos. Auto-Remove Silence, Add Captions, and Post.',
     description:
-      'AI-powered video content platform for professionals. Scripts, editing, captions, and Instagram scheduling — all in one tool. Built for financial advisors, real estate agents, mortgage brokers, and lawyers.',
+      'You spent 2 hours recording and 6 hours editing. TimeBack does the editing in seconds — silence removal, captions, clean cuts — so you go from raw footage to posted in minutes.',
     url: 'https://www.timebackvideo.com',
   },
 }
@@ -198,15 +198,15 @@ export default async function LandingPage() {
 
       {/* HERO */}
       <section className="lp-hero">
-        <h1>Record once. Post all month.<br /><em>We handle everything else.</em></h1>
+        <h1>Stop editing videos.<br /><em>Start posting them.</em></h1>
         <p className="hero-sub">
-          You talk into your phone for an afternoon. TimeBack writes your scripts, cuts the dead air, adds captions, and posts to Instagram for you — every single day. No editing. No content calendar. No skill required.
+          You spent 2 hours recording and 6 hours editing. TimeBack does the editing in seconds — silence removal, captions, clean cuts — so you go from raw footage to posted in minutes.
         </p>
         <div className="hero-ctas">
           <Link href="/sign-up" className="btn-primary">Get 5 Free Videos →</Link>
           <a href="#selector" className="hero-link-secondary">What&apos;s your industry? ↓</a>
         </div>
-        <p className="hero-proof">No credit card · No editing skills · <strong>Ready in minutes, not days</strong></p>
+        <p className="hero-proof">No editing skills · No timeline scrubbing · <strong>Ready in seconds</strong></p>
       </section>
 
       {/* INDUSTRY SELECTOR */}
@@ -219,20 +219,20 @@ export default async function LandingPage() {
         <div className="steps">
           <div className="step">
             <div className="step-number">01</div>
-            <h3>Pick your topics</h3>
-            <p>Tell TimeBack your industry and audience. AI generates a batch of scroll-stopping scripts you can customize or use as-is.</p>
+            <h3>Record your videos</h3>
+            <p>Just talk. Don&apos;t worry about pauses, ums, or retakes — TimeBack cuts all of that out automatically.</p>
             <span className="time-tag">⚡ 5 minutes</span>
           </div>
           <div className="step">
             <div className="step-number">02</div>
-            <h3>Batch record &amp; upload</h3>
-            <p>Film your videos back to back, then upload up to 50 at once. No teleprompter needed — just talk and AI handles the rest.</p>
+            <h3>Upload &amp; walk away</h3>
+            <p>Drop up to 50 videos at once. TimeBack handles the editing — silence removal, captions, clean cuts — while you do literally anything else.</p>
             <span className="time-tag">⚡ 1–2 hours</span>
           </div>
           <div className="step">
             <div className="step-number">03</div>
-            <h3>Auto-edit &amp; auto-post</h3>
-            <p>TimeBack removes silences, adds captions, polishes your cuts, and auto-schedules everything to Instagram. You&apos;re done.</p>
+            <h3>Post or schedule</h3>
+            <p>Download your polished videos or auto-post to Instagram. No editing app. No timeline. No export settings.</p>
             <span className="time-tag">⚡ Automatic</span>
           </div>
         </div>
@@ -254,28 +254,28 @@ export default async function LandingPage() {
       {/* PROBLEM */}
       <section className="lp-problem reveal">
         <div className="section-label">Sound Familiar?</div>
-        <h2>You&apos;re great at your job. Terrible at posting about it.</h2>
-        <p>Every week you tell yourself &ldquo;I&apos;ll start posting this week.&rdquo; Every week you don&apos;t. Not because you&apos;re lazy — because it takes forever and you don&apos;t know where to start.</p>
+        <h2>Editing is the bottleneck. Not the recording.</h2>
+        <p>Recording takes 2 hours. Editing takes 6. That&apos;s why your camera roll is full of videos that never get posted — the editing kills your momentum every single time.</p>
         <div className="pain-grid">
           <div className="pain-card">
             <div className="icon">⏰</div>
-            <h4>Videos rotting in your camera roll</h4>
-            <p>You recorded 10 videos last month. They&apos;re still unedited. You know it. It haunts you.</p>
+            <h4>6 hours of editing per video</h4>
+            <p>Cutting silences, syncing captions, tweaking timelines. The editing takes 3x longer than the recording itself.</p>
           </div>
           <div className="pain-card">
             <div className="icon">🤷</div>
-            <h4>&ldquo;What do I even talk about?&rdquo;</h4>
-            <p>You open your camera, freeze, close it. Repeat. The blank stare is killing your momentum.</p>
+            <h4>20 unedited videos in your camera roll</h4>
+            <p>You recorded them weeks ago. They&apos;re still sitting there because you haven&apos;t had time to edit a single one.</p>
           </div>
           <div className="pain-card">
             <div className="icon">💸</div>
-            <h4>Agencies want $3K/month</h4>
-            <p>You called a content agency. They quoted you $3,000/month for 12 videos. That&apos;s insane.</p>
+            <h4>Editors want $50–$100 per video</h4>
+            <p>Outsourcing the editing costs $1,500+/month. And you still wait 3–5 days for each video back.</p>
           </div>
           <div className="pain-card">
             <div className="icon">📉</div>
-            <h4>Post, ghost, repeat</h4>
-            <p>One week you&apos;re on fire. Three weeks of silence. Your followers forget you exist.</p>
+            <h4>You post once, then disappear for a month</h4>
+            <p>You have the content. You just can&apos;t keep up with the editing. So you go silent and lose momentum.</p>
           </div>
         </div>
       </section>
@@ -283,23 +283,23 @@ export default async function LandingPage() {
       {/* NUMBERS */}
       <div className="lp-numbers">
         <div className="number-item">
-          <div className="big">50</div>
-          <div className="label">Videos per batch upload</div>
+          <div className="big">30</div>
+          <div className="label">Seconds to edit one video</div>
+        </div>
+        <div className="number-item">
+          <div className="big">40+</div>
+          <div className="label">Hours saved per month</div>
         </div>
         <div className="number-item">
           <div className="big">0</div>
-          <div className="label">Editing skills needed</div>
-        </div>
-        <div className="number-item">
-          <div className="big">1</div>
-          <div className="label">Afternoon to a month of content</div>
+          <div className="label">Editing skills required</div>
         </div>
       </div>
 
       {/* REPLACES */}
       <section className="lp-replaces reveal">
         <div className="section-label">One Tool, Not Three</div>
-        <h2>Stop paying for 3 apps that don&apos;t talk to each other</h2>
+        <h2>TimeBack replaces your entire editing workflow</h2>
         <p>You&apos;re using ChatGPT for scripts, CapCut to edit, and Metricool to schedule. TimeBack replaces all three — for less than any one of them costs.</p>
         <div className="replaces-grid">
           <div className="replaces-card replaced">
@@ -327,7 +327,7 @@ export default async function LandingPage() {
       {/* COMPARISON */}
       <section className="lp-comparison reveal">
         <div className="section-label">Why TimeBack</div>
-        <h2>You&apos;re overpaying. By a lot.</h2>
+        <h2>What 6 hours of editing looks like vs. 6 seconds</h2>
         <div className="compare-table">
           <div className="compare-row header">
             <div className="compare-cell"></div>
@@ -433,12 +433,12 @@ export default async function LandingPage() {
       {/* FEATURES */}
       <section className="lp-features reveal">
         <div className="section-label">Features</div>
-        <h2>You record. We write, edit, caption, and post.</h2>
+        <h2>You record. We edit. That&apos;s the deal.</h2>
         <div className="feature-grid">
           <div className="feature-card highlight">
             <span className="feature-tag">Core Feature</span>
-            <h3>Bulk upload. Bulk edit. Bulk schedule.</h3>
-            <p>Upload up to 50 raw videos at once. TimeBack edits every single one — removing dead air, adding captions, tightening pacing — then queues them all to post. One session, one month of content.</p>
+            <h3>Upload raw. Download polished.</h3>
+            <p>Drop up to 50 raw videos at once. TimeBack edits every single one in seconds — removing dead air, adding captions, tightening cuts — then queues them all to post. No timeline. No export settings. No editing skills.</p>
           </div>
           <div className="feature-card">
             <span className="feature-tag">AI Scripts</span>
@@ -447,8 +447,8 @@ export default async function LandingPage() {
           </div>
           <div className="feature-card">
             <span className="feature-tag">Smart Editing</span>
-            <h3>Silence removal that just works</h3>
-            <p>Awkward pauses, ums, dead air — all cut automatically. Your videos sound crisp and confident without touching an editor.</p>
+            <h3>Silence removal that saves hours</h3>
+            <p>Awkward pauses, ums, dead air — all cut automatically in seconds. What used to take 30 minutes per video now takes zero effort.</p>
           </div>
           <div className="feature-card">
             <span className="feature-tag">Captions</span>
@@ -469,7 +469,7 @@ export default async function LandingPage() {
         <h2>The all-in-one video content platform for professionals</h2>
         <div className="about-content">
           <p>
-            TimeBack is a video content creation platform that helps professionals create 30 days of social media video content in under one hour. It solves &ldquo;content paralysis&rdquo; — the problem where professionals know they should post video content but don&apos;t because it&apos;s too time-consuming and they don&apos;t know what to say.
+            TimeBack is a video editing platform that turns raw footage into polished, captioned, ready-to-post videos in seconds. It solves the real bottleneck in content creation — not the recording, but the hours of editing that come after. Upload your raw videos and TimeBack handles silence removal, captions, and clean cuts automatically.
           </p>
           <p>
             TimeBack combines four capabilities into a single tool: AI script generation tailored to your specific profession, automatic video editing with silence removal and dead air detection, auto-captioning on every video, and Instagram auto-scheduling. You can upload up to 50 videos at once and have them all edited, captioned, and scheduled automatically.
@@ -522,7 +522,7 @@ export default async function LandingPage() {
       {/* PRICING */}
       <section className="lp-pricing reveal" id="pricing">
         <div className="section-label">Pricing</div>
-        <h2>An agency charges $3,000/month.<br />TimeBack starts at $19.</h2>
+        <h2>Stop paying to edit videos.<br />Start at $19.</h2>
         <p>Same output. Fraction of the cost. And you get 5 videos free before you pay a dime.</p>
         <div className="price-cards">
           <div className="price-card">
@@ -554,8 +554,8 @@ export default async function LandingPage() {
 
       {/* FINAL CTA */}
       <section className="lp-final-cta reveal">
-        <h2>One afternoon. 30 days of content. <em>Zero excuses.</em></h2>
-        <p>Record your videos on Sunday. TimeBack writes the scripts, cuts the dead air, adds captions, and posts for you every day of the month. Your first 5 videos are free — no credit card, no commitment, no catch.</p>
+        <h2>Record today. Post tomorrow. <em>Skip the editing entirely.</em></h2>
+        <p>Record your videos, upload them, and TimeBack handles the editing — silence removal, captions, clean cuts — in seconds. Your first 5 videos are free. No credit card, no commitment, no editing required.</p>
         <Link href="/sign-up" className="btn-primary" style={{ fontSize: '1.1rem', padding: '1.1rem 2.8rem' }}>Get Your 5 Free Videos →</Link>
         <div className="final-footer">No credit card · No editing skills needed · Cancel anytime</div>
       </section>
