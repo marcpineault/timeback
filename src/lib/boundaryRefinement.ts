@@ -272,9 +272,23 @@ export function buildCrossfadeFilterComplex(
   });
 
   // Concatenate all segments
-  filterParts.push(
-    `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`
-  );
+  if (hasRoomTone) {
+    // Concat to intermediate labels, then mix room tone underneath
+    filterParts.push(
+      `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa_raw]`
+    );
+    // Loop room tone (input 1) infinitely and mix at low volume under speech
+    filterParts.push(
+      `[1:a]aloop=loop=-1:size=2000000,volume=0.04[rt]`
+    );
+    filterParts.push(
+      `[outa_raw][rt]amix=inputs=2:duration=first:weights=1 0.04[outa]`
+    );
+  } else {
+    filterParts.push(
+      `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`
+    );
+  }
 
   return {
     filterComplex: filterParts.join(';'),

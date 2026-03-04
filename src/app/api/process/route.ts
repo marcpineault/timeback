@@ -342,11 +342,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Remove silence using hybrid pipeline (VAD + word boundaries + gap processing)
+    // Use lossless intermediate encoding when another encode pass will follow
+    const willReEncode = generateCaptions || !!willHaveHeadline;
     reportProgress('Removing silence...');
     logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     intermediateFiles.push(stepOutput); // Track for cleanup on error
-    await removeSilence(currentInput, stepOutput, options, earlyTranscriptionWords);
+    await removeSilence(currentInput, stepOutput, { ...options, isIntermediate: willReEncode }, earlyTranscriptionWords);
     // Clean up intermediate file (and remove from tracking since it's deleted)
     if (currentInput !== inputPath) {
       await fs.unlink(currentInput).catch(() => {});

@@ -8,7 +8,7 @@ import { runFFmpegCommand, runFFmpegWithRetry, runFFmpegSpawn, FFmpegProcessErro
 import { detectSilenceWithVad, isSileroVadAvailable, SpeechSegment, SileroVadConfig, DEFAULT_VAD_CONFIG } from './sileroVadDetection';
 import { refineWithWordBoundaries, refinedSegmentsToSilences, RefinedSpeechSegment, RefinementConfig, DEFAULT_REFINEMENT_CONFIG } from './hybridBoundaryRefinement';
 import { buildFinalSegments, GapProcessingConfig, DEFAULT_GAP_CONFIG } from './gapProcessing';
-import { buildCrossfadeFilterComplex, BoundaryRefinementConfig, DEFAULT_BOUNDARY_CONFIG } from './boundaryRefinement';
+import { buildCrossfadeFilterComplex, extractRoomTone, BoundaryRefinementConfig, DEFAULT_BOUNDARY_CONFIG } from './boundaryRefinement';
 import { SilencePresetName, SILENCE_PRESETS, getConfigsFromPreset, validatePresetName } from './silencePresets';
 import type { TranscriptionWord } from './whisper';
 
@@ -70,6 +70,7 @@ export interface ProcessingOptions {
   headlinePosition?: 'top' | 'center' | 'bottom';
   headlineStyle?: HeadlineStyle;
   captionStyle?: 'instagram' | 'minimal';
+  isIntermediate?: boolean; // Use lossless encoding for intermediate files that will be re-encoded
 }
 
 // Caption styles optimized for safe zones
@@ -786,17 +787,41 @@ export async function removeSilence(
     return outputPath;
   }
 
-  // Step 3: Build FFmpeg filter complex with crossfades at splice points
+  // Step 3: Extract room tone for natural splice transitions
+  const outputDir = path.dirname(outputPath);
+  let roomTonePath: string | null = null;
+  try {
+    roomTonePath = await extractRoomTone(inputPath, silences, outputDir);
+    if (roomTonePath) {
+      logger.info(`[Silence Removal] Room tone extracted for ambient bed`);
+    }
+  } catch (roomToneErr) {
+    logger.warn(`[Silence Removal] Room tone extraction failed, continuing without`, {
+      error: roomToneErr instanceof Error ? roomToneErr.message : String(roomToneErr),
+    });
+  }
+
+  // Step 4: Build FFmpeg filter complex with crossfades at splice points
   const crossfadeMs = 5;
-  const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs);
+  const hasRoomTone = roomTonePath !== null;
+  const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs, hasRoomTone);
 
   if (!filterComplex) {
     logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
+    if (roomTonePath) fs.unlinkSync(roomTonePath);
     fs.copyFileSync(inputPath, outputPath);
     return outputPath;
   }
 
   logger.debug(`[Silence Removal] Concatenating ${segments.length} segments with crossfades...`);
+
+  // Encoding settings: lossless for intermediate files, quality for final output
+  const isIntermediate = options.isIntermediate === true;
+  const videoCrf = isIntermediate ? '0' : '18';
+  const videoPreset = isIntermediate ? 'ultrafast' : 'fast';
+  if (isIntermediate) {
+    logger.info(`[Silence Removal] Using lossless intermediate encoding (CRF 0) — will be re-encoded later`);
+  }
 
   // Use retry wrapper for resilience against SIGKILL/memory issues
   const processConfig: FFmpegProcessConfig = {
@@ -807,14 +832,18 @@ export async function removeSilence(
 
   try {
     await runFFmpegWithRetry(() => {
-      return ffmpeg(inputPath)
+      const cmd = ffmpeg(inputPath);
+      if (roomTonePath) {
+        cmd.input(roomTonePath);
+      }
+      return cmd
         .complexFilter(filterComplex)
         .outputOptions([
           '-map', '[outv]',
           '-map', '[outa]',
           '-c:v', 'libx264',
-          '-preset', 'fast',
-          '-crf', '18',
+          '-preset', videoPreset,
+          '-crf', videoCrf,
           '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
@@ -824,9 +853,18 @@ export async function removeSilence(
         .output(outputPath);
     }, processConfig);
 
+    // Clean up room tone file
+    if (roomTonePath) {
+      try { fs.unlinkSync(roomTonePath); } catch { /* ignore */ }
+    }
+
     logger.debug(`[Silence Removal] Complete!`);
     return outputPath;
   } catch (err) {
+    // Clean up room tone file on error
+    if (roomTonePath) {
+      try { fs.unlinkSync(roomTonePath); } catch { /* ignore */ }
+    }
     if (err instanceof FFmpegProcessError) {
       if (err.isMemoryKill) {
         logger.error(`[Silence Removal] Process killed due to memory constraints.`);
