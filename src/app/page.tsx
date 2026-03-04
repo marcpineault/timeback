@@ -198,15 +198,15 @@ export default async function LandingPage() {
 
       {/* HERO */}
       <section className="lp-hero">
-        <h1>Create one month of content.<br /><em>In one hour.</em></h1>
+        <h1>Record once. Post all month.<br /><em>We handle everything else.</em></h1>
         <p className="hero-sub">
-          TimeBack writes your scripts, edits your videos, and posts to Instagram — all on autopilot. No content experience needed.
+          You talk into your phone for an afternoon. TimeBack writes your scripts, cuts the dead air, adds captions, and posts to Instagram for you — every single day. No editing. No content calendar. No skill required.
         </p>
         <div className="hero-ctas">
-          <Link href="/sign-up" className="btn-primary">Start Creating Free →</Link>
+          <Link href="/sign-up" className="btn-primary">Get 5 Free Videos →</Link>
           <a href="#selector" className="hero-link-secondary">What&apos;s your industry? ↓</a>
         </div>
-        <p className="hero-proof">No credit card required · <strong>5 free videos</strong> to start</p>
+        <p className="hero-proof">No credit card · No editing skills · <strong>Ready in minutes, not days</strong></p>
       </section>
 
       {/* INDUSTRY SELECTOR */}
@@ -215,7 +215,7 @@ export default async function LandingPage() {
       {/* HOW IT WORKS */}
       <section className="lp-how reveal" id="how-it-works">
         <div className="section-label">How It Works</div>
-        <h2>From zero to a full feed in 3 steps</h2>
+        <h2>Talk into your phone. We do the rest. Seriously.</h2>
         <div className="steps">
           <div className="step">
             <div className="step-number">01</div>
@@ -253,29 +253,29 @@ export default async function LandingPage() {
 
       {/* PROBLEM */}
       <section className="lp-problem reveal">
-        <div className="section-label">The Problem</div>
-        <h2>You know you should be posting. But you&apos;re not.</h2>
-        <p>You&apos;re good at what you do — coaching, selling homes, advising clients. But growing on social media feels like a second full-time job you didn&apos;t sign up for.</p>
+        <div className="section-label">Sound Familiar?</div>
+        <h2>You&apos;re great at your job. Terrible at posting about it.</h2>
+        <p>Every week you tell yourself &ldquo;I&apos;ll start posting this week.&rdquo; Every week you don&apos;t. Not because you&apos;re lazy — because it takes forever and you don&apos;t know where to start.</p>
         <div className="pain-grid">
           <div className="pain-card">
             <div className="icon">⏰</div>
-            <h4>No time to edit</h4>
-            <p>You recorded 10 videos last weekend. They&apos;re still sitting in your camera roll, unedited.</p>
+            <h4>Videos rotting in your camera roll</h4>
+            <p>You recorded 10 videos last month. They&apos;re still unedited. You know it. It haunts you.</p>
           </div>
           <div className="pain-card">
             <div className="icon">🤷</div>
-            <h4>No idea what to say</h4>
-            <p>Staring at the camera with nothing to talk about is worse than not posting at all.</p>
+            <h4>&ldquo;What do I even talk about?&rdquo;</h4>
+            <p>You open your camera, freeze, close it. Repeat. The blank stare is killing your momentum.</p>
           </div>
           <div className="pain-card">
             <div className="icon">💸</div>
-            <h4>Can&apos;t afford an agency</h4>
-            <p>$2K–$5K/month for a content agency isn&apos;t realistic when you&apos;re building your business.</p>
+            <h4>Agencies want $3K/month</h4>
+            <p>You called a content agency. They quoted you $3,000/month for 12 videos. That&apos;s insane.</p>
           </div>
           <div className="pain-card">
             <div className="icon">📉</div>
-            <h4>Inconsistent posting</h4>
-            <p>You go hard for a week, disappear for a month, then wonder why nobody&apos;s engaging.</p>
+            <h4>Post, ghost, repeat</h4>
+            <p>One week you&apos;re on fire. Three weeks of silence. Your followers forget you exist.</p>
           </div>
         </div>
       </section>
@@ -299,8 +299,8 @@ export default async function LandingPage() {
       {/* REPLACES */}
       <section className="lp-replaces reveal">
         <div className="section-label">One Tool, Not Three</div>
-        <h2>Replace your entire stack</h2>
-        <p>Stop juggling three apps. TimeBack does it all.</p>
+        <h2>Stop paying for 3 apps that don&apos;t talk to each other</h2>
+        <p>You&apos;re using ChatGPT for scripts, CapCut to edit, and Metricool to schedule. TimeBack replaces all three — for less than any one of them costs.</p>
         <div className="replaces-grid">
           <div className="replaces-card replaced">
             <div className="replaces-name">ChatGPT</div>
@@ -327,7 +327,7 @@ export default async function LandingPage() {
       {/* COMPARISON */}
       <section className="lp-comparison reveal">
         <div className="section-label">Why TimeBack</div>
-        <h2>The math is simple</h2>
+        <h2>You&apos;re overpaying. By a lot.</h2>
         <div className="compare-table">
           <div className="compare-row header">
             <div className="compare-cell"></div>
@@ -364,7 +364,7 @@ export default async function LandingPage() {
 
       {/* SOCIAL PROOF */}
       <section className="lp-proof reveal">
-        <h2>People are saving hours every week</h2>
+        <h2>They thought it was too good to be true, too</h2>
         <div className="testimonials">
           <div className="testimonial">
             <div className="stars">★★★★★</div>
@@ -395,7 +395,7 @@ export default async function LandingPage() {
       <section className="lp-audience reveal">
         <div className="section-label">Who It&apos;s For</div>
         <h2>Built for experts, not influencers</h2>
-        <p>You don&apos;t need to be a content creator. You just need something worth saying.</p>
+        <p>You don&apos;t need a ring light or a content strategy. You just need to know your stuff — TimeBack handles the rest.</p>
         <div className="audience-grid">
           <div className="audience-card">
             <div className="emoji">🏡</div>
@@ -433,7 +433,7 @@ export default async function LandingPage() {
       {/* FEATURES */}
       <section className="lp-features reveal">
         <div className="section-label">Features</div>
-        <h2>Everything between &ldquo;record&rdquo; and &ldquo;posted&rdquo;</h2>
+        <h2>You record. We write, edit, caption, and post.</h2>
         <div className="feature-grid">
           <div className="feature-card highlight">
             <span className="feature-tag">Core Feature</span>
@@ -522,8 +522,8 @@ export default async function LandingPage() {
       {/* PRICING */}
       <section className="lp-pricing reveal" id="pricing">
         <div className="section-label">Pricing</div>
-        <h2>Less than your morning coffee habit</h2>
-        <p>Start free. Upgrade when you&apos;re hooked.</p>
+        <h2>An agency charges $3,000/month.<br />TimeBack starts at $19.</h2>
+        <p>Same output. Fraction of the cost. And you get 5 videos free before you pay a dime.</p>
         <div className="price-cards">
           <div className="price-card">
             <div className="tier">Starter</div>
@@ -554,10 +554,10 @@ export default async function LandingPage() {
 
       {/* FINAL CTA */}
       <section className="lp-final-cta reveal">
-        <h2>Stop overthinking. <em>Start posting.</em></h2>
-        <p>Your next 30 days of content are one afternoon away. No editing skills. No content calendar anxiety. Just results.</p>
-        <Link href="/sign-up" className="btn-primary" style={{ fontSize: '1.1rem', padding: '1.1rem 2.8rem' }}>Start Creating Free →</Link>
-        <div className="final-footer">5 free videos · No credit card · Cancel anytime</div>
+        <h2>One afternoon. 30 days of content. <em>Zero excuses.</em></h2>
+        <p>Record your videos on Sunday. TimeBack writes the scripts, cuts the dead air, adds captions, and posts for you every day of the month. Your first 5 videos are free — no credit card, no commitment, no catch.</p>
+        <Link href="/sign-up" className="btn-primary" style={{ fontSize: '1.1rem', padding: '1.1rem 2.8rem' }}>Get Your 5 Free Videos →</Link>
+        <div className="final-footer">No credit card · No editing skills needed · Cancel anytime</div>
       </section>
 
       {/* FOOTER */}
