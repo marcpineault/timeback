@@ -19,27 +19,6 @@ const DEFAULT_CONFIG: ProcessingConfig = {
   silencePreset: 'natural' as const,
   useHookAsHeadline: false,
   generateAIHeadline: false,
-  generateBRoll: false,
-  bRollConfig: {
-    style: 'dynamic',
-    intensity: 'medium',
-    maxMoments: 3,
-  },
-  aspectRatio: 'original',
-  speechCorrection: false,
-  speechCorrectionConfig: {
-    removeFillerWords: true,
-    removeRepeatedWords: true,
-    removeRepeatedPhrases: true,
-    removeFalseStarts: true,
-    removeSelfCorrections: true,
-    aggressiveness: 'moderate',
-    confidenceThreshold: 0.6,
-    language: 'auto',
-    customFillerWords: [],
-    customFillerPhrases: [],
-  },
-  speechCorrectionPreset: null,
 };
 
 export interface ProcessingPreferencesState {
@@ -99,14 +78,6 @@ export function useProcessingPreferences(): UseProcessingPreferencesReturn {
             autoSilenceThreshold: data.preferences.autoSilenceThreshold,
             useHookAsHeadline: data.preferences.useHookAsHeadline,
             generateAIHeadline: data.preferences.generateAIHeadline,
-            aspectRatio: data.preferences.aspectRatio,
-            speechCorrection: data.preferences.speechCorrection,
-            speechCorrectionConfig: {
-              ...DEFAULT_CONFIG.speechCorrectionConfig,
-              ...(data.preferences.speechCorrectionConfig || {}),
-            },
-            speechCorrectionPreset: data.preferences.speechCorrectionPreset ?? null,
-            generateBRoll: data.preferences.generateBRoll,
           };
 
           setConfigState(serverConfig);
@@ -152,14 +123,6 @@ export function useProcessingPreferences(): UseProcessingPreferencesReturn {
           ...DEFAULT_CONFIG,
           ...parsed,
           headline: '', // Always reset headline
-          speechCorrectionConfig: {
-            ...DEFAULT_CONFIG.speechCorrectionConfig,
-            ...(parsed.speechCorrectionConfig || {}),
-          },
-          bRollConfig: {
-            ...DEFAULT_CONFIG.bRollConfig,
-            ...(parsed.bRollConfig || {}),
-          },
         };
         setConfigState(mergedConfig);
         lastSavedConfig.current = JSON.stringify(mergedConfig);

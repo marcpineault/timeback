@@ -2,10 +2,6 @@
 
 import { useState, useEffect } from 'react';
 
-interface EnabledFeatures {
-  speechCorrection: boolean;
-}
-
 interface ProcessingOptionsProps {
   onProcess: (options: ProcessingConfig) => void;
   isProcessing: boolean;
@@ -15,22 +11,11 @@ interface ProcessingOptionsProps {
     originalName: string;
   } | null;
   videoCount?: number;
-  enabledFeatures?: EnabledFeatures;
 }
-
-export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
 
 export type HeadlineStyle = 'classic' | 'speech-bubble' | 'clean';
 
 export type CaptionStyle = 'instagram' | 'minimal';
-
-export type BRollStyle = 'minimal' | 'dynamic' | 'data-focused';
-
-export interface BRollConfig {
-  style: BRollStyle;
-  intensity: 'low' | 'medium' | 'high';
-  maxMoments: number;
-}
 
 export type SilencePreset = 'natural' | 'gentle';
 
@@ -45,25 +30,7 @@ export interface ProcessingConfig {
   autoSilenceThreshold: boolean;
   silencePreset: SilencePreset;
   useHookAsHeadline: boolean;
-  generateAIHeadline: boolean;  // Use AI to generate engaging headline
-  generateBRoll: boolean;
-  bRollConfig: BRollConfig;
-  aspectRatio: AspectRatioPreset;
-  // Speech correction options
-  speechCorrection: boolean;
-  speechCorrectionConfig: {
-    removeFillerWords: boolean;
-    removeRepeatedWords: boolean;
-    removeRepeatedPhrases: boolean;
-    removeFalseStarts: boolean;
-    removeSelfCorrections: boolean;
-    aggressiveness: 'conservative' | 'moderate' | 'aggressive';
-    confidenceThreshold: number;
-    language: string;
-    customFillerWords: string[];
-    customFillerPhrases: string[];
-  };
-  speechCorrectionPreset?: string | null;
+  generateAIHeadline: boolean;
 }
 
 // Processing presets for quick configuration
@@ -85,7 +52,6 @@ const PRESETS: Record<PresetKey, Preset> = {
     name: 'YouTube Shorts',
     icon: '🎬',
     config: {
-      aspectRatio: '9:16',
       generateCaptions: true,
       captionStyle: 'instagram',
 
@@ -97,7 +63,6 @@ const PRESETS: Record<PresetKey, Preset> = {
     name: 'Instagram Reels',
     icon: '📸',
     config: {
-      aspectRatio: '9:16',
       generateCaptions: true,
       captionStyle: 'instagram',
 
@@ -109,7 +74,6 @@ const PRESETS: Record<PresetKey, Preset> = {
     name: 'YouTube',
     icon: '▶️',
     config: {
-      aspectRatio: '16:9',
       generateCaptions: true,
       captionStyle: 'instagram',
 
@@ -121,7 +85,6 @@ const PRESETS: Record<PresetKey, Preset> = {
     name: 'Instagram Feed',
     icon: '🖼️',
     config: {
-      aspectRatio: '1:1',
       generateCaptions: true,
       captionStyle: 'instagram',
 
@@ -130,59 +93,8 @@ const PRESETS: Record<PresetKey, Preset> = {
   },
 };
 
-const ASPECT_RATIO_OPTIONS: { value: AspectRatioPreset; label: string; platforms: string }[] = [
-  { value: 'original', label: 'Original', platforms: 'Keep as-is' },
-  { value: '9:16', label: '9:16 Vertical', platforms: 'Reels, Shorts' },
-  { value: '16:9', label: '16:9 Landscape', platforms: 'YouTube, Twitter' },
-  { value: '1:1', label: '1:1 Square', platforms: 'Instagram Feed' },
-  { value: '4:5', label: '4:5 Portrait', platforms: 'Instagram, Facebook' },
-];
-
 // localStorage key for persisting processing config
 const STORAGE_KEY = 'timeback_processing_config';
-
-// Speech correction presets with simple labels
-const SPEECH_PRESETS = {
-  minimal: {
-    label: 'Clean',
-    description: 'Removes um, uh, and stutters',
-    config: {
-      removeFillerWords: true,
-      removeRepeatedWords: true,
-      removeRepeatedPhrases: false,
-      removeFalseStarts: false,
-      removeSelfCorrections: false,
-      aggressiveness: 'conservative' as const,
-      confidenceThreshold: 0.80,
-    },
-  },
-  professional: {
-    label: 'Professional',
-    description: 'Removes all fillers, repeats, and false starts',
-    config: {
-      removeFillerWords: true,
-      removeRepeatedWords: true,
-      removeRepeatedPhrases: true,
-      removeFalseStarts: true,
-      removeSelfCorrections: false,
-      aggressiveness: 'moderate' as const,
-      confidenceThreshold: 0.60,
-    },
-  },
-  broadcast: {
-    label: 'Maximum',
-    description: 'Removes everything including self-corrections',
-    config: {
-      removeFillerWords: true,
-      removeRepeatedWords: true,
-      removeRepeatedPhrases: true,
-      removeFalseStarts: true,
-      removeSelfCorrections: true,
-      aggressiveness: 'aggressive' as const,
-      confidenceThreshold: 0.40,
-    },
-  },
-};
 
 // Default config - used for initial state and merging with saved config
 const DEFAULT_CONFIG: ProcessingConfig = {
@@ -197,27 +109,6 @@ const DEFAULT_CONFIG: ProcessingConfig = {
   silencePreset: 'natural',
   useHookAsHeadline: false,
   generateAIHeadline: false,
-  generateBRoll: false,
-  bRollConfig: {
-    style: 'dynamic',
-    intensity: 'medium',
-    maxMoments: 3,
-  },
-  aspectRatio: 'original',
-  speechCorrection: true,
-  speechCorrectionConfig: {
-    removeFillerWords: true,
-    removeRepeatedWords: true,
-    removeRepeatedPhrases: true,
-    removeFalseStarts: true,
-    removeSelfCorrections: false,
-    aggressiveness: 'moderate',
-    confidenceThreshold: 0.6,
-    language: 'auto',
-    customFillerWords: [],
-    customFillerPhrases: [],
-  },
-  speechCorrectionPreset: 'professional',
 };
 
 export default function ProcessingOptions({
@@ -225,7 +116,6 @@ export default function ProcessingOptions({
   isProcessing,
   uploadedFile,
   videoCount = 1,
-  enabledFeatures = { speechCorrection: false },
 }: ProcessingOptionsProps) {
   const [config, setConfig] = useState<ProcessingConfig>(DEFAULT_CONFIG);
   const [activePreset, setActivePreset] = useState<PresetKey>('custom');
@@ -245,16 +135,6 @@ export default function ProcessingOptions({
           ...parsed,
           // Always reset headline to empty (session-specific)
           headline: '',
-          // Deep merge speechCorrectionConfig
-          speechCorrectionConfig: {
-            ...prev.speechCorrectionConfig,
-            ...(parsed.speechCorrectionConfig || {}),
-          },
-          // Deep merge bRollConfig
-          bRollConfig: {
-            ...prev.bRollConfig,
-            ...(parsed.bRollConfig || {}),
-          },
         }));
       }
     } catch {
@@ -435,174 +315,6 @@ export default function ProcessingOptions({
           </div>
         )}
       </div>
-
-      {/* Speech Correction Settings */}
-      {enabledFeatures.speechCorrection && (
-      <div className="space-y-3 sm:space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Speech Correction</h3>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={config.speechCorrection}
-              onChange={(e) => setConfig({ ...config, speechCorrection: e.target.checked })}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-[#e0dbd4] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#e85d26] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#e85d26]"></div>
-          </label>
-        </div>
-        <p className="text-xs text-[#8a8580]">
-          Automatically removes filler words (um, uh), stutters, and speech mistakes from your video{config.generateCaptions ? ' and captions' : ''}
-        </p>
-
-        {config.speechCorrection && (
-          <div className="space-y-3">
-            {/* Simple preset cards */}
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.entries(SPEECH_PRESETS) as [string, typeof SPEECH_PRESETS[keyof typeof SPEECH_PRESETS]][]).map(([key, preset]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setConfig({
-                      ...config,
-                      speechCorrectionPreset: key,
-                      speechCorrectionConfig: {
-                        ...config.speechCorrectionConfig,
-                        ...preset.config,
-                      },
-                    });
-                  }}
-                  className={`p-3 rounded-2xl border-2 transition-all text-center ${
-                    config.speechCorrectionPreset === key
-                      ? 'border-[#e85d26] bg-[#e85d26]/10'
-                      : 'border-[#e0dbd4] hover:border-[#8a8580] bg-[#e0dbd4]/30'
-                  }`}
-                >
-                  <span className={`text-sm font-medium block ${
-                    config.speechCorrectionPreset === key ? 'text-[#0a0a0a]' : 'text-[#0a0a0a]'
-                  }`}>
-                    {preset.label}
-                  </span>
-                  <p className={`text-xs mt-1 ${
-                    config.speechCorrectionPreset === key ? 'text-[#0a0a0a]' : 'text-[#8a8580]'
-                  }`}>
-                    {preset.description}
-                  </p>
-                </button>
-              ))}
-            </div>
-
-            {/* Caption sync note */}
-            {config.generateCaptions && (
-              <div className="flex items-start gap-2 p-2.5 bg-[#e85d26]/10 border border-[#e85d26]/20 rounded-2xl">
-                <svg className="w-4 h-4 text-[#e85d26] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-xs text-[#e85d26]">
-                  Captions will automatically update to match — removed words won&apos;t appear in your captions
-                </p>
-              </div>
-            )}
-
-            {/* Advanced settings toggle */}
-            <details className="group">
-              <summary className="flex items-center gap-2 cursor-pointer text-xs text-[#8a8580] hover:text-[#8a8580] transition-colors py-1">
-                <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                Advanced settings
-              </summary>
-              <div className="mt-3 space-y-3 p-3 bg-[#e0dbd4]/30 rounded-2xl border border-[#e0dbd4]">
-                {/* Language Selection */}
-                <div>
-                  <label className="block text-sm text-[#8a8580] mb-1.5">Language</label>
-                  <select
-                    value={config.speechCorrectionConfig.language}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      speechCorrectionConfig: { ...config.speechCorrectionConfig, language: e.target.value }
-                    })}
-                    className="w-full p-2 rounded-2xl bg-[#e0dbd4] text-[#0a0a0a] text-sm border border-[#e0dbd4] focus:ring-[#e85d26] focus:border-[#e85d26]"
-                  >
-                    <option value="auto">Auto-detect (English)</option>
-                    <option value="en">English</option>
-                    <option value="fr">French</option>
-                    <option value="es">Spanish</option>
-                    <option value="de">German</option>
-                    <option value="pt">Portuguese</option>
-                  </select>
-                </div>
-
-                {/* Custom Filler Words */}
-                <div>
-                  <label className="block text-sm text-[#8a8580] mb-1.5">Custom words to remove</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. literally, honestly, right (comma-separated)"
-                    value={config.speechCorrectionConfig.customFillerWords.join(', ')}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      speechCorrectionConfig: {
-                        ...config.speechCorrectionConfig,
-                        customFillerWords: e.target.value.split(',').map(w => w.trim()).filter(Boolean),
-                      }
-                    })}
-                    className="w-full p-2 rounded-2xl bg-[#e0dbd4] text-[#0a0a0a] text-sm border border-[#e0dbd4] focus:ring-[#e85d26] focus:border-[#e85d26] placeholder-[#8a8580]"
-                  />
-                  <p className="text-xs text-[#8a8580] mt-1">Words specific to your speaking style</p>
-                </div>
-
-                {/* Custom Filler Phrases */}
-                <div>
-                  <label className="block text-sm text-[#8a8580] mb-1.5">Custom phrases to remove</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. at the end of the day, if that makes sense"
-                    value={config.speechCorrectionConfig.customFillerPhrases.join(', ')}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      speechCorrectionConfig: {
-                        ...config.speechCorrectionConfig,
-                        customFillerPhrases: e.target.value.split(',').map(p => p.trim()).filter(Boolean),
-                      }
-                    })}
-                    className="w-full p-2 rounded-2xl bg-[#e0dbd4] text-[#0a0a0a] text-sm border border-[#e0dbd4] focus:ring-[#e85d26] focus:border-[#e85d26] placeholder-[#8a8580]"
-                  />
-                </div>
-
-                {/* Confidence Threshold */}
-                <div>
-                  <label className="block text-sm text-[#8a8580] mb-1.5">
-                    Sensitivity: {Math.round(config.speechCorrectionConfig.confidenceThreshold * 100)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="20"
-                    max="95"
-                    step="5"
-                    value={Math.round(config.speechCorrectionConfig.confidenceThreshold * 100)}
-                    onChange={(e) => setConfig({
-                      ...config,
-                      speechCorrectionPreset: null,
-                      speechCorrectionConfig: {
-                        ...config.speechCorrectionConfig,
-                        confidenceThreshold: parseInt(e.target.value) / 100,
-                      }
-                    })}
-                    className="w-full h-2 rounded-full appearance-none cursor-pointer bg-[#e0dbd4] accent-[#e85d26]"
-                  />
-                  <div className="flex justify-between text-xs text-[#8a8580] mt-1">
-                    <span>More corrections</span>
-                    <span>Fewer, safer</span>
-                  </div>
-                </div>
-              </div>
-            </details>
-          </div>
-        )}
-      </div>
-      )}
 
       {/* Captions Settings */}
       <div className="space-y-3 sm:space-y-4">
@@ -859,115 +571,6 @@ export default function ProcessingOptions({
           </div>
         )}
       </div>
-
-      {/* B-Roll Animations Settings - TEMPORARILY DISABLED - Hidden on mobile */}
-      <div className="hidden sm:block space-y-3 sm:space-y-4 opacity-50">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">B-Roll Animations</h3>
-          <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded-full">Coming Soon</span>
-        </div>
-        <p className="text-xs text-[#8a8580]">
-          AI-generated animations that appear during key moments to add visual context. This feature is currently being improved.
-        </p>
-      </div>
-
-      {/* Original B-Roll UI - Hidden while feature is disabled
-      <div className="space-y-3 sm:space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">B-Roll Animations</h3>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={config.generateBRoll}
-              onChange={(e) => setConfig({ ...config, generateBRoll: e.target.checked })}
-              className="w-5 h-5 rounded bg-[#e0dbd4] border-[#e0dbd4] text-[#e85d26] focus:ring-[#e85d26]"
-            />
-            <span className="text-[#8a8580]">Enable B-Roll</span>
-          </label>
-        </div>
-
-        {config.generateBRoll && (
-          <div className="space-y-4 p-4 bg-[#f5f0e8] rounded-2xl">
-            <p className="text-xs text-[#8a8580]">
-              AI-generated animations that appear during key moments to add visual context
-            </p>
-
-            <div>
-              <label className="block text-sm text-[#8a8580] mb-2">Animation Style</label>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { value: 'minimal', label: 'Minimal', desc: 'Clean & subtle' },
-                  { value: 'dynamic', label: 'Dynamic', desc: 'Engaging & varied' },
-                  { value: 'data-focused', label: 'Data', desc: 'Charts & stats' },
-                ] as const).map((style) => (
-                  <button
-                    key={style.value}
-                    type="button"
-                    onClick={() => setConfig({
-                      ...config,
-                      bRollConfig: { ...config.bRollConfig, style: style.value }
-                    })}
-                    className={`p-2 rounded-2xl border-2 transition-colors text-center ${
-                      config.bRollConfig.style === style.value
-                        ? 'border-[#e85d26] bg-[#e85d26]/10'
-                        : 'border-[#e0dbd4] hover:border-[#8a8580]'
-                    }`}
-                  >
-                    <span className={`text-xs font-medium ${
-                      config.bRollConfig.style === style.value ? 'text-[#e85d26]' : 'text-[#0a0a0a]'
-                    }`}>
-                      {style.label}
-                    </span>
-                    <p className="text-xs text-[#8a8580] mt-0.5">{style.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm text-[#8a8580]">Frequency</label>
-                <span className="text-sm text-[#0a0a0a] font-medium capitalize">{config.bRollConfig.intensity}</span>
-              </div>
-              <div className="flex gap-2">
-                {(['low', 'medium', 'high'] as const).map((intensity) => (
-                  <button
-                    key={intensity}
-                    type="button"
-                    onClick={() => setConfig({
-                      ...config,
-                      bRollConfig: {
-                        ...config.bRollConfig,
-                        intensity,
-                        maxMoments: intensity === 'low' ? 2 : intensity === 'medium' ? 3 : 5,
-                      }
-                    })}
-                    className={`flex-1 py-2 px-3 rounded-full capitalize text-sm transition-colors ${
-                      config.bRollConfig.intensity === intensity
-                        ? 'bg-[#e85d26] text-[#0a0a0a]'
-                        : 'bg-[#e0dbd4] text-[#8a8580] hover:bg-[#e0dbd4]'
-                    }`}
-                  >
-                    {intensity}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-[#8a8580] mt-2">
-                {config.bRollConfig.intensity === 'low' && '2 animations - one at the start, one at a key point'}
-                {config.bRollConfig.intensity === 'medium' && '3 animations - balanced throughout the video'}
-                {config.bRollConfig.intensity === 'high' && '5 animations - frequent visual variety'}
-              </p>
-            </div>
-
-            <div className="pt-2 border-t border-[#e0dbd4]">
-              <p className="text-xs text-[#8a8580]">
-                Animations include: charts, graphs, progress bars, checkmarks, comparisons, countdowns, and more - automatically selected based on your content
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-      */}
 
       {/* Save as Default & Submit Buttons */}
       <div className="space-y-3">

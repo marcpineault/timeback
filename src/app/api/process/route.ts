@@ -3,9 +3,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { removeSilence, burnCaptions, addHeadline, insertBRollCutaways, ProcessingOptions, BRollCutaway, convertAspectRatio, AspectRatioPreset, applyCombinedFilters } from '@/lib/ffmpeg';
-import { transcribeVideo, extractHook, identifyBRollMoments, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
-import { correctSpeechMistakes, SpeechCorrectionConfig, DEFAULT_SPEECH_CORRECTION_CONFIG } from '@/lib/speechCorrection';
+import { removeSilence, ProcessingOptions, applyCombinedFilters } from '@/lib/ffmpeg';
+import { transcribeVideo, extractHook, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { canProcessVideo, incrementVideoCount } from '@/lib/user';
@@ -51,17 +50,9 @@ export async function POST(request: NextRequest) {
       generateCaptions,
       useHookAsHeadline,
       generateAIHeadline: shouldGenerateAIHeadline,
-      generateBRoll,
-      bRollConfig,
-      aspectRatio,
-      speechCorrection: _speechCorrection,
-      speechCorrectionConfig,
       userId: bodyUserId,
       videoId: existingVideoId,  // Optional: for reprocessing existing videos
     } = body;
-
-    // Speech correction is disabled - it was causing issues with silence removal
-    const speechCorrection = false;
 
     if (!fileId || !filename) {
       return NextResponse.json(
@@ -284,10 +275,10 @@ export async function POST(request: NextRequest) {
     };
 
     // Determine what features need transcription
-    const needsTranscription = generateCaptions || useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll || speechCorrection;
-    // Early transcription: needed for hook/B-roll, AND for hybrid silence removal word boundary refinement
+    const needsTranscription = generateCaptions || useHookAsHeadline || shouldGenerateAIHeadline;
+    // Early transcription: needed for hook, AND for hybrid silence removal word boundary refinement
     const useHybridSilenceRemoval = options.autoSilenceThreshold !== false;
-    const needsEarlyTranscription = useHookAsHeadline || shouldGenerateAIHeadline || generateBRoll || useHybridSilenceRemoval;
+    const needsEarlyTranscription = useHookAsHeadline || shouldGenerateAIHeadline || useHybridSilenceRemoval;
 
     // Determine the headline we'll use (before step counting so we know if we need captions+headline)
     // Note: AI headline text will be determined later, but we know if we need the step
@@ -296,10 +287,8 @@ export async function POST(request: NextRequest) {
     // Calculate total processing steps for progress reporting
     let totalSteps = 1; // Step 1: Silence removal (always)
     if (needsTranscription) totalSteps++; // Transcription
-    if (speechCorrection) totalSteps++; // Speech correction
     // Captions and headline are now combined into a single step when both are present
     if (generateCaptions || willHaveHeadline) totalSteps++; // Captions/Headline (combined pass)
-    if (aspectRatio && aspectRatio !== 'original') totalSteps++; // Aspect ratio
 
     let currentStep = 0;
     const reportProgress = (label: string) => {
@@ -314,7 +303,7 @@ export async function POST(request: NextRequest) {
     // and also for hook/B-roll detection
     let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] }> | null = null;
 
-    if (needsEarlyTranscription && !speechCorrection) {
+    if (needsEarlyTranscription) {
       // Start transcribing original video in parallel — include word timestamps for hybrid silence removal
       logger.info('Starting parallel transcription of original video (with word timestamps for hybrid silence removal)');
       earlyTranscriptionPromise = transcribeVideo(inputPath, processedDir, {
@@ -371,12 +360,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 2: Transcribe the SILENCE-REMOVED video (only if needed for captions or speech correction)
+    // Step 2: Transcribe the SILENCE-REMOVED video (only if needed for captions)
     let srtPath: string | undefined;
     let hookText: string | undefined;
     let aiHeadlineText: string | undefined;
     let transcriptionSegments: { start: number; end: number; text: string }[] = [];
-    let transcriptionWords: TranscriptionWord[] = [];
 
     if (needsTranscription) {
       reportProgress('Transcribing audio...');
@@ -401,27 +389,14 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // For B-roll, use early transcription segments if available
-      if (generateBRoll && earlyTranscription && !generateCaptions && !speechCorrection) {
-        transcriptionSegments = earlyTranscription.segments;
-        logger.info('Using parallel transcription for B-roll', { segmentCount: transcriptionSegments.length });
-      }
-
-      // Only transcribe silence-removed video if we need accurate timestamps for captions or speech correction
-      const needsSilenceRemovedTranscription = generateCaptions || speechCorrection ||
-        (generateBRoll && !earlyTranscription); // Fallback if no early transcription
-
-      if (needsSilenceRemovedTranscription) {
-        logger.info('Step 2: Transcribing silence-removed video for captions/speech correction');
-        // Use animated transcription (word-level timestamps) for animated caption style or speech correction
-        // Use forSpeechCorrection to prompt Whisper to include filler words
+      // Only transcribe silence-removed video if we need accurate timestamps for captions
+      if (generateCaptions) {
+        logger.info('Step 2: Transcribing silence-removed video for captions');
         const transcription = await transcribeVideo(currentInput, processedDir, {
           animated: captionStyle === 'animated',
-          forSpeechCorrection: speechCorrection,
         });
         srtPath = transcription.srtPath;
         transcriptionSegments = transcription.segments;
-        transcriptionWords = transcription.words || [];
 
         // Extract hook if not already done from early transcription
         // Always extract hook for filename, even if not displaying it
@@ -441,75 +416,6 @@ export async function POST(request: NextRequest) {
             logger.error('AI headline generation failed, falling back to hook extraction', { error: String(aiError) });
             aiHeadlineText = extractHook(transcription.text);
           }
-        }
-      }
-
-      if (speechCorrection) {
-        logger.debug('Transcription for speech correction', { wordCount: transcriptionWords.length });
-      }
-
-      // Step 2.5: Apply AI Speech Correction if enabled
-      if (speechCorrection && transcriptionWords.length > 0) {
-        reportProgress('Correcting speech...');
-        logger.info('Step 2.5: Applying AI speech correction');
-
-        // Parse speech correction config
-        const correctionConfig: SpeechCorrectionConfig = speechCorrectionConfig ? {
-          removeFillerWords: speechCorrectionConfig.removeFillerWords ?? true,
-          removeRepeatedWords: speechCorrectionConfig.removeRepeatedWords ?? true,
-          removeRepeatedPhrases: speechCorrectionConfig.removeRepeatedPhrases ?? true,
-          removeFalseStarts: speechCorrectionConfig.removeFalseStarts ?? true,
-          removeSelfCorrections: speechCorrectionConfig.removeSelfCorrections ?? true,
-          aggressiveness: speechCorrectionConfig.aggressiveness || 'moderate',
-          confidenceThreshold: speechCorrectionConfig.confidenceThreshold ?? 0.6,
-          language: speechCorrectionConfig.language || 'auto',
-          customFillerWords: speechCorrectionConfig.customFillerWords ?? [],
-          customFillerPhrases: speechCorrectionConfig.customFillerPhrases ?? [],
-        } : DEFAULT_SPEECH_CORRECTION_CONFIG;
-
-        stepOutput = path.join(processedDir, `${baseName}_corrected.mp4`);
-        intermediateFiles.push(stepOutput); // Track for cleanup on error
-
-        try {
-          const correctionResult = await correctSpeechMistakes(
-            currentInput,
-            stepOutput,
-            transcriptionWords,
-            correctionConfig
-          );
-
-          logger.info('Speech correction complete', { segmentsRemoved: correctionResult.segmentsRemoved, timeRemoved: correctionResult.timeRemoved.toFixed(2) });
-
-          // Clean up intermediate file (and remove from tracking)
-          if (currentInput !== inputPath) {
-            await fs.unlink(currentInput).catch(() => {});
-            const idx = intermediateFiles.indexOf(currentInput);
-            if (idx > -1) intermediateFiles.splice(idx, 1);
-          }
-          currentInput = stepOutput;
-
-          // Re-transcribe the corrected video if we need captions (since timestamps changed)
-          if (generateCaptions && correctionResult.segmentsRemoved > 0) {
-            logger.info('Re-transcribing after speech correction for accurate captions');
-            try {
-              const newTranscription = await transcribeVideo(currentInput, processedDir, { animated: captionStyle === 'animated' });
-              srtPath = newTranscription.srtPath;
-              transcriptionSegments = newTranscription.segments;
-            } catch (reTranscribeError) {
-              // Re-transcription failed - disable captions to avoid misaligned timestamps
-              logger.error('Re-transcription after speech correction failed, disabling captions', {
-                error: String(reTranscribeError),
-              });
-              srtPath = undefined; // Clear the old SRT path to prevent misaligned captions
-              // Continue processing without captions rather than failing entirely
-            }
-          }
-        } catch (speechCorrectionError) {
-          // Speech correction failed - log and continue without it
-          logger.error('Speech correction failed, continuing without', {
-            error: String(speechCorrectionError),
-          });
-          // Don't update currentInput - keep using the previous step's output
         }
       }
 
@@ -559,58 +465,6 @@ export async function POST(request: NextRequest) {
     // Clean up SRT file
     if (srtPath && existsSync(srtPath)) {
       await fs.unlink(srtPath).catch(() => {});
-    }
-
-    // Step 3.5: AI B-Roll - TEMPORARILY DISABLED
-    // TODO: Re-enable once animation generation is stable
-    // The B-roll feature is disabled while we improve the animation quality
-    /*
-    const bRollStyle = bRollConfig?.style || 'dynamic';
-    const bRollMaxMoments = bRollConfig?.maxMoments || 3;
-
-    logger.debug('B-Roll check', { enabled: generateBRoll, segmentCount: transcriptionSegments.length, style: bRollStyle, maxMoments: bRollMaxMoments });
-    if (generateBRoll && transcriptionSegments.length > 0) {
-      logger.info('Step 3.5: Generating AI B-Roll animations');
-
-      // Identify key moments for B-roll using configured style and count
-      const moments = await identifyBRollMoments(transcriptionSegments, bRollMaxMoments, bRollStyle);
-      logger.info('Identified B-roll moments', { count: moments.length, style: bRollStyle });
-
-      if (moments.length > 0) {
-        // Create cutaways from identified moments - pass context for animation generation
-        const cutaways: BRollCutaway[] = moments.map(moment => ({
-          timestamp: moment.timestamp,
-          duration: moment.duration,
-          context: moment.context, // Pass context for contextual animation
-        }));
-
-        // Insert animated cutaways into video with configured style
-        stepOutput = path.join(processedDir, `${baseName}_broll.mp4`);
-        await insertBRollCutaways(currentInput, stepOutput, cutaways, processedDir, bRollStyle);
-
-        // Clean up intermediate file
-        if (currentInput !== inputPath) {
-          await fs.unlink(currentInput).catch(() => {})
-        }
-        currentInput = stepOutput;
-      }
-    }
-    */
-
-    // Step 5: Convert aspect ratio if specified
-    if (aspectRatio && aspectRatio !== 'original') {
-      reportProgress('Converting aspect ratio...');
-      logger.info('Step 5: Converting aspect ratio', { aspectRatio });
-      stepOutput = path.join(processedDir, `${baseName}_aspect.mp4`);
-      intermediateFiles.push(stepOutput); // Track for cleanup on error
-      await convertAspectRatio(currentInput, stepOutput, aspectRatio as AspectRatioPreset);
-      // Clean up intermediate file (and remove from tracking)
-      if (currentInput !== inputPath) {
-        await fs.unlink(currentInput).catch(() => {});
-        const idx = intermediateFiles.indexOf(currentInput);
-        if (idx > -1) intermediateFiles.splice(idx, 1);
-      }
-      currentInput = stepOutput;
     }
 
     // Rename to final output - use headline or hook as filename if available

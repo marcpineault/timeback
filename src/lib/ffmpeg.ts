@@ -52,8 +52,6 @@ export function safeFFprobe(inputPath: string): Promise<ffmpeg.FfprobeData> {
     });
   });
 }
-import { generateContextualAnimation, selectAnimationFromContext, generateAnimation } from './sharp-animations';
-
 export interface SilenceInterval {
   start: number;
   end: number;
@@ -788,17 +786,21 @@ export async function removeSilence(
   }
 
   // Step 3: Extract room tone for natural splice transitions
+  // Skip when intermediate — room tone quality benefit is wasted on a file that will be re-encoded
+  const isIntermediate = options.isIntermediate === true;
   const outputDir = path.dirname(outputPath);
   let roomTonePath: string | null = null;
-  try {
-    roomTonePath = await extractRoomTone(inputPath, silences, outputDir);
-    if (roomTonePath) {
-      logger.info(`[Silence Removal] Room tone extracted for ambient bed`);
+  if (!isIntermediate) {
+    try {
+      roomTonePath = await extractRoomTone(inputPath, silences, outputDir);
+      if (roomTonePath) {
+        logger.info(`[Silence Removal] Room tone extracted for ambient bed`);
+      }
+    } catch (roomToneErr) {
+      logger.warn(`[Silence Removal] Room tone extraction failed, continuing without`, {
+        error: roomToneErr instanceof Error ? roomToneErr.message : String(roomToneErr),
+      });
     }
-  } catch (roomToneErr) {
-    logger.warn(`[Silence Removal] Room tone extraction failed, continuing without`, {
-      error: roomToneErr instanceof Error ? roomToneErr.message : String(roomToneErr),
-    });
   }
 
   // Step 4: Build FFmpeg filter complex with crossfades at splice points
@@ -816,11 +818,11 @@ export async function removeSilence(
   logger.debug(`[Silence Removal] Concatenating ${segments.length} segments with crossfades...`);
 
   // Encoding settings: lossless for intermediate files, quality for final output
-  const isIntermediate = options.isIntermediate === true;
   const videoCrf = isIntermediate ? '0' : '18';
   const videoPreset = isIntermediate ? 'ultrafast' : 'fast';
+  const audioBitrate = isIntermediate ? '256k' : '128k';
   if (isIntermediate) {
-    logger.info(`[Silence Removal] Using lossless intermediate encoding (CRF 0) — will be re-encoded later`);
+    logger.info(`[Silence Removal] Using lossless intermediate encoding (CRF 0, audio 256k) — will be re-encoded later`);
   }
 
   // Use retry wrapper for resilience against SIGKILL/memory issues
@@ -844,11 +846,11 @@ export async function removeSilence(
           '-c:v', 'libx264',
           '-preset', videoPreset,
           '-crf', videoCrf,
-          '-threads', '4',
+          '-threads', '0',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
           '-c:a', 'aac',
-          '-b:a', '128k',
+          '-b:a', audioBitrate,
         ])
         .output(outputPath);
     }, processConfig);
@@ -1063,83 +1065,6 @@ function validateTranscriptCoverage(
 }
 
 /**
- * Burn captions (subtitles) into video
- */
-export async function burnCaptions(
-  inputPath: string,
-  outputPath: string,
-  srtPath: string,
-  style: string = 'default'
-): Promise<string> {
-  validateFileExists(inputPath, 'burn captions');
-  // Check if this is an animated ASS file
-  const isAnimated = style === 'animated' || srtPath.endsWith('.ass');
-
-  logger.debug(`[Captions] Burning captions from: ${srtPath}`);
-  logger.debug(`[Captions] Style: ${style}, Animated: ${isAnimated}`);
-
-  // Read and log subtitle content for debugging
-  const subContent = fs.readFileSync(srtPath, 'utf-8');
-  const lineCount = subContent.split('\n').length;
-  logger.debug(`[Captions] Subtitle file has ${lineCount} lines`);
-
-  // Copy subtitle to a temp file with simple name to avoid FFmpeg path escaping issues
-  const tempSubName = isAnimated ? 'temp_subs.ass' : 'temp_subs.srt';
-  const subDir = path.dirname(srtPath);
-  const tempSubPath = path.join(subDir, tempSubName);
-  fs.copyFileSync(srtPath, tempSubPath);
-
-  const escapedPath = tempSubPath.replace(/:/g, '\\:').replace(/'/g, "'\\''");
-
-  // For animated ASS files, use the ass filter directly (styles are embedded in the file)
-  // For SRT files, use subtitles filter with force_style
-  let filterString: string;
-  if (isAnimated) {
-    filterString = `ass='${escapedPath}'`;
-  } else {
-    const subtitleStyle = CAPTION_STYLE_MAP[style] || CAPTION_STYLE_MAP.instagram;
-    filterString = `subtitles='${escapedPath}':force_style='${subtitleStyle}'`;
-  }
-  logger.debug(`[Captions] Filter: ${filterString}`);
-
-  const processConfig: FFmpegProcessConfig = {
-    timeout: 5 * 60 * 1000,
-    maxRetries: 1,
-    context: 'Captions',
-  };
-
-  try {
-    await runFFmpegWithRetry(() => {
-      return ffmpeg(inputPath)
-        .videoFilters(filterString)
-        .outputOptions([
-          // Memory-efficient encoding for constrained server environments
-          '-c:v', 'libx264',
-          '-preset', 'fast',
-          '-crf', '18',
-          '-threads', '4',
-          '-max_muxing_queue_size', '512',
-          '-bufsize', '1M',
-          '-c:a', 'copy',
-        ])
-        .output(outputPath);
-    }, processConfig);
-
-    logger.debug(`[Captions] Complete!`);
-    try { fs.unlinkSync(tempSubPath); } catch {}
-    return outputPath;
-  } catch (err) {
-    try { fs.unlinkSync(tempSubPath); } catch {}
-
-    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
-      throw new Error('Caption burning failed due to memory constraints. Try a shorter video.');
-    }
-    logger.error(`[Captions] Error:`, err instanceof Error ? err : new Error(String(err)));
-    throw err;
-  }
-}
-
-/**
  * Split headline into two balanced lines
  */
 function splitHeadlineIntoTwoLines(headline: string): [string, string] {
@@ -1307,436 +1232,6 @@ async function generateHeadlinePNG(
 }
 
 /**
- * Add headline text overlay to video with selectable styling
- * Uses Sharp-generated PNG with rounded corners overlaid via FFmpeg
- * Styles:
- * - 'speech-bubble': White rounded rectangle, black bold text (Instagram-native)
- * - 'classic': Semi-transparent dark rounded rectangle, white bold text
- * Headline appears instantly and fades out after 5 seconds
- */
-export async function addHeadline(
-  inputPath: string,
-  outputPath: string,
-  headline: string,
-  position: 'top' | 'center' | 'bottom' = 'top',
-  captionStyle: string = 'instagram',
-  headlineStyle: HeadlineStyle = 'speech-bubble',
-  accentWords: string[] = [],
-  accentColor: string = '#e85d26',
-): Promise<string> {
-  validateFileExists(inputPath, 'add headline');
-
-  // Validate headline is not empty after sanitization
-  const sanitizedTest = headline.replace(/[^\x20-\x7E\u00C0-\u00FF]/g, '').trim();
-  if (!sanitizedTest) {
-    logger.debug(`[Headline] Empty headline after sanitization, copying original file`);
-    fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
-  }
-
-  // Y positions optimized for safe zones (1080x1920)
-  const baseYPositions: Record<string, number> = {
-    top: 350,
-    center: 860,
-    bottom: 1350,
-  };
-
-  const processDir = path.dirname(outputPath);
-  const { pngPath, imageHeight } = await generateHeadlinePNG(
-    headline, headlineStyle, processDir, 1080, accentWords, accentColor
-  );
-
-  const baseY = baseYPositions[position];
-  // Center the headline image vertically around the target Y position
-  const overlayY = Math.max(0, baseY - Math.floor(imageHeight / 2));
-
-  // Overlay the PNG on the video: appears instantly, fades out at 4.5-5s
-  const filterComplex = [
-    `[1:v]format=rgba,fade=t=out:st=4.5:d=0.5:alpha=1[hl]`,
-    `[0:v][hl]overlay=x=(W-w)/2:y=${overlayY}:eof_action=pass[out]`
-  ].join(';');
-
-  logger.debug(`[Headline] Adding headline at ${position} (${headlineStyle}), y=${overlayY}`);
-
-  const processConfig: FFmpegProcessConfig = {
-    timeout: 3 * 60 * 1000,
-    maxRetries: 1,
-    context: 'Headline',
-  };
-
-  try {
-    const args = [
-      '-y',
-      '-i', inputPath,
-      '-loop', '1', '-t', '5', '-i', pngPath,
-      '-filter_complex', filterComplex,
-      '-map', '[out]',
-      '-map', '0:a?',
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-threads', '4',
-      '-max_muxing_queue_size', '512',
-      '-bufsize', '1M',
-      '-c:a', 'copy',
-      '-shortest',
-      outputPath
-    ];
-
-    await runFFmpegSpawn(args, processConfig);
-    logger.debug(`[Headline] Complete!`);
-    return outputPath;
-  } catch (err) {
-    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
-      throw new Error('Headline rendering failed due to memory constraints.');
-    }
-    logger.error(`[Headline] Error:`, err instanceof Error ? err : new Error(String(err)));
-    throw err;
-  } finally {
-    try { fs.unlinkSync(pngPath); } catch { /* ignore cleanup errors */ }
-  }
-}
-
-export interface BRollCutaway {
-  timestamp: number;
-  duration: number;
-  context: string;  // Context text used to generate contextual animation
-}
-
-/**
- * Convert an image to a video clip with subtle ken burns effect
- */
-export async function imageToVideoClip(
-  imagePath: string,
-  outputPath: string,
-  duration: number,
-  videoWidth: number = 1080,
-  videoHeight: number = 1920
-): Promise<string> {
-  logger.debug(`[B-Roll] Converting image to ${duration}s video clip`);
-
-  return new Promise((resolve, reject) => {
-    // Ken burns effect: slow zoom in
-    const filterComplex = [
-      `scale=${videoWidth * 1.1}:${videoHeight * 1.1}`,
-      `zoompan=z='min(zoom+0.001,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${duration * 30}:s=${videoWidth}x${videoHeight}:fps=30`
-    ].join(',');
-
-    ffmpeg(imagePath)
-      .loop(1)
-      .inputOptions(['-t', String(duration)])
-      .videoFilters(filterComplex)
-      .outputOptions([
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '18',
-        '-threads', '0',
-        '-t', String(duration),
-        '-pix_fmt', 'yuv420p',
-        '-r', '30',
-        '-max_muxing_queue_size', '512',
-      ])
-      .output(outputPath)
-      .on('end', () => {
-        logger.debug(`[B-Roll] Video clip created: ${outputPath}`);
-        resolve(outputPath);
-      })
-      .on('error', (err: Error) => {
-        logger.error(`[B-Roll] Error creating clip:`, err);
-        reject(err);
-      })
-      .run();
-  });
-}
-
-/**
- * Insert B-roll animation overlays using sharp-generated animations
- * Creates smooth, professional animations overlaid on the video
- */
-export async function insertBRollCutaways(
-  inputPath: string,
-  outputPath: string,
-  cutaways: BRollCutaway[],
-  outputDir: string,
-  style: 'minimal' | 'dynamic' | 'data-focused' = 'dynamic'
-): Promise<string> {
-  if (cutaways.length === 0) {
-    fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
-  }
-
-  logger.debug(`[B-Roll] Adding ${cutaways.length} animation overlays (style: ${style})`);
-
-  // Get video dimensions
-  const metadata = await safeFFprobe(inputPath);
-  const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-  const videoInfo = {
-    width: videoStream?.width || 1080,
-    height: videoStream?.height || 1920,
-    duration: metadata.format.duration || 60,
-  };
-
-  // Animation box dimensions (centered, 70% width, 35% height)
-  const animWidth = Math.floor(videoInfo.width * 0.7);
-  const animHeight = Math.floor(videoInfo.height * 0.35);
-  const animX = Math.floor((videoInfo.width - animWidth) / 2);
-  const animY = Math.floor((videoInfo.height - animHeight) / 2);
-
-  // Sort cutaways by timestamp
-  const sortedCutaways = [...cutaways].sort((a, b) => a.timestamp - b.timestamp);
-
-  // Generate animation videos for each cutaway
-  const animationPaths: string[] = [];
-  const animationInfos: { path: string; start: number; duration: number }[] = [];
-
-  for (let i = 0; i < sortedCutaways.length; i++) {
-    const cutaway = sortedCutaways[i];
-    const animPath = path.join(outputDir, `broll_anim_${i}_${Date.now()}.mp4`);
-
-    try {
-      await generateContextualAnimation(
-        animPath,
-        cutaway.duration,
-        animWidth,
-        animHeight,
-        cutaway.context,
-        style
-      );
-      animationPaths.push(animPath);
-      animationInfos.push({
-        path: animPath,
-        start: cutaway.timestamp,
-        duration: cutaway.duration
-      });
-      logger.debug(`[B-Roll] Generated animation ${i + 1}/${sortedCutaways.length} for: "${cutaway.context.slice(0, 40)}..."`);
-    } catch (err) {
-      logger.error(`[B-Roll] Failed to generate animation for cutaway ${i}:`, err as Error);
-      // Continue with other cutaways
-    }
-  }
-
-  if (animationInfos.length === 0) {
-    logger.debug(`[B-Roll] No animations generated, copying original`);
-    fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
-  }
-
-  // Build FFmpeg command with overlay filter for each animation
-  try {
-    let currentInput = inputPath;
-    let stepIndex = 0;
-
-    for (const anim of animationInfos) {
-      const stepOutput = path.join(outputDir, `broll_step_${stepIndex}_${Date.now()}.mp4`);
-
-      await overlayAnimationOnVideo(
-        currentInput,
-        anim.path,
-        stepOutput,
-        animX,
-        animY,
-        anim.start,
-        anim.duration
-      );
-
-      // Cleanup previous step if not the original
-      if (currentInput !== inputPath && fs.existsSync(currentInput)) {
-        try { fs.unlinkSync(currentInput); } catch (e) { /* ignore */ }
-      }
-
-      currentInput = stepOutput;
-      stepIndex++;
-    }
-
-    // Move final result to output path
-    if (currentInput !== outputPath) {
-      fs.renameSync(currentInput, outputPath);
-    }
-
-    logger.debug(`[B-Roll] All animation overlays added successfully`);
-  } finally {
-    // Cleanup animation files
-    for (const animPath of animationPaths) {
-      try { if (fs.existsSync(animPath)) fs.unlinkSync(animPath); } catch (e) { /* ignore */ }
-    }
-  }
-
-  return outputPath;
-}
-
-/**
- * Overlay a single animation video onto the main video at specified position and time
- */
-async function overlayAnimationOnVideo(
-  mainVideo: string,
-  animationVideo: string,
-  outputPath: string,
-  x: number,
-  y: number,
-  startTime: number,
-  duration: number
-): Promise<void> {
-  // Use filter_complex to overlay animation with fade in/out
-  const fadeIn = 0.3;
-  const fadeOut = 0.3;
-  const endTime = startTime + duration;
-
-  // Filter: overlay animation on main video with time-based enable and fade
-  const filterComplex = [
-    // Scale animation if needed and add fade
-    `[1:v]fade=t=in:st=0:d=${fadeIn},fade=t=out:st=${duration - fadeOut}:d=${fadeOut}[anim]`,
-    // Overlay at position with time enable
-    `[0:v][anim]overlay=x=${x}:y=${y}:enable='between(t,${startTime},${endTime})'[out]`
-  ].join(';');
-
-  const args = [
-    '-y',
-    '-i', mainVideo,
-    '-i', animationVideo,
-    '-filter_complex', filterComplex,
-    '-map', '[out]',
-    '-map', '0:a?',
-    '-c:v', 'libx264',
-    '-preset', 'fast',
-    '-crf', '18',
-    '-threads', '4',
-    '-c:a', 'copy',
-    '-shortest',
-    outputPath
-  ];
-
-  logger.debug(`[B-Roll] Overlaying animation at (${x},${y}) from ${startTime}s to ${endTime}s`);
-
-  try {
-    await runFFmpegSpawn(args, {
-      timeout: 3 * 60 * 1000, // 3 minute timeout
-      maxRetries: 1,
-      context: 'B-Roll Overlay',
-    });
-  } catch (err) {
-    if (err instanceof FFmpegProcessError) {
-      logger.error(`[B-Roll] FFmpeg overlay error: ${err.message}`);
-      if (err.isMemoryKill) {
-        throw new Error('B-Roll overlay failed due to memory constraints.');
-      }
-    }
-    throw err;
-  }
-}
-
-/**
- * Aspect ratio presets for different platforms
- */
-export type AspectRatioPreset = 'original' | '9:16' | '16:9' | '1:1' | '4:5';
-
-export interface AspectRatioInfo {
-  name: string;
-  ratio: number; // width/height
-  platforms: string[];
-}
-
-export const ASPECT_RATIOS: Record<AspectRatioPreset, AspectRatioInfo> = {
-  'original': { name: 'Original', ratio: 0, platforms: ['Keep original'] },
-  '9:16': { name: 'Vertical', ratio: 9/16, platforms: ['Reels', 'Shorts'] },
-  '16:9': { name: 'Landscape', ratio: 16/9, platforms: ['YouTube', 'Twitter'] },
-  '1:1': { name: 'Square', ratio: 1, platforms: ['Instagram Feed'] },
-  '4:5': { name: 'Portrait', ratio: 4/5, platforms: ['Instagram', 'Facebook'] },
-};
-
-/**
- * Convert video to a different aspect ratio using blur background padding
- * This preserves all content by adding blurred edges instead of cropping
- */
-export async function convertAspectRatio(
-  inputPath: string,
-  outputPath: string,
-  targetRatio: AspectRatioPreset
-): Promise<string> {
-  validateFileExists(inputPath, 'convert aspect ratio');
-  if (targetRatio === 'original') {
-    logger.debug(`[Aspect] Keeping original aspect ratio`);
-    fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
-  }
-
-  // Get video dimensions
-  const aspectMetadata = await safeFFprobe(inputPath);
-  const aspectVideoStream = aspectMetadata.streams.find(s => s.codec_type === 'video');
-  const videoInfo = {
-    width: aspectVideoStream?.width || 1920,
-    height: aspectVideoStream?.height || 1080,
-  };
-
-  const currentRatio = videoInfo.width / videoInfo.height;
-  const targetRatioValue = ASPECT_RATIOS[targetRatio].ratio;
-
-  logger.debug(`[Aspect] Converting from ${currentRatio.toFixed(2)} to ${targetRatioValue.toFixed(2)} (${targetRatio})`);
-
-  // Calculate target dimensions (keep the larger dimension, adjust the other)
-  let targetWidth: number;
-  let targetHeight: number;
-
-  if (targetRatioValue > currentRatio) {
-    // Target is wider - keep height, add width
-    targetHeight = videoInfo.height;
-    targetWidth = Math.round(targetHeight * targetRatioValue);
-  } else {
-    // Target is taller - keep width, add height
-    targetWidth = videoInfo.width;
-    targetHeight = Math.round(targetWidth / targetRatioValue);
-  }
-
-  // Ensure dimensions are even (required for most codecs)
-  targetWidth = targetWidth + (targetWidth % 2);
-  targetHeight = targetHeight + (targetHeight % 2);
-
-  logger.debug(`[Aspect] Original: ${videoInfo.width}x${videoInfo.height}, Target: ${targetWidth}x${targetHeight}`);
-
-  // Build filter for blur background padding
-  // This creates a blurred, scaled-up version of the video as background
-  // Then overlays the original centered on top
-  const filterComplex = [
-    // Create blurred background - scale to fill, apply heavy blur
-    `[0:v]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=increase,crop=${targetWidth}:${targetHeight},boxblur=20:5[bg]`,
-    // Scale original to fit within target (with letterbox/pillarbox)
-    `[0:v]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease[fg]`,
-    // Overlay centered original on blurred background
-    `[bg][fg]overlay=(W-w)/2:(H-h)/2[out]`
-  ].join(';');
-
-  const processConfig: FFmpegProcessConfig = {
-    timeout: 5 * 60 * 1000,
-    maxRetries: 1,
-    context: 'Aspect Ratio',
-  };
-
-  try {
-    await runFFmpegWithRetry(() => {
-      return ffmpeg(inputPath)
-        .complexFilter(filterComplex, 'out')
-        .outputOptions([
-          '-c:v', 'libx264',
-          '-preset', 'fast',
-          '-crf', '18',
-          '-threads', '4',
-          '-max_muxing_queue_size', '512',
-          '-c:a', 'copy',
-        ])
-        .output(outputPath);
-    }, processConfig);
-
-    logger.debug(`[Aspect] Conversion complete!`);
-    return outputPath;
-  } catch (err) {
-    if (err instanceof FFmpegProcessError && err.isMemoryKill) {
-      throw new Error('Aspect ratio conversion failed due to memory constraints.');
-    }
-    logger.error(`[Aspect] Conversion error:`, err instanceof Error ? err : new Error(String(err)));
-    throw err;
-  }
-}
-
-/**
  * Combined video processing options for single-pass encoding
  * This reduces multiple FFmpeg passes to a single pass when possible
  */
@@ -1852,7 +1347,7 @@ export async function applyCombinedFilters(
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', '18',
-        '-threads', '4',
+        '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
@@ -1872,7 +1367,7 @@ export async function applyCombinedFilters(
             '-c:v', 'libx264',
             '-preset', 'fast',
             '-crf', '18',
-            '-threads', '4',
+            '-threads', '0',
             '-max_muxing_queue_size', '512',
             '-bufsize', '1M',
             '-c:a', 'copy',
@@ -2012,47 +1507,3 @@ export async function splitVideo(
   return outputPaths;
 }
 
-/**
- * Full processing pipeline: remove silence, add captions, add headline
- */
-export async function processVideo(
-  inputPath: string,
-  outputDir: string,
-  srtPath?: string,
-  options: ProcessingOptions = {}
-): Promise<string> {
-  const baseName = path.basename(inputPath, path.extname(inputPath));
-  let currentInput = inputPath;
-  let stepOutput: string;
-
-  // Step 1: Remove silence
-  stepOutput = path.join(outputDir, `${baseName}_nosilence.mp4`);
-  await removeSilence(currentInput, stepOutput, options);
-  currentInput = stepOutput;
-
-  // Step 2: Burn captions if SRT provided
-  if (srtPath && fs.existsSync(srtPath)) {
-    stepOutput = path.join(outputDir, `${baseName}_captioned.mp4`);
-    await burnCaptions(currentInput, stepOutput, srtPath, options.captionStyle);
-    // Clean up intermediate file
-    if (currentInput !== inputPath) fs.unlinkSync(currentInput);
-    currentInput = stepOutput;
-  }
-
-  // Step 3: Add headline if provided
-  if (options.headline) {
-    stepOutput = path.join(outputDir, `${baseName}_final.mp4`);
-    await addHeadline(currentInput, stepOutput, options.headline, options.headlinePosition, options.captionStyle);
-    // Clean up intermediate file
-    if (currentInput !== inputPath) fs.unlinkSync(currentInput);
-    currentInput = stepOutput;
-  }
-
-  // Rename to final output if needed
-  const finalOutput = path.join(outputDir, `${baseName}_processed.mp4`);
-  if (currentInput !== finalOutput) {
-    fs.renameSync(currentInput, finalOutput);
-  }
-
-  return finalOutput;
-}

@@ -13,7 +13,6 @@ import Link from 'next/link'
 import UpgradeBanner from '@/components/upgrade/UpgradeBanner'
 
 interface EnabledFeatures {
-  speechCorrection: boolean
   instagramScheduling: boolean
 }
 
@@ -39,7 +38,7 @@ export default function VideoProcessor({
   canProcess,
   videosRemaining: initialVideosRemaining,
   hasWatermark,
-  enabledFeatures = { speechCorrection: false, instagramScheduling: false },
+  enabledFeatures = { instagramScheduling: false },
   videosProcessed = 999,
 }: VideoProcessorProps) {
   const [videoQueue, setVideoQueue] = useState<QueuedVideo[]>([])
@@ -355,27 +354,6 @@ export default function VideoProcessor({
         silencePreset: 'natural' as const,
         useHookAsHeadline: false,
         generateAIHeadline: false,
-        generateBRoll: false,
-        bRollConfig: {
-          style: 'dynamic',
-          intensity: 'medium',
-          maxMoments: 3,
-        },
-        aspectRatio: 'original',
-        speechCorrection: false,
-        speechCorrectionConfig: {
-          removeFillerWords: true,
-          removeRepeatedWords: true,
-          removeRepeatedPhrases: true,
-          removeFalseStarts: true,
-          removeSelfCorrections: true,
-          aggressiveness: 'moderate',
-          confidenceThreshold: 0.6,
-          language: 'auto',
-          customFillerWords: [],
-          customFillerPhrases: [],
-        },
-        speechCorrectionPreset: null,
       }
 
       const prefs = cachedPreferencesRef.current
@@ -392,12 +370,6 @@ export default function VideoProcessor({
           silencePreset: ((prefs as Record<string, unknown>).silencePreset as ProcessingConfig['silencePreset']) ?? defaultConfig.silencePreset,
           useHookAsHeadline: (prefs.useHookAsHeadline as boolean) ?? defaultConfig.useHookAsHeadline,
           generateAIHeadline: (prefs.generateAIHeadline as boolean) ?? defaultConfig.generateAIHeadline,
-          generateBRoll: (prefs.generateBRoll as boolean) ?? defaultConfig.generateBRoll,
-          bRollConfig: defaultConfig.bRollConfig,
-          aspectRatio: (prefs.aspectRatio as ProcessingConfig['aspectRatio']) ?? defaultConfig.aspectRatio,
-          speechCorrection: (prefs.speechCorrection as boolean) ?? defaultConfig.speechCorrection,
-          speechCorrectionConfig: (prefs.speechCorrectionConfig as ProcessingConfig['speechCorrectionConfig']) ?? defaultConfig.speechCorrectionConfig,
-          speechCorrectionPreset: (prefs as Record<string, unknown>).speechCorrectionPreset as string | null ?? defaultConfig.speechCorrectionPreset,
         }
         console.log('[VideoProcessor] Auto-process: using cached preferences')
         setPendingAutoProcess(savedConfig)
@@ -1035,7 +1007,6 @@ export default function VideoProcessor({
           onProcess={handleProcess}
           isProcessing={isProcessing}
           videoCount={pendingVideos.length}
-          enabledFeatures={enabledFeatures}
         />
       )}
 
