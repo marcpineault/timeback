@@ -813,8 +813,8 @@ export async function removeSilence(
           '-map', '[outv]',
           '-map', '[outa]',
           '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '28',
+          '-preset', 'fast',
+          '-crf', '18',
           '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
@@ -1077,8 +1077,8 @@ export async function burnCaptions(
         .outputOptions([
           // Memory-efficient encoding for constrained server environments
           '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '28',
+          '-preset', 'fast',
+          '-crf', '18',
           '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
@@ -1335,8 +1335,8 @@ export async function addHeadline(
       '-map', '[out]',
       '-map', '0:a?',
       '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '28',
+      '-preset', 'fast',
+      '-crf', '18',
       '-threads', '4',
       '-max_muxing_queue_size', '512',
       '-bufsize', '1M',
@@ -1390,8 +1390,8 @@ export async function imageToVideoClip(
       .videoFilters(filterComplex)
       .outputOptions([
         '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
+        '-preset', 'fast',
+        '-crf', '18',
         '-threads', '0',
         '-t', String(duration),
         '-pix_fmt', 'yuv420p',
@@ -1559,8 +1559,8 @@ async function overlayAnimationOnVideo(
     '-map', '[out]',
     '-map', '0:a?',
     '-c:v', 'libx264',
-    '-preset', 'ultrafast',
-    '-crf', '28',
+    '-preset', 'fast',
+    '-crf', '18',
     '-threads', '4',
     '-c:a', 'copy',
     '-shortest',
@@ -1678,8 +1678,8 @@ export async function convertAspectRatio(
         .complexFilter(filterComplex, 'out')
         .outputOptions([
           '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '28',
+          '-preset', 'fast',
+          '-crf', '18',
           '-threads', '4',
           '-max_muxing_queue_size', '512',
           '-c:a', 'copy',
@@ -1812,8 +1812,8 @@ export async function applyCombinedFilters(
         '-map', '[out]',
         '-map', '0:a?',
         '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
+        '-preset', 'fast',
+        '-crf', '18',
         '-threads', '4',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
@@ -1832,8 +1832,8 @@ export async function applyCombinedFilters(
           .videoFilters(captionFilter!)
           .outputOptions([
             '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-crf', '28',
+            '-preset', 'fast',
+            '-crf', '18',
             '-threads', '4',
             '-max_muxing_queue_size', '512',
             '-bufsize', '1M',
@@ -1882,8 +1882,8 @@ export async function trimVideo(
       .setDuration(duration)
       .outputOptions([
         '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
+        '-preset', 'fast',
+        '-crf', '18',
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
@@ -1947,8 +1947,8 @@ export async function splitVideo(
         .setDuration(segmentDuration)
         .outputOptions([
           '-c:v', 'libx264',
-          '-preset', 'ultrafast',
-          '-crf', '28',
+          '-preset', 'fast',
+          '-crf', '18',
           '-threads', '0',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',

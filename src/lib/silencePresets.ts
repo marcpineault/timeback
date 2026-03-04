@@ -42,7 +42,7 @@ export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
     speechPadMs: 40,
     prePadMs: 80,
     postPadMs: 150,
-    minSilenceToRemoveMs: 500,
+    minSilenceToRemoveMs: 300,
     minRetainedGapMs: 25,
     sentenceGapMs: 60,
     breathHandling: 'remove',
