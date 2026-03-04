@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
       step: progress.step,
       totalSteps: progress.totalSteps,
       stepLabel: progress.stepLabel,
+      substepLabel: progress.substepLabel,
+      percent: progress.percent,
     },
   });
 }

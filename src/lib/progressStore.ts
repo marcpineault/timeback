@@ -12,6 +12,10 @@ export interface ProcessingProgress {
   totalSteps: number;
   /** Human-readable label for the current step */
   stepLabel: string;
+  /** Sub-step label within the current step (e.g. "Analyzing audio...") */
+  substepLabel?: string;
+  /** Progress percentage (0-100) within the current step */
+  percent?: number;
   /** Timestamp of last update */
   updatedAt: number;
 }

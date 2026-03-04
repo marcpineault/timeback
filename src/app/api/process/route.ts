@@ -4,7 +4,8 @@ import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { removeSilence, ProcessingOptions, applyCombinedFilters } from '@/lib/ffmpeg';
-import { transcribeVideo, extractHook, TranscriptionWord, generateAIHeadline } from '@/lib/whisper';
+import { transcribeVideo, extractHook, TranscriptionWord, generateAIHeadline, generateSrt, generateAnimatedAss } from '@/lib/whisper';
+import { buildSegmentMap, remapTranscriptionSegments, remapWords } from '@/lib/timestampRemap';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
 import { canProcessVideo, incrementVideoCount } from '@/lib/user';
@@ -297,6 +298,11 @@ export async function POST(request: NextRequest) {
         setProgress(fileId, { step: currentStep, totalSteps, stepLabel: label });
       }
     };
+    const reportSubProgress = (substepLabel: string, percent?: number) => {
+      if (fileId) {
+        setProgress(fileId, { step: currentStep, totalSteps, stepLabel: 'Removing silence...', substepLabel, percent });
+      }
+    };
 
     // OPTIMIZATION: Run early transcription WITH word-level timestamps in parallel
     // Word timestamps are used by the hybrid silence removal pipeline for boundary refinement,
@@ -337,7 +343,8 @@ export async function POST(request: NextRequest) {
     logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     intermediateFiles.push(stepOutput); // Track for cleanup on error
-    await removeSilence(currentInput, stepOutput, { ...options, isIntermediate: willReEncode }, earlyTranscriptionWords);
+    const silenceResult = await removeSilence(currentInput, stepOutput, { ...options, isIntermediate: willReEncode }, earlyTranscriptionWords, reportSubProgress);
+    const { keptSegments } = silenceResult;
     // Clean up intermediate file (and remove from tracking since it's deleted)
     if (currentInput !== inputPath) {
       await fs.unlink(currentInput).catch(() => {});
@@ -389,32 +396,75 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Only transcribe silence-removed video if we need accurate timestamps for captions
+      // Generate captions: prefer remapping early transcription over re-transcribing
       if (generateCaptions) {
-        logger.info('Step 2: Transcribing silence-removed video for captions');
-        const transcription = await transcribeVideo(currentInput, processedDir, {
-          animated: captionStyle === 'animated',
-        });
-        srtPath = transcription.srtPath;
-        transcriptionSegments = transcription.segments;
+        let usedRemap = false;
+
+        // Try timestamp remapping from early transcription + kept segments
+        if (earlyTranscription && earlyTranscription.segments.length > 0) {
+          try {
+            logger.info('Remapping timestamps from early transcription');
+            const segmentMap = buildSegmentMap(keptSegments);
+            const remappedSegments = remapTranscriptionSegments(earlyTranscription.segments, segmentMap);
+
+            // Sanity check: if we lost more than 20% of segments, fall back to re-transcription
+            const retention = remappedSegments.length / earlyTranscription.segments.length;
+            if (retention >= 0.8) {
+              transcriptionSegments = remappedSegments;
+
+              // Generate subtitle file from remapped data
+              const subtitleBaseName = path.basename(currentInput, path.extname(currentInput));
+              if (captionStyle === 'animated' && earlyTranscription.words && earlyTranscription.words.length > 0) {
+                const remappedWords = remapWords(earlyTranscription.words, segmentMap);
+                srtPath = path.join(processedDir, `${subtitleBaseName}.ass`);
+                generateAnimatedAss(remappedWords, srtPath);
+                logger.info(`Generated animated ASS from remapped words (${remappedWords.length} words)`);
+              } else {
+                srtPath = path.join(processedDir, `${subtitleBaseName}.srt`);
+                generateSrt(remappedSegments, srtPath);
+                logger.info(`Generated SRT from remapped segments (${remappedSegments.length} segments)`);
+              }
+
+              usedRemap = true;
+              logger.info(`Timestamp remap succeeded (retention: ${(retention * 100).toFixed(0)}%)`);
+            } else {
+              logger.warn(`Timestamp remap retention too low (${(retention * 100).toFixed(0)}%), falling back to re-transcription`);
+            }
+          } catch (remapErr) {
+            logger.warn('Timestamp remapping failed, falling back to re-transcription', {
+              error: remapErr instanceof Error ? remapErr.message : String(remapErr),
+            });
+          }
+        }
+
+        // Fall back to full re-transcription if remap wasn't used
+        if (!usedRemap) {
+          logger.info('Step 2: Transcribing silence-removed video for captions');
+          const transcription = await transcribeVideo(currentInput, processedDir, {
+            animated: captionStyle === 'animated',
+          });
+          srtPath = transcription.srtPath;
+          transcriptionSegments = transcription.segments;
+        }
 
         // Extract hook if not already done from early transcription
-        // Always extract hook for filename, even if not displaying it
         if (!hookText) {
-          hookText = extractHook(transcription.text);
-          logger.info('Extracted hook from silence-removed transcription', { hookText });
+          const fallbackText = transcriptionSegments.map(s => s.text).join(' ');
+          hookText = extractHook(fallbackText);
+          logger.info('Extracted hook from transcription segments', { hookText });
         }
 
         // Generate AI headline if not already done from early transcription
         if (shouldGenerateAIHeadline && !aiHeadlineText) {
-          logger.info('Generating AI headline from silence-removed transcription');
+          logger.info('Generating AI headline from transcription segments');
           try {
             const aiResult = await generateAIHeadline(transcriptionSegments);
             aiHeadlineText = aiResult.headline;
             logger.info('AI headline generated', { headline: aiHeadlineText, confidence: aiResult.confidence });
           } catch (aiError) {
             logger.error('AI headline generation failed, falling back to hook extraction', { error: String(aiError) });
-            aiHeadlineText = extractHook(transcription.text);
+            const fallbackText = transcriptionSegments.map(s => s.text).join(' ');
+            aiHeadlineText = extractHook(fallbackText);
           }
         }
       }

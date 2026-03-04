@@ -71,6 +71,11 @@ export interface ProcessingOptions {
   isIntermediate?: boolean; // Use lossless encoding for intermediate files that will be re-encoded
 }
 
+export interface RemoveSilenceResult {
+  outputPath: string;
+  keptSegments: SilenceInterval[];
+}
+
 // Caption styles optimized for safe zones
 // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
 // All margin values must be scaled to this coordinate system
@@ -87,24 +92,23 @@ const CAPTION_STYLE_MAP: Record<string, string> = {
 };
 
 /**
- * Analyze a single chunk of audio and return volume statistics
+ * Single-pass audio analysis using asplit to fork into volumedetect + astats simultaneously.
+ * Replaces the old multi-chunk analyzeFullVideoAudio + analyzeAudioPercentiles with one FFmpeg process.
  *
- * NOISE-AWARE: Uses speech-band filtering to focus on voice frequencies
- * This gives more accurate volume stats by ignoring background noise
+ * NOISE-AWARE: Uses speech-band filtering (200Hz-6000Hz) before analysis.
  */
-async function analyzeAudioChunk(
-  inputPath: string,
-  startTime: number,
-  duration: number
-): Promise<{ maxVolume: number; meanVolume: number } | null> {
+async function analyzeAudioSinglePass(
+  inputPath: string
+): Promise<{ maxVolume: number; meanVolume: number; peakLevel: number; rmsLevel: number; dynamicRange: number }> {
   return new Promise((resolve) => {
     let statsOutput = '';
 
-    // Apply speech-band filter before volume detection
-    // This focuses analysis on voice frequencies (200Hz-6000Hz)
     const command = ffmpeg(inputPath)
-      .inputOptions(['-ss', String(startTime), '-t', String(duration)])
-      .audioFilters('highpass=f=200,lowpass=f=6000,volumedetect')
+      .complexFilter([
+        '[0:a]highpass=f=200,lowpass=f=6000,asplit=2[vol][stat]',
+        '[vol]volumedetect,anullsink',
+        '[stat]astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level,anullsink',
+      ])
       .format('null')
       .output('/dev/null');
 
@@ -113,144 +117,26 @@ async function analyzeAudioChunk(
         statsOutput += line + '\n';
       })
       .on('end', () => {
+        // Parse volumedetect output
         const meanMatch = statsOutput.match(/mean_volume:\s*(-?[\d.]+)\s*dB/i);
         const maxMatch = statsOutput.match(/max_volume:\s*(-?[\d.]+)\s*dB/i);
-
-        if (!maxMatch) {
-          resolve(null);
-          return;
-        }
-
-        resolve({
-          maxVolume: parseFloat(maxMatch[1]),
-          meanVolume: meanMatch ? parseFloat(meanMatch[1]) : parseFloat(maxMatch[1]) - 15,
-        });
-      })
-      .on('error', () => {
-        resolve(null);
-      })
-      .run();
-  });
-}
-
-/**
- * Phase 1: Full-video audio analysis in chunks
- * Analyzes the entire video in chunks and uses the median of max volumes
- * to be robust against outliers and varying audio levels throughout the video.
- */
-async function analyzeFullVideoAudio(
-  inputPath: string,
-  videoDuration: number,
-  chunkDuration: number = 30
-): Promise<{ maxVolumes: number[]; meanVolumes: number[]; medianMax: number; medianMean: number }> {
-  // Guard against invalid duration values
-  if (!Number.isFinite(videoDuration) || videoDuration <= 0) {
-    logger.warn('[Audio Analysis] Invalid video duration, using default values', { videoDuration });
-    return { maxVolumes: [], meanVolumes: [], medianMax: -25, medianMean: -30 };
-  }
-
-  const numChunks = Math.ceil(videoDuration / chunkDuration);
-  const maxVolumes: number[] = [];
-  const meanVolumes: number[] = [];
-
-  logger.debug(`[Audio Analysis] Analyzing full video in ${numChunks} chunks of ${chunkDuration}s each`);
-
-  // Analyze chunks in parallel (up to 3 at a time to avoid overwhelming the system)
-  const chunkPromises: Promise<void>[] = [];
-
-  for (let i = 0; i < numChunks; i++) {
-    const startTime = i * chunkDuration;
-    const actualDuration = Math.min(chunkDuration, videoDuration - startTime);
-
-    if (actualDuration < 1) continue; // Skip very short final chunks
-
-    chunkPromises.push(
-      analyzeAudioChunk(inputPath, startTime, actualDuration).then((result) => {
-        if (result) {
-          maxVolumes.push(result.maxVolume);
-          meanVolumes.push(result.meanVolume);
-        }
-      })
-    );
-
-    // Process in batches of 3 to limit concurrent FFmpeg processes
-    if (chunkPromises.length >= 3 || i === numChunks - 1) {
-      await Promise.all(chunkPromises);
-      chunkPromises.length = 0;
-    }
-  }
-
-  // Calculate medians (robust to outliers)
-  const sortedMax = [...maxVolumes].sort((a, b) => a - b);
-  const sortedMean = [...meanVolumes].sort((a, b) => a - b);
-
-  const medianMax = sortedMax.length > 0
-    ? sortedMax[Math.floor(sortedMax.length / 2)]
-    : -20;
-  const medianMean = sortedMean.length > 0
-    ? sortedMean[Math.floor(sortedMean.length / 2)]
-    : -35;
-
-  logger.debug(`[Audio Analysis] Chunk analysis complete: ${maxVolumes.length} chunks analyzed`);
-  logger.debug(`[Audio Analysis] Max volumes range: ${Math.min(...maxVolumes).toFixed(1)} to ${Math.max(...maxVolumes).toFixed(1)} dB`);
-  logger.debug(`[Audio Analysis] Median max: ${medianMax.toFixed(1)} dB, Median mean: ${medianMean.toFixed(1)} dB`);
-
-  return { maxVolumes, meanVolumes, medianMax, medianMean };
-}
-
-/**
- * Phase 3: Percentile-based threshold calculation using astats
- * Uses FFmpeg astats to get more detailed audio statistics including RMS levels
- * This is more robust than simple max/mean as it considers the distribution of audio levels
- *
- * NOISE-AWARE: Uses speech-band filtering to focus analysis on voice frequencies
- */
-async function analyzeAudioPercentiles(
-  inputPath: string,
-  sampleDuration?: number
-): Promise<{ peakLevel: number; rmsLevel: number; dynamicRange: number } | null> {
-  return new Promise((resolve) => {
-    let statsOutput = '';
-
-    const inputOptions = sampleDuration ? ['-t', String(sampleDuration)] : [];
-
-    // Apply speech-band filter before astats analysis
-    // This focuses on voice frequencies (200Hz-6000Hz) and rejects background noise
-    const command = ffmpeg(inputPath)
-      .inputOptions(inputOptions)
-      .audioFilters('highpass=f=200,lowpass=f=6000,astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level')
-      .format('null')
-      .output('/dev/null');
-
-    command
-      .on('stderr', (line: string) => {
-        statsOutput += line + '\n';
-      })
-      .on('end', () => {
-        // Parse astats output - look for Overall statistics
-        // Format: [Parsed_astats_0 @ ...] Overall
-        // Peak level dB: -X.XX
-        // RMS level dB: -X.XX
+        // Parse astats output
         const peakMatch = statsOutput.match(/Peak level dB:\s*(-?[\d.]+)/i);
         const rmsMatch = statsOutput.match(/RMS level dB:\s*(-?[\d.]+)/i);
 
-        if (!peakMatch || !rmsMatch) {
-          logger.debug(`[Audio Percentiles] Could not parse astats output`);
-          resolve(null);
-          return;
-        }
-
-        const peakLevel = parseFloat(peakMatch[1]);
-        const rmsLevel = parseFloat(rmsMatch[1]);
+        const maxVolume = maxMatch ? parseFloat(maxMatch[1]) : -25;
+        const meanVolume = meanMatch ? parseFloat(meanMatch[1]) : maxVolume - 15;
+        const peakLevel = peakMatch ? parseFloat(peakMatch[1]) : maxVolume;
+        const rmsLevel = rmsMatch ? parseFloat(rmsMatch[1]) : meanVolume;
         const dynamicRange = peakLevel - rmsLevel;
 
-        logger.debug(`[Audio Percentiles] Peak: ${peakLevel.toFixed(1)} dB, RMS: ${rmsLevel.toFixed(1)} dB, Dynamic range: ${dynamicRange.toFixed(1)} dB`);
+        logger.info(`[Audio SinglePass] max=${maxVolume.toFixed(1)}dB, mean=${meanVolume.toFixed(1)}dB, peak=${peakLevel.toFixed(1)}dB, rms=${rmsLevel.toFixed(1)}dB, DR=${dynamicRange.toFixed(1)}dB`);
 
-        resolve({ peakLevel, rmsLevel, dynamicRange });
+        resolve({ maxVolume, meanVolume, peakLevel, rmsLevel, dynamicRange });
       })
       .on('error', (err: Error) => {
-        logger.debug(`[Audio Percentiles] Error: ${err.message}`);
-        resolve(null);
+        logger.warn(`[Audio SinglePass] Error: ${err.message}, using defaults`);
+        resolve({ maxVolume: -25, meanVolume: -30, peakLevel: -25, rmsLevel: -30, dynamicRange: 5 });
       })
       .run();
   });
@@ -438,21 +324,16 @@ export async function detectSilenceAdaptive(
 
   logger.info(`[Adaptive Silence] Starting adaptive detection for ${videoDuration.toFixed(1)}s video`);
 
-  // Phase 1: Full-video analysis
-  const chunkDuration = Math.min(30, videoDuration); // Use smaller chunks for short videos
-  const { medianMax, medianMean } = await analyzeFullVideoAudio(inputPath, videoDuration, chunkDuration);
-
-  // Phase 3: Percentile-based analysis (sample first 60s or full video if shorter)
-  const sampleForPercentiles = Math.min(60, videoDuration);
-  const percentileData = await analyzeAudioPercentiles(inputPath, sampleForPercentiles);
+  // Single-pass analysis: volumedetect + astats in one FFmpeg process
+  const { maxVolume, meanVolume, peakLevel, rmsLevel, dynamicRange } = await analyzeAudioSinglePass(inputPath);
 
   // Calculate adaptive threshold
   const adaptiveThreshold = calculateAdaptiveThreshold(
-    medianMax,
-    medianMean,
-    percentileData?.peakLevel,
-    percentileData?.rmsLevel,
-    percentileData?.dynamicRange
+    maxVolume,
+    meanVolume,
+    peakLevel,
+    rmsLevel,
+    dynamicRange
   );
 
   logger.info(`[Adaptive Silence] Calculated adaptive threshold: ${adaptiveThreshold.toFixed(1)} dB`);
@@ -468,7 +349,7 @@ export async function detectSilenceAdaptive(
   const totalSilence = silences.reduce((sum, s) => sum + (s.end - s.start), 0);
   const silencePercent = (totalSilence / videoDuration) * 100;
 
-  const analysisInfo = `Adaptive detection: medianMax=${medianMax.toFixed(1)}dB, threshold=${threshold.toFixed(1)}dB${wasAdjusted ? ' (adjusted)' : ''}, ${silences.length} silences (${silencePercent.toFixed(1)}%)`;
+  const analysisInfo = `Adaptive detection: maxVolume=${maxVolume.toFixed(1)}dB, threshold=${threshold.toFixed(1)}dB${wasAdjusted ? ' (adjusted)' : ''}, ${silences.length} silences (${silencePercent.toFixed(1)}%)`;
 
   logger.info(`[Adaptive Silence] ${analysisInfo}`);
 
@@ -730,8 +611,9 @@ export async function removeSilence(
   inputPath: string,
   outputPath: string,
   options: ProcessingOptions = {},
-  wordTimestamps?: TranscriptionWord[]
-): Promise<string> {
+  wordTimestamps?: TranscriptionWord[],
+  onProgress?: (substepLabel: string, percent?: number) => void
+): Promise<RemoveSilenceResult> {
   // Validate input file exists before spawning any ffmpeg processes
   validateFileExists(inputPath, 'silence removal');
 
@@ -755,11 +637,15 @@ export async function removeSilence(
     logger.info(`[Silence Removal] Manual threshold: ${threshold}dB, found ${silences.length} silences`);
   }
 
+  onProgress?.('Analyzing audio...', 0);
+
   if (silences.length === 0) {
     logger.debug(`[Silence Removal] No silences found, copying original file`);
     fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
+    return { outputPath, keptSegments: [{ start: 0, end: duration }] };
   }
+
+  onProgress?.('Detecting silence...', 30);
 
   // Step 2: Convert silences to keep-segments using FFmpeg-based approach
   let segments = getNonSilentSegments(silences, duration, {
@@ -782,7 +668,7 @@ export async function removeSilence(
   if (segments.length === 0) {
     logger.debug(`[Silence Removal] No segments to keep, copying original file`);
     fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
+    return { outputPath, keptSegments: [{ start: 0, end: duration }] };
   }
 
   // Step 3: Extract room tone for natural splice transitions
@@ -812,10 +698,14 @@ export async function removeSilence(
     logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
     if (roomTonePath) fs.unlinkSync(roomTonePath);
     fs.copyFileSync(inputPath, outputPath);
-    return outputPath;
+    return { outputPath, keptSegments: segments };
   }
 
+  onProgress?.('Encoding video...', 50);
   logger.debug(`[Silence Removal] Concatenating ${segments.length} segments with crossfades...`);
+
+  // Calculate expected output duration for progress reporting
+  const expectedDuration = segments.reduce((sum, s) => sum + (s.end - s.start), 0);
 
   // Encoding settings: lossless for intermediate files, quality for final output
   const videoCrf = isIntermediate ? '0' : '18';
@@ -838,7 +728,7 @@ export async function removeSilence(
       if (roomTonePath) {
         cmd.input(roomTonePath);
       }
-      return cmd
+      const pipeline = cmd
         .complexFilter(filterComplex)
         .outputOptions([
           '-map', '[outv]',
@@ -853,6 +743,20 @@ export async function removeSilence(
           '-b:a', audioBitrate,
         ])
         .output(outputPath);
+
+      // Hook progress event for sub-step reporting
+      if (onProgress && expectedDuration > 0) {
+        pipeline.on('progress', (progress: { timemark?: string }) => {
+          if (progress.timemark) {
+            const parts = progress.timemark.split(':').map(Number);
+            const currentSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+            const pct = Math.min(99, Math.round(50 + (currentSec / expectedDuration) * 50));
+            onProgress('Encoding video...', pct);
+          }
+        });
+      }
+
+      return pipeline;
     }, processConfig);
 
     // Clean up room tone file
@@ -861,7 +765,7 @@ export async function removeSilence(
     }
 
     logger.debug(`[Silence Removal] Complete!`);
-    return outputPath;
+    return { outputPath, keptSegments: segments };
   } catch (err) {
     // Clean up room tone file on error
     if (roomTonePath) {
