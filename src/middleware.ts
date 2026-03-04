@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/pricing',
+  '/compare',
   '/financial-advisors',
   '/mortgage-brokers',
   '/real-estate-agents',
@@ -14,6 +15,8 @@ const isPublicRoute = createRouteMatcher([
   '/health-practitioners',
   '/privacy',
   '/terms',
+  '/sitemap.xml',
+  '/robots.txt',
   '/api/webhooks(.*)',
   '/api/upload', // Upload route handles its own auth after parsing body
   '/api/health', // Health check endpoint for monitoring
