@@ -621,7 +621,8 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Processing error', { error: errorMessage, videoId: videoRecordId });
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logger.error('Processing error', { error: errorMessage, stack: errorStack, videoId: videoRecordId });
 
     // Clear progress tracking on error
     if (fileId) clearProgress(fileId);

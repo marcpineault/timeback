@@ -103,12 +103,16 @@ async function analyzeAudioSinglePass(
   return new Promise((resolve) => {
     let statsOutput = '';
 
+    // Use simple audio filter chain instead of complexFilter with asplit/anullsink.
+    // The complex filter approach fails on Alpine Linux (ffmpeg exit code 218 / ENOSYS).
+    // volumedetect passes audio through, so astats can run on the same stream.
     const command = ffmpeg(inputPath)
-      .complexFilter([
-        '[0:a]highpass=f=200,lowpass=f=6000,asplit=2[vol][stat]',
-        '[vol]volumedetect,anullsink',
-        '[stat]astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level,anullsink',
-      ])
+      .audioFilters(
+        'highpass=f=200',
+        'lowpass=f=6000',
+        'volumedetect',
+        'astats=measure_perchannel=Peak_level+RMS_level:measure_overall=Peak_level+RMS_level',
+      )
       .format('null')
       .output('/dev/null');
 
