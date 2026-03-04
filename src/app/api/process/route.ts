@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       silenceThreshold,
       silenceDuration,
       autoSilenceThreshold,
-      silencePreset,  // 'jumpCut' | 'natural' | 'gentle' — controls silence removal style
+      silencePreset,  // 'natural' | 'gentle' — controls silence removal style
       generateCaptions,
       useHookAsHeadline,
       generateAIHeadline: shouldGenerateAIHeadline,

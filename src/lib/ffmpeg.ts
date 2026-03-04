@@ -65,7 +65,7 @@ export interface ProcessingOptions {
   silenceThreshold?: number; // in dB, default -30
   silenceDuration?: number; // minimum silence duration in seconds, default 0.35
   autoSilenceThreshold?: boolean; // auto-detect optimal threshold based on audio noise floor
-  silencePreset?: SilencePresetName; // 'jumpCut' | 'natural' | 'gentle' — controls VAD+gap aggressiveness
+  silencePreset?: SilencePresetName; // 'natural' | 'gentle' — controls VAD+gap aggressiveness
   headline?: string;
   headlinePosition?: 'top' | 'center' | 'bottom';
   headlineStyle?: HeadlineStyle;
@@ -787,7 +787,7 @@ export async function removeSilence(
   }
 
   // Step 3: Build FFmpeg filter complex with crossfades at splice points
-  const crossfadeMs = presetName === 'jumpCut' ? 3 : 5;
+  const crossfadeMs = 5;
   const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs);
 
   if (!filterComplex) {

@@ -32,7 +32,7 @@ export interface BRollConfig {
   maxMoments: number;
 }
 
-export type SilencePreset = 'jumpCut' | 'natural' | 'gentle';
+export type SilencePreset = 'natural' | 'gentle';
 
 export interface ProcessingConfig {
   generateCaptions: boolean;
@@ -340,9 +340,8 @@ export default function ProcessingOptions({
         <h3 className="text-base sm:text-lg font-medium text-[#0a0a0a]">Silence Removal</h3>
 
         {/* Editing Style Presets */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {([
-            { key: 'jumpCut' as SilencePreset, label: 'Jump Cut', desc: 'Fast-paced, TikTok style' },
             { key: 'natural' as SilencePreset, label: 'Natural', desc: 'Conversational, podcast style' },
             { key: 'gentle' as SilencePreset, label: 'Gentle', desc: 'Minimal editing, lectures' },
           ]).map(({ key, label, desc }) => (
