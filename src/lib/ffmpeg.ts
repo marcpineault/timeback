@@ -745,6 +745,9 @@ export async function removeSilence(
           '-bufsize', '1M',
           '-c:a', 'aac',
           '-b:a', audioBitrate,
+          // faststart moves moov atom to the front for instant mobile playback/preview.
+          // Skip for intermediate files since they'll be re-encoded anyway.
+          ...(isIntermediate ? [] : ['-movflags', '+faststart', '-pix_fmt', 'yuv420p']),
         ])
         .output(outputPath);
 
@@ -1255,10 +1258,12 @@ export async function applyCombinedFilters(
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', '18',
+        '-pix_fmt', 'yuv420p',
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
+        '-movflags', '+faststart',
         '-shortest',
         outputPath
       ];
@@ -1275,10 +1280,12 @@ export async function applyCombinedFilters(
             '-c:v', 'libx264',
             '-preset', 'fast',
             '-crf', '18',
+            '-pix_fmt', 'yuv420p',
             '-threads', '0',
             '-max_muxing_queue_size', '512',
             '-bufsize', '1M',
             '-c:a', 'copy',
+            '-movflags', '+faststart',
           ])
           .output(outputPath);
       }, processConfig);
@@ -1325,12 +1332,14 @@ export async function trimVideo(
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', '18',
+        '-pix_fmt', 'yuv420p',
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'aac',
         '-b:a', '128k',
         '-avoid_negative_ts', 'make_zero',
+        '-movflags', '+faststart',
       ])
       .output(outputPath)
       .on('end', () => {
@@ -1390,12 +1399,14 @@ export async function splitVideo(
           '-c:v', 'libx264',
           '-preset', 'fast',
           '-crf', '18',
+          '-pix_fmt', 'yuv420p',
           '-threads', '0',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
           '-c:a', 'aac',
           '-b:a', '128k',
           '-avoid_negative_ts', 'make_zero',
+          '-movflags', '+faststart',
         ])
         .output(segment.outputPath)
         .on('end', () => {
