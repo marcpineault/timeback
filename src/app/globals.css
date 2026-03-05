@@ -155,7 +155,6 @@ body {
   max-width: 700px;
   color: var(--lp-black);
   margin-bottom: 1.8rem;
-  animation: fadeUp 0.8s ease both;
 }
 
 .lp-hero h1 em {
@@ -170,7 +169,6 @@ body {
   max-width: 480px;
   margin-bottom: 2.5rem;
   line-height: 1.75;
-  animation: fadeUp 0.8s ease 0.1s both;
 }
 
 .hero-ctas {
