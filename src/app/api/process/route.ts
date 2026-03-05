@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { existsSync, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { removeSilence, ProcessingOptions, applyCombinedFilters } from '@/lib/ffmpeg';
-import { transcribeVideo, extractHook, TranscriptionWord, generateAIHeadline, generateSrt, generateAnimatedAss } from '@/lib/whisper';
+import { transcribeVideo, extractHook, TranscriptionWord, generateAIHeadline, generateSrt, generateSrtFromWords, generateAnimatedAss } from '@/lib/whisper';
 import { buildSegmentMap, remapTranscriptionSegments, remapWords } from '@/lib/timestampRemap';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
@@ -419,6 +419,12 @@ export async function POST(request: NextRequest) {
                 srtPath = path.join(processedDir, `${subtitleBaseName}.ass`);
                 generateAnimatedAss(remappedWords, srtPath);
                 logger.info(`Generated animated ASS from remapped words (${remappedWords.length} words)`);
+              } else if (earlyTranscription.words && earlyTranscription.words.length > 0) {
+                // Use word-level remapping for precise SRT timing after silence removal
+                const remappedWords = remapWords(earlyTranscription.words, segmentMap);
+                srtPath = path.join(processedDir, `${subtitleBaseName}.srt`);
+                generateSrtFromWords(remappedWords, srtPath);
+                logger.info(`Generated SRT from remapped words (${remappedWords.length} words)`);
               } else {
                 srtPath = path.join(processedDir, `${subtitleBaseName}.srt`);
                 generateSrt(remappedSegments, srtPath);

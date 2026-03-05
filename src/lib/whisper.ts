@@ -219,6 +219,46 @@ export function generateSrt(
 }
 
 /**
+ * Generate SRT file from word-level timestamps for precise caption timing.
+ * Groups words into short captions (max 4 words) using actual word boundaries
+ * instead of proportional splitting, which is critical after silence removal
+ * where gaps within a Whisper segment have been removed.
+ */
+export function generateSrtFromWords(
+  words: TranscriptionWord[],
+  outputPath: string,
+  maxWordsPerCaption: number = 4
+): string {
+  if (words.length === 0) {
+    fs.writeFileSync(outputPath, '', 'utf-8');
+    return outputPath;
+  }
+
+  const captions: { start: number; end: number; text: string }[] = [];
+
+  for (let i = 0; i < words.length; i += maxWordsPerCaption) {
+    const chunk = words.slice(i, i + maxWordsPerCaption);
+    captions.push({
+      start: chunk[0].start,
+      end: chunk[chunk.length - 1].end,
+      text: chunk.map(w => w.word).join(' '),
+    });
+  }
+
+  const captionEndPadding = 0.4;
+  const srtContent = captions
+    .map((cap, index) => {
+      const nextStart = index < captions.length - 1 ? captions[index + 1].start : Infinity;
+      const paddedEnd = Math.min(cap.end + captionEndPadding, nextStart);
+      return `${index + 1}\n${formatSrtTime(cap.start)} --> ${formatSrtTime(paddedEnd)}\n${cap.text}\n`;
+    })
+    .join('\n');
+
+  fs.writeFileSync(outputPath, srtContent, 'utf-8');
+  return outputPath;
+}
+
+/**
  * Group words into lines for display
  * Short-form style: max 2 words per line for a clean, minimal look
  */
