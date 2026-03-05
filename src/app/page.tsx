@@ -30,28 +30,21 @@ const softwareAppJsonLd = {
   applicationCategory: 'MultimediaApplication',
   operatingSystem: 'Web',
   description:
-    'TimeBack is a video content creation platform that helps professionals create 30 days of social media video content in under an hour. It combines AI script generation, automatic video editing with silence removal, auto-captioning, and Instagram scheduling into a single tool. Built for financial advisors, real estate agents, mortgage brokers, lawyers, and other service professionals.',
+    'Timeback is software that edits your videos for you. Upload your video and Timeback does the rest — it adds captions, removes silences, and auto-posts to social media. Built for financial advisors, real estate agents, mortgage brokers, lawyers, and other service professionals.',
   offers: [
     {
       '@type': 'Offer',
       name: 'Starter',
-      price: '0',
+      price: '19',
       priceCurrency: 'USD',
-      description: '5 videos per month, 3 AI script generations, 720p resolution',
+      description: '35 videos per month, AI script generation, auto silence removal, auto captions, Instagram scheduling',
     },
     {
       '@type': 'Offer',
       name: 'Creator',
-      price: '19',
+      price: '39',
       priceCurrency: 'USD',
-      description: '120 videos per month, 50 AI script generations, 1080p, no watermark, priority processing',
-    },
-    {
-      '@type': 'Offer',
-      name: 'Business',
-      price: '49',
-      priceCurrency: 'USD',
-      description: '250 videos per month, 200 AI script generations, up to 10-minute videos, 1080p, priority processing',
+      description: '120 videos per month, bulk upload (50 at once), priority processing, advanced captions',
     },
   ],
   featureList: [
@@ -108,7 +101,7 @@ const homepageFaqJsonLd = {
       name: 'What is TimeBack?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'TimeBack is a video content creation platform that helps professionals — financial advisors, real estate agents, mortgage brokers, lawyers, health practitioners, and coaches — create 30 days of social media video content in under one hour. It combines AI script generation, automatic video editing with silence removal, auto-captioning, and Instagram scheduling into a single tool. It solves the problem of "content paralysis" — knowing you should post but not doing it because it takes too long and you don\'t know what to say.',
+        text: 'Timeback is software that edits your videos for you. Upload your video and Timeback does the rest — it adds captions, removes silences, and auto-posts to social media so you never have to worry about your next video again. It combines AI script generation, automatic video editing, auto-captioning, and social media scheduling into a single tool. Built for financial advisors, real estate agents, mortgage brokers, lawyers, health practitioners, and coaches.',
       },
     },
     {
@@ -124,7 +117,7 @@ const homepageFaqJsonLd = {
       name: 'How much does TimeBack cost?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'TimeBack offers a free tier with 5 videos per month. Paid plans start at $19/month (Creator plan with 120 videos, 50 AI script generations, 1080p, no watermark) and $49/month (Business plan with 250 videos, 200 AI script generations, up to 10-minute videos). Enterprise pricing is available for unlimited usage. All paid plans include a 30-day money-back guarantee.',
+        text: 'TimeBack starts at $19/month (Starter plan with 35 videos, AI script generation, auto silence removal, auto captions, and Instagram scheduling). The Creator plan is $39/month with 120 videos, bulk upload of 50 at once, priority processing, and advanced captions. You get 5 free videos to try before you pay.',
       },
     },
     {
@@ -132,7 +125,7 @@ const homepageFaqJsonLd = {
       name: 'How does TimeBack compare to hiring a video editor or content agency?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'TimeBack costs $19-$49/month compared to $1,500-$5,000/month for a freelance editor or content agency. TimeBack edits videos instantly (vs. 2-5 business days), processes up to 50 at once (vs. one at a time), and includes AI script generation and Instagram scheduling. It replaces three tools — ChatGPT for scripts, CapCut for editing, and Metricool for scheduling — with a single platform.',
+        text: 'TimeBack costs $19-$39/month compared to $1,500-$5,000/month for a freelance editor or content agency. TimeBack edits videos instantly (vs. 2-5 business days), processes up to 50 at once (vs. one at a time), and includes AI script generation and Instagram scheduling. It replaces three tools — ChatGPT for scripts, CapCut for editing, and Metricool for scheduling — with a single platform.',
       },
     },
     {
@@ -215,24 +208,24 @@ export default async function LandingPage() {
       {/* HOW IT WORKS */}
       <section className="lp-how reveal" id="how-it-works">
         <div className="section-label">How It Works</div>
-        <h2>Talk into your phone. We do the rest. Seriously.</h2>
+        <h2>Upload your video. Timeback does the rest.</h2>
         <div className="steps">
           <div className="step">
             <div className="step-number">01</div>
             <h3>Record your videos</h3>
-            <p>Just talk. Don&apos;t worry about pauses, ums, or retakes — TimeBack cuts all of that out automatically.</p>
+            <p>Just talk into your phone. Don&apos;t worry about pauses, ums, or retakes — Timeback removes all of that for you.</p>
             <span className="time-tag">⚡ 5 minutes</span>
           </div>
           <div className="step">
             <div className="step-number">02</div>
             <h3>Upload &amp; walk away</h3>
-            <p>Drop up to 50 videos at once. TimeBack handles the editing — silence removal, captions, clean cuts — while you do literally anything else.</p>
+            <p>Drop up to 50 videos at once. Timeback adds captions, removes silences, and cleans up your cuts — while you do literally anything else.</p>
             <span className="time-tag">⚡ 1–2 hours</span>
           </div>
           <div className="step">
             <div className="step-number">03</div>
             <h3>Post or schedule</h3>
-            <p>Download your polished videos or auto-post to Instagram. No editing app. No timeline. No export settings.</p>
+            <p>Download your finished videos or let Timeback auto-post to social media for you. You never have to think about it again.</p>
             <span className="time-tag">⚡ Automatic</span>
           </div>
         </div>
@@ -254,28 +247,28 @@ export default async function LandingPage() {
       {/* PROBLEM */}
       <section className="lp-problem reveal">
         <div className="section-label">Sound Familiar?</div>
-        <h2>Editing is the bottleneck. Not the recording.</h2>
-        <p>Recording takes 2 hours. Editing takes 6. That&apos;s why your camera roll is full of videos that never get posted — the editing kills your momentum every single time.</p>
+        <h2>You have the videos. They&apos;re just not posted yet.</h2>
+        <p>Your camera roll is full of content that never sees the light of day — because editing takes forever. Timeback fixes that.</p>
         <div className="pain-grid">
           <div className="pain-card">
             <div className="icon">⏰</div>
-            <h4>6 hours of editing per video</h4>
-            <p>Cutting silences, syncing captions, tweaking timelines. The editing takes 3x longer than the recording itself.</p>
+            <h4>Editing takes longer than recording</h4>
+            <p>Cutting silences, syncing captions, tweaking timelines. Timeback does all of this for you automatically.</p>
           </div>
           <div className="pain-card">
             <div className="icon">🤷</div>
-            <h4>20 unedited videos in your camera roll</h4>
-            <p>You recorded them weeks ago. They&apos;re still sitting there because you haven&apos;t had time to edit a single one.</p>
+            <h4>Unedited videos piling up</h4>
+            <p>You recorded them weeks ago. They&apos;re still sitting there. Upload them to Timeback and they&apos;re done in seconds.</p>
           </div>
           <div className="pain-card">
             <div className="icon">💸</div>
-            <h4>Editors want $50–$100 per video</h4>
-            <p>Outsourcing the editing costs $1,500+/month. And you still wait 3–5 days for each video back.</p>
+            <h4>Editors cost $50–$100 per video</h4>
+            <p>Outsourcing costs $1,500+/month and takes days. Timeback does the same thing instantly for a fraction of the price.</p>
           </div>
           <div className="pain-card">
             <div className="icon">📉</div>
-            <h4>You post once, then disappear for a month</h4>
-            <p>You have the content. You just can&apos;t keep up with the editing. So you go silent and lose momentum.</p>
+            <h4>You post once, then disappear</h4>
+            <p>You have the content — you just can&apos;t keep up with the editing. Timeback auto-posts for you so you stay consistent.</p>
           </div>
         </div>
       </section>
@@ -299,8 +292,8 @@ export default async function LandingPage() {
       {/* REPLACES */}
       <section className="lp-replaces reveal">
         <div className="section-label">One Tool, Not Three</div>
-        <h2>TimeBack replaces your entire editing workflow</h2>
-        <p>You&apos;re using ChatGPT for scripts, CapCut to edit, and Metricool to schedule. TimeBack replaces all three — for less than any one of them costs.</p>
+        <h2>One tool instead of three</h2>
+        <p>Scripts, editing, and scheduling — Timeback does it all. No more juggling ChatGPT, CapCut, and Metricool.</p>
         <div className="replaces-grid">
           <div className="replaces-card replaced">
             <div className="replaces-name">ChatGPT</div>
@@ -327,7 +320,7 @@ export default async function LandingPage() {
       {/* COMPARISON */}
       <section className="lp-comparison reveal">
         <div className="section-label">Why TimeBack</div>
-        <h2>What 6 hours of editing looks like vs. 6 seconds</h2>
+        <h2>Timeback vs. hiring an editor</h2>
         <div className="compare-table">
           <div className="compare-row header">
             <div className="compare-cell"></div>
@@ -395,7 +388,7 @@ export default async function LandingPage() {
       <section className="lp-audience reveal">
         <div className="section-label">Who It&apos;s For</div>
         <h2>Built for experts, not influencers</h2>
-        <p>You don&apos;t need a ring light or a content strategy. You just need to know your stuff — TimeBack handles the rest.</p>
+        <p>You don&apos;t need a ring light or a content strategy. You just need to know your stuff — Timeback handles the rest.</p>
         <div className="audience-grid">
           <div className="audience-card">
             <div className="emoji">🏡</div>
@@ -433,12 +426,12 @@ export default async function LandingPage() {
       {/* FEATURES */}
       <section className="lp-features reveal">
         <div className="section-label">Features</div>
-        <h2>You record. We edit. That&apos;s the deal.</h2>
+        <h2>Upload your video. Get back a finished post.</h2>
         <div className="feature-grid">
           <div className="feature-card highlight">
             <span className="feature-tag">Core Feature</span>
             <h3>Upload raw. Download polished.</h3>
-            <p>Drop up to 50 raw videos at once. TimeBack edits every single one in seconds — removing dead air, adding captions, tightening cuts — then queues them all to post. No timeline. No export settings. No editing skills.</p>
+            <p>Drop up to 50 raw videos at once. Timeback adds captions, removes silences, tightens your cuts, and queues them all to post. No timeline. No export settings. No editing skills.</p>
           </div>
           <div className="feature-card">
             <span className="feature-tag">AI Scripts</span>
@@ -447,18 +440,18 @@ export default async function LandingPage() {
           </div>
           <div className="feature-card">
             <span className="feature-tag">Smart Editing</span>
-            <h3>Silence removal that saves hours</h3>
-            <p>Awkward pauses, ums, dead air — all cut automatically in seconds. What used to take 30 minutes per video now takes zero effort.</p>
+            <h3>Silences removed automatically</h3>
+            <p>Awkward pauses, ums, dead air — Timeback removes all of it for you. What used to take 30 minutes per video now takes zero effort.</p>
           </div>
           <div className="feature-card">
             <span className="feature-tag">Captions</span>
-            <h3>Auto-captions on every video</h3>
-            <p>Captions added automatically so your content works in the feed with sound off — where most people scroll.</p>
+            <h3>Captions added for you</h3>
+            <p>Timeback adds captions to every video automatically, so your content works in the feed with sound off — where most people scroll.</p>
           </div>
           <div className="feature-card">
             <span className="feature-tag">Scheduling</span>
-            <h3>Auto-post to Instagram</h3>
-            <p>Set it and forget it. TimeBack publishes your finished videos on a schedule so you stay consistent without thinking about it.</p>
+            <h3>Auto-posts to social media</h3>
+            <p>Timeback publishes your finished videos on a schedule so you never have to worry about your next post again.</p>
           </div>
         </div>
       </section>
@@ -469,13 +462,13 @@ export default async function LandingPage() {
         <h2>The all-in-one video content platform for professionals</h2>
         <div className="about-content">
           <p>
-            TimeBack is a video editing platform that turns raw footage into polished, captioned, ready-to-post videos in seconds. It solves the real bottleneck in content creation — not the recording, but the hours of editing that come after. Upload your raw videos and TimeBack handles silence removal, captions, and clean cuts automatically.
+            Timeback is software that edits your videos for you. Upload your video and Timeback does the rest — it adds captions, removes silences, and auto-posts to social media so you never have to worry about your next video again.
           </p>
           <p>
-            TimeBack combines four capabilities into a single tool: AI script generation tailored to your specific profession, automatic video editing with silence removal and dead air detection, auto-captioning on every video, and Instagram auto-scheduling. You can upload up to 50 videos at once and have them all edited, captioned, and scheduled automatically.
+            Timeback combines AI script generation, automatic video editing, auto-captioning, and social media scheduling into a single tool. Upload up to 50 videos at once and have them all edited, captioned, and scheduled automatically.
           </p>
           <p>
-            TimeBack replaces three separate tools — ChatGPT for script writing, CapCut for video editing, and Metricool for scheduling — with one platform. No video editing skills are required. Pricing starts at $0/month (free tier with 5 videos), with paid plans from $19/month.
+            One tool instead of three — Timeback replaces ChatGPT for scripts, CapCut for editing, and Metricool for scheduling. No video editing skills required. Plans start at $19/month.
           </p>
         </div>
       </section>
@@ -522,8 +515,8 @@ export default async function LandingPage() {
       {/* PRICING */}
       <section className="lp-pricing reveal" id="pricing">
         <div className="section-label">Pricing</div>
-        <h2>Stop paying to edit videos.<br />Start at $19.</h2>
-        <p>Same output. Fraction of the cost. And you get 5 videos free before you pay a dime.</p>
+        <h2>Plans that let Timeback<br />do the editing for you.</h2>
+        <p>Try 5 videos free. No credit card required.</p>
         <div className="price-cards">
           <div className="price-card">
             <div className="tier">Starter</div>
@@ -554,8 +547,8 @@ export default async function LandingPage() {
 
       {/* FINAL CTA */}
       <section className="lp-final-cta reveal">
-        <h2>Record today. Post tomorrow. <em>Skip the editing entirely.</em></h2>
-        <p>Record your videos, upload them, and TimeBack handles the editing — silence removal, captions, clean cuts — in seconds. Your first 5 videos are free. No credit card, no commitment, no editing required.</p>
+        <h2>Upload your video. <em>Timeback does the rest.</em></h2>
+        <p>Captions, silence removal, and auto-posting — all handled for you. Your first 5 videos are free. No credit card, no commitment, no editing required.</p>
         <Link href="/sign-up" className="btn-primary" style={{ fontSize: '1.1rem', padding: '1.1rem 2.8rem' }}>Get Your 5 Free Videos →</Link>
         <div className="final-footer">No credit card · No editing skills needed · Cancel anytime</div>
       </section>
