@@ -76,6 +76,16 @@ export interface RemoveSilenceResult {
   keptSegments: SilenceInterval[];
 }
 
+/** Returns a random CRF between 17–19 for anti-fingerprinting. Visually indistinguishable but produces unique bitrate curves. */
+function naturalCrf(): string {
+  return String(17 + Math.floor(Math.random() * 3));
+}
+
+/** Returns metadata flags embedding the current timestamp as creation_time. */
+function creationTimestamp(): string[] {
+  return ['-metadata', `creation_time=${new Date().toISOString()}`];
+}
+
 // Caption styles optimized for safe zones
 // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
 // All margin values must be scaled to this coordinate system
@@ -712,7 +722,7 @@ export async function removeSilence(
   const expectedDuration = segments.reduce((sum, s) => sum + (s.end - s.start), 0);
 
   // Encoding settings: lossless for intermediate files, quality for final output
-  const videoCrf = isIntermediate ? '0' : '18';
+  const videoCrf = isIntermediate ? '0' : naturalCrf();
   const videoPreset = isIntermediate ? 'ultrafast' : 'fast';
   const audioBitrate = isIntermediate ? '256k' : '128k';
   if (isIntermediate) {
@@ -748,6 +758,7 @@ export async function removeSilence(
           // faststart moves moov atom to the front for instant mobile playback/preview.
           // Skip for intermediate files since they'll be re-encoded anyway.
           ...(isIntermediate ? [] : ['-movflags', '+faststart', '-pix_fmt', 'yuv420p']),
+          ...(isIntermediate ? [] : creationTimestamp()),
         ])
         .output(outputPath);
 
@@ -1257,13 +1268,14 @@ export async function applyCombinedFilters(
         '-map', '0:a?',
         '-c:v', 'libx264',
         '-preset', 'fast',
-        '-crf', '18',
+        '-crf', naturalCrf(),
         '-pix_fmt', 'yuv420p',
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
         '-c:a', 'copy',
         '-movflags', '+faststart',
+        ...creationTimestamp(),
         '-shortest',
         outputPath
       ];
@@ -1279,13 +1291,14 @@ export async function applyCombinedFilters(
           .outputOptions([
             '-c:v', 'libx264',
             '-preset', 'fast',
-            '-crf', '18',
+            '-crf', naturalCrf(),
             '-pix_fmt', 'yuv420p',
             '-threads', '0',
             '-max_muxing_queue_size', '512',
             '-bufsize', '1M',
             '-c:a', 'copy',
             '-movflags', '+faststart',
+            ...creationTimestamp(),
           ])
           .output(outputPath);
       }, processConfig);
@@ -1331,7 +1344,7 @@ export async function trimVideo(
       .outputOptions([
         '-c:v', 'libx264',
         '-preset', 'fast',
-        '-crf', '18',
+        '-crf', naturalCrf(),
         '-pix_fmt', 'yuv420p',
         '-threads', '0',
         '-max_muxing_queue_size', '512',
@@ -1340,6 +1353,7 @@ export async function trimVideo(
         '-b:a', '128k',
         '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
+        ...creationTimestamp(),
       ])
       .output(outputPath)
       .on('end', () => {
@@ -1398,7 +1412,7 @@ export async function splitVideo(
         .outputOptions([
           '-c:v', 'libx264',
           '-preset', 'fast',
-          '-crf', '18',
+          '-crf', naturalCrf(),
           '-pix_fmt', 'yuv420p',
           '-threads', '0',
           '-max_muxing_queue_size', '512',
@@ -1407,6 +1421,7 @@ export async function splitVideo(
           '-b:a', '128k',
           '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
+          ...creationTimestamp(),
         ])
         .output(segment.outputPath)
         .on('end', () => {
