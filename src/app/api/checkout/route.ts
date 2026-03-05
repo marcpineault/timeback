@@ -60,16 +60,46 @@ export async function POST(req: Request) {
           user.stripeSubscriptionId
         )
 
-        // Only upgrade if subscription is active and not canceled
-        if (
-          existingSubscription.status === 'active' &&
-          !existingSubscription.cancel_at_period_end
-        ) {
+        if (existingSubscription.status === 'active') {
+          // If subscription is canceling at period end, reactivate it and switch plan
+          if (existingSubscription.cancel_at_period_end) {
+            const subscriptionItemId = existingSubscription.items.data[0]?.id
+
+            if (subscriptionItemId) {
+              // Remove cancellation and update plan in one call
+              await stripe.subscriptions.update(user.stripeSubscriptionId, {
+                cancel_at_period_end: false,
+                items: [
+                  {
+                    id: subscriptionItemId,
+                    price: STRIPE_PRICES[plan],
+                  },
+                ],
+                proration_behavior: 'create_prorations',
+                metadata: {
+                  plan,
+                  videosPerMonth: planDetails.videosPerMonth.toString(),
+                  maxDuration: planDetails.maxDuration.toString(),
+                  maxResolution: planDetails.maxResolution.toString(),
+                },
+              })
+
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { plan },
+              })
+
+              return NextResponse.redirect(
+                new URL(`/thank-you`, process.env.NEXT_PUBLIC_APP_URL),
+                { status: 303 }
+              )
+            }
+          }
+
+          // Active subscription, not canceling - upgrade with proration
           const subscriptionItemId = existingSubscription.items.data[0]?.id
 
           if (subscriptionItemId) {
-            // Update the subscription with proration
-            // This gives credit for unused time on current plan
             await stripe.subscriptions.update(user.stripeSubscriptionId, {
               items: [
                 {
@@ -86,18 +116,13 @@ export async function POST(req: Request) {
               },
             })
 
-            // Update user's plan in database immediately
             await prisma.user.update({
               where: { id: user.id },
               data: { plan },
             })
 
-            // Redirect to thank-you page - upgrade is complete with proration
             return NextResponse.redirect(
-              new URL(
-                `/thank-you`,
-                process.env.NEXT_PUBLIC_APP_URL
-              ),
+              new URL(`/thank-you`, process.env.NEXT_PUBLIC_APP_URL),
               { status: 303 }
             )
           }

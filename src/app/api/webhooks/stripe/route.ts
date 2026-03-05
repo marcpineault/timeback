@@ -64,6 +64,23 @@ export async function POST(req: Request) {
         })
 
         if (user) {
+          // Handle non-active statuses: downgrade user if subscription is no longer active
+          if (subscription.status === 'canceled' || subscription.status === 'unpaid' || subscription.status === 'incomplete_expired') {
+            logger.info('Subscription no longer active, downgrading user', {
+              userId: user.id,
+              status: subscription.status,
+              subscriptionId: subscription.id,
+            })
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                plan: 'FREE',
+                stripeSubscriptionId: null,
+              },
+            })
+            break
+          }
+
           // Check if subscription is active
           if (subscription.status === 'active') {
             // Get price to determine plan
@@ -126,9 +143,13 @@ export async function POST(req: Request) {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
 
-        // Find users first to log what's being changed
+        // Only downgrade users whose current subscription matches the deleted one.
+        // This prevents an old canceling subscription from nuking a newer active one.
         const affectedUsers = await prisma.user.findMany({
-          where: { stripeCustomerId: customerId },
+          where: {
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: subscription.id,
+          },
           select: { id: true, plan: true, email: true }
         })
 
@@ -144,7 +165,10 @@ export async function POST(req: Request) {
           })
 
           await prisma.user.updateMany({
-            where: { stripeCustomerId: customerId },
+            where: {
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscription.id,
+            },
             data: {
               plan: 'FREE',
               stripeSubscriptionId: null,
@@ -163,10 +187,24 @@ export async function POST(req: Request) {
             })
           }
         } else {
-          logger.warn('Subscription deleted but no users found with customer ID', {
-            customerId,
-            subscriptionId: subscription.id
+          // Check if user exists but has a different (newer) subscription
+          const usersWithDifferentSub = await prisma.user.findMany({
+            where: { stripeCustomerId: customerId },
+            select: { id: true, stripeSubscriptionId: true }
           })
+
+          if (usersWithDifferentSub.length > 0) {
+            logger.info('Subscription deleted but user has a different active subscription, skipping downgrade', {
+              customerId,
+              deletedSubscriptionId: subscription.id,
+              currentSubscriptionIds: usersWithDifferentSub.map(u => u.stripeSubscriptionId),
+            })
+          } else {
+            logger.warn('Subscription deleted but no users found with customer ID', {
+              customerId,
+              subscriptionId: subscription.id
+            })
+          }
         }
         break
       }
