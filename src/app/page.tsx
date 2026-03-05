@@ -8,16 +8,16 @@ import MobileMenuToggle from '@/components/MobileMenuToggle'
 import BeforeAfterVideo from '@/components/BeforeAfterVideo'
 
 export const metadata: Metadata = {
-  title: 'TimeBack — Stop Editing Videos. Auto-Remove Silence, Add Captions, and Post.',
+  title: 'TimeBack — Software That Edits Your Videos For You',
   description:
-    'TimeBack edits your videos in seconds — silence removal, captions, clean cuts — so you skip the editing entirely. Upload raw footage, download polished posts. No editing skills required. Free to start.',
+    'Upload your video and TimeBack does the rest. It adds captions, removes silences, and auto-posts to social media for you — so you never have to worry about your next video again.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'TimeBack — Stop Editing Videos. Auto-Remove Silence, Add Captions, and Post.',
+    title: 'TimeBack — Software That Edits Your Videos For You',
     description:
-      'You spent 2 hours recording and 6 hours editing. TimeBack does the editing in seconds — silence removal, captions, clean cuts — so you go from raw footage to posted in minutes.',
+      'Upload your video and TimeBack does the rest. It adds captions, removes silences, and auto-posts to social media for you — so you never have to worry about your next video again.',
     url: 'https://www.timebackvideo.com',
   },
 }
@@ -198,9 +198,9 @@ export default async function LandingPage() {
 
       {/* HERO */}
       <section className="lp-hero">
-        <h1>Stop editing videos.<br /><em>Start posting them.</em></h1>
+        <h1>Timeback is software that<br /><em>edits your videos for you.</em></h1>
         <p className="hero-sub">
-          You spent 2 hours recording and 6 hours editing. TimeBack does the editing in seconds — silence removal, captions, clean cuts — so you go from raw footage to posted in minutes.
+          Upload your video and Timeback does the rest. It adds captions, removes silences, and auto-posts to social media for you — so you never have to worry about your next video again.
         </p>
         <div className="hero-ctas">
           <Link href="/sign-up" className="btn-primary">Get 5 Free Videos →</Link>
