@@ -679,12 +679,21 @@ export async function removeSilence(
     logger.info(`[Silence Removal] Hybrid path: ${speechSegments.length} VAD segments + ${wordTimestamps!.length} words`);
 
     // Layer 2: Refine VAD boundaries using word-level timestamps
-    const refinedSegments = refineWithWordBoundaries(
+    let refinedSegments = refineWithWordBoundaries(
       speechSegments,
       wordTimestamps!,
       duration,
       refinementConfig
     );
+
+    // Drop non-verbal segments (breaths, laughs) when breathHandling='remove'
+    if (gapConfig.breathHandling === 'remove') {
+      const before = refinedSegments.length;
+      refinedSegments = refinedSegments.filter(s => !s.isNonVerbal);
+      if (before !== refinedSegments.length) {
+        logger.info(`[Silence Removal] Removed ${before - refinedSegments.length} non-verbal segments (breaths/sounds)`);
+      }
+    }
 
     // Layer 3: Intelligent gap processing with context-aware pause sizing
     segments = buildFinalSegments(refinedSegments, duration, gapConfig);

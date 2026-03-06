@@ -41,6 +41,44 @@ export function remapTime(t: number, map: SegmentMapEntry[]): number | null {
 }
 
 /**
+ * Remap a timestamp, snapping to the nearest segment boundary if it falls
+ * in a removed region. This prevents captions from collapsing to zero
+ * duration when a word straddles a cut point.
+ */
+export function remapTimeSnap(t: number, map: SegmentMapEntry[]): number | null {
+  // Exact match first
+  const exact = remapTime(t, map);
+  if (exact !== null) return exact;
+
+  if (map.length === 0) return null;
+
+  // Snap to nearest segment boundary
+  let bestOutput: number | null = null;
+  let bestDist = Infinity;
+
+  for (const entry of map) {
+    const segDuration = entry.originalEnd - entry.originalStart;
+
+    // Distance to segment start
+    const distStart = Math.abs(t - entry.originalStart);
+    if (distStart < bestDist) {
+      bestDist = distStart;
+      bestOutput = entry.outputStart;
+    }
+
+    // Distance to segment end
+    const distEnd = Math.abs(t - entry.originalEnd);
+    if (distEnd < bestDist) {
+      bestDist = distEnd;
+      bestOutput = entry.outputStart + segDuration;
+    }
+  }
+
+  // Only snap if reasonably close (within 500ms)
+  return bestDist <= 0.5 ? bestOutput : null;
+}
+
+/**
  * Remap transcription segments. Drops segments whose midpoint falls in a removed region.
  */
 export function remapTranscriptionSegments(
@@ -51,17 +89,18 @@ export function remapTranscriptionSegments(
 
   for (const seg of segments) {
     const midpoint = (seg.start + seg.end) / 2;
-    const newStart = remapTime(seg.start, map);
-    const newEnd = remapTime(seg.end, map);
     const newMid = remapTime(midpoint, map);
 
     // Drop if midpoint is in removed region
     if (newMid === null) continue;
 
-    // Use remapped start/end if available, otherwise clamp to midpoint
+    // Use snap remapping so boundaries that straddle a cut don't collapse
+    const newStart = remapTimeSnap(seg.start, map);
+    const newEnd = remapTimeSnap(seg.end, map);
+
     result.push({
       start: newStart ?? newMid,
-      end: newEnd ?? newMid,
+      end: Math.max((newStart ?? newMid) + 0.01, newEnd ?? newMid),
       text: seg.text,
     });
   }
@@ -80,16 +119,19 @@ export function remapWords(
 
   for (const word of words) {
     const midpoint = (word.start + word.end) / 2;
-    const newStart = remapTime(word.start, map);
-    const newEnd = remapTime(word.end, map);
     const newMid = remapTime(midpoint, map);
 
     if (newMid === null) continue;
 
+    // Use snap remapping so word boundaries that straddle a cut point
+    // snap to the nearest segment edge instead of collapsing to midpoint
+    const newStart = remapTimeSnap(word.start, map);
+    const newEnd = remapTimeSnap(word.end, map);
+
     result.push({
       word: word.word,
       start: newStart ?? newMid,
-      end: newEnd ?? newMid,
+      end: Math.max((newStart ?? newMid) + 0.01, newEnd ?? newMid),
     });
   }
 

@@ -93,12 +93,15 @@ export function refineWithWordBoundaries(
         isNonVerbal: true,
       });
     } else {
-      // Extend segment to encompass full word boundaries with padding
+      // Use word boundaries as the source of truth with padding for plosive
+      // onsets / trailing consonants. Do NOT extend to VAD boundaries — the
+      // VAD can overshoot by hundreds of milliseconds, embedding silence
+      // inside the kept segment where gap processing can never reach it.
       const earliestWord = Math.min(...overlappingWords.map(w => w.start));
       const latestWord = Math.max(...overlappingWords.map(w => w.end));
 
-      const refinedStart = Math.max(0, Math.min(seg.start, earliestWord - prePad));
-      const refinedEnd = Math.min(totalDuration, Math.max(seg.end, latestWord + postPad));
+      const refinedStart = Math.max(0, earliestWord - prePad);
+      const refinedEnd = Math.min(totalDuration, latestWord + postPad);
 
       refined.push({
         start: refinedStart,
