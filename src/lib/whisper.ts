@@ -490,6 +490,45 @@ export async function generateBRollImage(
 }
 
 /**
+ * Truncate text at a natural phrase boundary instead of mid-sentence.
+ * Looks for clause-ending punctuation (commas, dashes, semicolons) or
+ * conjunction words ("and", "but", "so", "because", "when", "that", "which")
+ * to find a clean break point. Falls back to the last word boundary.
+ */
+function smartTruncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+
+  const cutRegion = text.substring(0, maxLength);
+
+  // Try to break at a clause-ending punctuation mark (comma, dash, semicolon)
+  const punctBreak = cutRegion.match(/^(.+)[,;:\u2014—–-]\s/);
+  if (punctBreak && punctBreak[1].length >= maxLength * 0.4) {
+    return punctBreak[1].trim();
+  }
+
+  // Try to break before a conjunction/subordinator
+  const conjunctions = /\s+(and|but|so|or|because|when|that|which|where|while|then|if)\s/gi;
+  let lastConjMatch: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = conjunctions.exec(cutRegion)) !== null) {
+    if (match.index >= maxLength * 0.4) {
+      lastConjMatch = match;
+    }
+  }
+  if (lastConjMatch) {
+    return cutRegion.substring(0, lastConjMatch.index).trim();
+  }
+
+  // Fall back to last word boundary
+  const wordBreak = cutRegion.match(/^(.+)\s\S*$/);
+  if (wordBreak) {
+    return wordBreak[1].trim();
+  }
+
+  return cutRegion.trim();
+}
+
+/**
  * Extract the hook (first sentence) from transcription text
  * Simple extraction - use generateAIHeadline for smarter hook detection
  */
@@ -498,9 +537,9 @@ export function extractHook(text: string, maxLength: number = 60): string {
   const sentenceMatch = text.match(/^[^.!?]+[.!?]/);
   let hook = sentenceMatch ? sentenceMatch[0].trim() : text.split(' ').slice(0, 10).join(' ');
 
-  // Truncate if too long
+  // Truncate at a natural phrase boundary if too long
   if (hook.length > maxLength) {
-    hook = hook.substring(0, maxLength - 3).trim() + '...';
+    hook = smartTruncate(hook, maxLength);
   }
 
   return hook;
@@ -576,13 +615,13 @@ Example output: {"headline": "This changed how I think about money", "hook": "No
     // Ensure headline fits within maxLength
     let headline = parsed.headline || extractHook(fullTranscript, maxLength);
     if (headline.length > maxLength) {
-      headline = headline.substring(0, maxLength - 3).trim() + '...';
+      headline = smartTruncate(headline, maxLength);
     }
 
     // Ensure hook fits within 60 chars
     let hook = parsed.hook || extractHook(fullTranscript, 60);
     if (hook.length > 60) {
-      hook = hook.substring(0, 57).trim() + '...';
+      hook = smartTruncate(hook, 60);
     }
 
     return {
