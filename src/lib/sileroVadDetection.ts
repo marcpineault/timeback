@@ -128,6 +128,10 @@ export async function runSileroVad(
   // Dynamic import for onnxruntime-web (WASM backend — no native/glibc dependency)
   const ort = await import('onnxruntime-web');
 
+  // Suppress "Unknown CPU vendor" warning on Apple Silicon — purely cosmetic,
+  // the WASM backend runs fine regardless.
+  ort.env.logLevel = 'error';
+
   // Locate the Silero VAD ONNX model
   const modelPath = await getSileroModelPath();
   if (!modelPath) {
