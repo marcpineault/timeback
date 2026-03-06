@@ -277,9 +277,7 @@ export async function POST(request: NextRequest) {
 
     // Determine what features need transcription
     const needsTranscription = generateCaptions || useHookAsHeadline || shouldGenerateAIHeadline;
-    // Early transcription: needed for hook, AND for hybrid silence removal word boundary refinement
-    const useHybridSilenceRemoval = options.autoSilenceThreshold !== false;
-    const needsEarlyTranscription = useHookAsHeadline || shouldGenerateAIHeadline || useHybridSilenceRemoval;
+    const needsEarlyTranscription = needsTranscription;
 
     // Determine the headline we'll use (before step counting so we know if we need captions+headline)
     // Note: AI headline text will be determined later, but we know if we need the step
@@ -310,40 +308,23 @@ export async function POST(request: NextRequest) {
     let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] }> | null = null;
 
     if (needsEarlyTranscription) {
-      // Start transcribing original video in parallel — include word timestamps for hybrid silence removal
-      logger.info('Starting parallel transcription of original video (with word timestamps for hybrid silence removal)');
+      // Start transcribing original video in parallel with silence removal
+      logger.info('Starting parallel transcription of original video');
       earlyTranscriptionPromise = transcribeVideo(inputPath, processedDir, {
         animated: false,
         forSpeechCorrection: false,
       }).then(t => ({ text: t.text, segments: t.segments, words: t.words }));
     }
 
-    // For hybrid silence removal, we want word timestamps from the early transcription.
-    // Wait for early transcription if hybrid mode needs it; otherwise run silence removal in parallel.
-    let earlyTranscriptionWords: TranscriptionWord[] | undefined;
-
-    if (useHybridSilenceRemoval && earlyTranscriptionPromise) {
-      logger.info('Waiting for word timestamps before hybrid silence removal...');
-      try {
-        const earlyResult = await earlyTranscriptionPromise;
-        earlyTranscriptionWords = earlyResult.words;
-        logger.info(`Got ${earlyTranscriptionWords?.length || 0} word timestamps for hybrid silence removal`);
-      } catch (transcriptionErr) {
-        logger.warn('Early transcription failed, proceeding without word timestamps', {
-          error: transcriptionErr instanceof Error ? transcriptionErr.message : String(transcriptionErr),
-        });
-        // Continue without word timestamps — hybrid pipeline will use VAD-only mode
-      }
-    }
-
-    // Step 1: Remove silence using hybrid pipeline (VAD + word boundaries + gap processing)
+    // Step 1: Remove silence using VAD-primary pipeline
+    // No longer needs word timestamps — VAD handles detection directly
     // Use lossless intermediate encoding when another encode pass will follow
     const willReEncode = generateCaptions || !!willHaveHeadline;
     reportProgress('Removing silence...');
     logger.info('Step 1: Removing silence');
     stepOutput = path.join(processedDir, `${baseName}_nosilence.mp4`);
     intermediateFiles.push(stepOutput); // Track for cleanup on error
-    const silenceResult = await removeSilence(currentInput, stepOutput, { ...options, isIntermediate: willReEncode }, earlyTranscriptionWords, reportSubProgress);
+    const silenceResult = await removeSilence(currentInput, stepOutput, { ...options, isIntermediate: willReEncode }, undefined, reportSubProgress);
     const { keptSegments } = silenceResult;
     // Clean up intermediate file (and remove from tracking since it's deleted)
     if (currentInput !== inputPath) {

@@ -6,7 +6,7 @@ import { spawn } from 'child_process';
 import { logger } from './logger';
 import { runFFmpegCommand, runFFmpegWithRetry, runFFmpegSpawn, FFmpegProcessError, FFmpegProcessConfig, getMemoryEfficientOptions } from './ffmpegProcess';
 import { detectSilenceWithVad, isSileroVadAvailable, SpeechSegment, SileroVadConfig, DEFAULT_VAD_CONFIG } from './sileroVadDetection';
-import { buildCrossfadeFilterComplex, extractRoomTone } from './boundaryRefinement';
+import { buildCrossfadeFilterComplex } from './boundaryRefinement';
 import { SilencePresetName, SILENCE_PRESETS, validatePresetName } from './silencePresets';
 import type { TranscriptionWord } from './whisper';
 
@@ -752,49 +752,14 @@ export async function removeSilence(
     return { outputPath, keptSegments: [{ start: 0, end: duration }] };
   }
 
-  // Step 3: Extract room tone for natural splice transitions
-  // Skip when intermediate — room tone quality benefit is wasted on a file that will be re-encoded
   const isIntermediate = options.isIntermediate === true;
-  const outputDir = path.dirname(outputPath);
-  let roomTonePath: string | null = null;
-  // Derive silence intervals from kept segments for room tone extraction
-  const silenceIntervalsForRoomTone: SilenceInterval[] = [];
-  if (segments.length > 0) {
-    if (segments[0].start > 0.1) {
-      silenceIntervalsForRoomTone.push({ start: 0, end: segments[0].start });
-    }
-    for (let i = 0; i < segments.length - 1; i++) {
-      const gapStart = segments[i].end;
-      const gapEnd = segments[i + 1].start;
-      if (gapEnd - gapStart > 0.1) {
-        silenceIntervalsForRoomTone.push({ start: gapStart, end: gapEnd });
-      }
-    }
-    if (duration - segments[segments.length - 1].end > 0.1) {
-      silenceIntervalsForRoomTone.push({ start: segments[segments.length - 1].end, end: duration });
-    }
-  }
-  if (!isIntermediate) {
-    try {
-      roomTonePath = await extractRoomTone(inputPath, silenceIntervalsForRoomTone, outputDir);
-      if (roomTonePath) {
-        logger.info(`[Silence Removal] Room tone extracted for ambient bed`);
-      }
-    } catch (roomToneErr) {
-      logger.warn(`[Silence Removal] Room tone extraction failed, continuing without`, {
-        error: roomToneErr instanceof Error ? roomToneErr.message : String(roomToneErr),
-      });
-    }
-  }
 
-  // Step 4: Build FFmpeg filter complex with crossfades at splice points
+  // Build FFmpeg filter complex with crossfades at splice points
   const crossfadeMs = 20;
-  const hasRoomTone = roomTonePath !== null;
-  const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs, hasRoomTone);
+  const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs, false);
 
   if (!filterComplex) {
     logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
-    if (roomTonePath) fs.unlinkSync(roomTonePath);
     fs.copyFileSync(inputPath, outputPath);
     return { outputPath, keptSegments: segments };
   }
@@ -822,11 +787,7 @@ export async function removeSilence(
 
   try {
     await runFFmpegWithRetry(() => {
-      const cmd = ffmpeg(inputPath);
-      if (roomTonePath) {
-        cmd.input(roomTonePath);
-      }
-      const pipeline = cmd
+      const pipeline = ffmpeg(inputPath)
         .complexFilter(filterComplex)
         .outputOptions([
           '-map', '[outv]',
@@ -861,11 +822,6 @@ export async function removeSilence(
       return pipeline;
     }, processConfig);
 
-    // Clean up room tone file
-    if (roomTonePath) {
-      try { fs.unlinkSync(roomTonePath); } catch { /* ignore */ }
-    }
-
     // Validate output: check duration is within expected range
     try {
       const outputDuration = await getVideoDuration(outputPath);
@@ -882,10 +838,6 @@ export async function removeSilence(
     logger.debug(`[Silence Removal] Complete!`);
     return { outputPath, keptSegments: segments };
   } catch (err) {
-    // Clean up room tone file on error
-    if (roomTonePath) {
-      try { fs.unlinkSync(roomTonePath); } catch { /* ignore */ }
-    }
     if (err instanceof FFmpegProcessError) {
       if (err.isMemoryKill) {
         logger.error(`[Silence Removal] Process killed due to memory constraints.`);
