@@ -234,15 +234,26 @@ export function generateSrtFromWords(
     return outputPath;
   }
 
+  // Group words into captions using punctuation, pauses, and word count
   const captions: { start: number; end: number; text: string }[] = [];
+  let chunk: TranscriptionWord[] = [];
 
-  for (let i = 0; i < words.length; i += maxWordsPerCaption) {
-    const chunk = words.slice(i, i + maxWordsPerCaption);
-    captions.push({
-      start: chunk[0].start,
-      end: chunk[chunk.length - 1].end,
-      text: chunk.map(w => w.word).join(' '),
-    });
+  for (let i = 0; i < words.length; i++) {
+    chunk.push(words[i]);
+
+    const atMax = chunk.length >= maxWordsPerCaption;
+    const atPunctuation = /[.!?,;:]$/.test(words[i].word.trim());
+    const hasNaturalPause = i < words.length - 1 && words[i + 1].start - words[i].end > 0.3;
+    const isLast = i === words.length - 1;
+
+    if (atMax || atPunctuation || hasNaturalPause || isLast) {
+      captions.push({
+        start: chunk[0].start,
+        end: chunk[chunk.length - 1].end,
+        text: chunk.map(w => w.word).join(' '),
+      });
+      chunk = [];
+    }
   }
 
   const captionEndPadding = 0.4;

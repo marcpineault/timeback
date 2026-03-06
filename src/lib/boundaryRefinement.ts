@@ -28,7 +28,7 @@ export const DEFAULT_BOUNDARY_CONFIG: BoundaryRefinementConfig = {
   preOnsetSearchMs: 200,
   postOffsetSearchMs: 200,
   onsetThresholdDb: 3,
-  crossfadeMs: 5,
+  crossfadeMs: 20,
   useRoomTone: true,
 };
 
@@ -127,34 +127,24 @@ export async function extractRoomTone(
   silenceSegments: SilenceInterval[],
   outputDir: string
 ): Promise<string | null> {
-  // Find silence segments between 2-5 seconds long
-  const candidates = silenceSegments
-    .filter(s => {
-      const dur = s.end - s.start;
-      return dur >= 2 && dur <= 10;
-    })
-    .sort((a, b) => (b.end - b.start) - (a.end - a.start)); // Longest first
+  // Find silence segments sorted by duration (longest first)
+  const sorted = [...silenceSegments]
+    .map(s => ({ ...s, dur: s.end - s.start }))
+    .filter(s => s.dur >= 0.3) // Minimum 300ms — enough for a usable room tone loop
+    .sort((a, b) => b.dur - a.dur);
 
-  if (candidates.length === 0) {
-    // Try shorter segments
-    const shortCandidates = silenceSegments
-      .filter(s => (s.end - s.start) >= 1)
-      .sort((a, b) => (b.end - b.start) - (a.end - a.start));
-
-    if (shortCandidates.length === 0) {
-      logger.debug('[Room Tone] No suitable silence segments for room tone extraction');
-      return null;
-    }
-
-    candidates.push(shortCandidates[0]);
+  if (sorted.length === 0) {
+    logger.debug('[Room Tone] No silence segments >= 300ms for room tone extraction');
+    return null;
   }
 
-  const bestSilence = candidates[0];
-  // Extract from the middle to avoid edge effects
-  const extractStart = bestSilence.start + 0.1;
-  const extractDuration = Math.min(bestSilence.end - bestSilence.start - 0.2, 3);
+  const bestSilence = sorted[0];
+  // Extract from the middle to avoid speech bleed at edges
+  const edgeMargin = Math.min(0.1, bestSilence.dur * 0.15);
+  const extractStart = bestSilence.start + edgeMargin;
+  const extractDuration = Math.min(bestSilence.dur - edgeMargin * 2, 3);
 
-  if (extractDuration < 0.5) {
+  if (extractDuration < 0.15) {
     return null;
   }
 

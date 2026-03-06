@@ -820,7 +820,7 @@ export async function removeSilence(
   }
 
   // Step 4: Build FFmpeg filter complex with crossfades at splice points
-  const crossfadeMs = 5;
+  const crossfadeMs = 20;
   const hasRoomTone = roomTonePath !== null;
   const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs, hasRoomTone);
 
@@ -896,6 +896,19 @@ export async function removeSilence(
     // Clean up room tone file
     if (roomTonePath) {
       try { fs.unlinkSync(roomTonePath); } catch { /* ignore */ }
+    }
+
+    // Validate output: check duration is within expected range
+    try {
+      const outputDuration = await getVideoDuration(outputPath);
+      const driftPercent = Math.abs(outputDuration - expectedDuration) / expectedDuration * 100;
+      if (driftPercent > 5) {
+        logger.warn(`[Silence Removal] Output duration drift: expected ${expectedDuration.toFixed(1)}s, got ${outputDuration.toFixed(1)}s (${driftPercent.toFixed(1)}% off)`);
+      } else {
+        logger.info(`[Silence Removal] Output validated: ${outputDuration.toFixed(1)}s (expected ${expectedDuration.toFixed(1)}s)`);
+      }
+    } catch {
+      logger.warn('[Silence Removal] Could not validate output duration');
     }
 
     logger.debug(`[Silence Removal] Complete!`);

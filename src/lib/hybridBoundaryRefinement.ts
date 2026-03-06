@@ -114,15 +114,16 @@ export function refineWithWordBoundaries(
   }
 
   // Handle VAD false negatives: words that the transcription found
-  // but VAD missed (e.g., very soft speech)
+  // but VAD missed (e.g., very soft speech). Use extra padding since
+  // Whisper timestamps are less reliable for soft/ambiguous speech.
+  const vadFalseNegPad = 1.5; // 50% extra padding for uncertain boundaries
   for (let i = 0; i < words.length; i++) {
     if (!wordAssigned[i]) {
       const word = words[i];
-      // Create a new speech segment for unassigned words
       refined.push({
-        start: Math.max(0, word.start - prePad),
-        end: Math.min(totalDuration, word.end + postPad),
-        confidence: 0.5, // Lower confidence since VAD didn't detect it
+        start: Math.max(0, word.start - prePad * vadFalseNegPad),
+        end: Math.min(totalDuration, word.end + postPad * vadFalseNegPad),
+        confidence: 0.5,
         words: [word],
         isNonVerbal: false,
       });

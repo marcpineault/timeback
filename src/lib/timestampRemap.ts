@@ -110,12 +110,13 @@ export function remapTranscriptionSegments(
 
 /**
  * Remap word-level timestamps. Drops words whose midpoint falls in a removed region.
+ * Enforces monotonic ordering so captions never overlap after remapping.
  */
 export function remapWords(
   words: TranscriptionWord[],
   map: SegmentMapEntry[]
 ): TranscriptionWord[] {
-  const result: TranscriptionWord[] = [];
+  const raw: TranscriptionWord[] = [];
 
   for (const word of words) {
     const midpoint = (word.start + word.end) / 2;
@@ -128,11 +129,25 @@ export function remapWords(
     const newStart = remapTimeSnap(word.start, map);
     const newEnd = remapTimeSnap(word.end, map);
 
-    result.push({
+    raw.push({
       word: word.word,
       start: newStart ?? newMid,
       end: Math.max((newStart ?? newMid) + 0.01, newEnd ?? newMid),
     });
+  }
+
+  // Enforce monotonic ordering: each word must start after the previous ends
+  const result: TranscriptionWord[] = [];
+  for (const word of raw) {
+    if (result.length > 0) {
+      const prev = result[result.length - 1];
+      // If this word overlaps the previous, push its start forward
+      if (word.start < prev.end) {
+        word.start = prev.end;
+        word.end = Math.max(word.start + 0.01, word.end);
+      }
+    }
+    result.push(word);
   }
 
   return result;

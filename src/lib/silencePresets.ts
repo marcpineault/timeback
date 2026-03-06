@@ -40,25 +40,25 @@ export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
     name: 'Natural',
     description: 'Conversational, podcast style (default) — tight editing',
     speechPadMs: 40,
-    prePadMs: 80,
-    postPadMs: 150,
+    prePadMs: 100,
+    postPadMs: 180,
     minSilenceToRemoveMs: 300,
-    minRetainedGapMs: 25,
-    sentenceGapMs: 60,
+    minRetainedGapMs: 40,
+    sentenceGapMs: 100,
     breathHandling: 'remove',
-    vadThreshold: 0.50,
+    vadThreshold: 0.45,
   },
   gentle: {
     name: 'Gentle',
     description: 'Light editing, presentations/lectures — brief pauses kept',
     speechPadMs: 60,
-    prePadMs: 100,
-    postPadMs: 180,
+    prePadMs: 120,
+    postPadMs: 200,
     minSilenceToRemoveMs: 800,
-    minRetainedGapMs: 55,
-    sentenceGapMs: 120,
+    minRetainedGapMs: 80,
+    sentenceGapMs: 180,
     breathHandling: 'remove',
-    vadThreshold: 0.45,
+    vadThreshold: 0.40,
   },
 };
 
@@ -116,7 +116,7 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
 
   const boundaryConfig: BoundaryRefinementConfig = {
     ...DEFAULT_BOUNDARY_CONFIG,
-    crossfadeMs: 5,
+    crossfadeMs: 20,
   };
 
   return { vadConfig, refinementConfig, gapConfig, boundaryConfig, fallbackPadMs: preset.speechPadMs };
