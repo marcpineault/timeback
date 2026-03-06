@@ -84,19 +84,19 @@ function creationTimestamp(): string[] {
   return ['-metadata', `creation_time=${new Date().toISOString()}`];
 }
 
-// Caption styles optimized for safe zones
+// Caption styles positioned for Instagram Reels safe areas (9:16, 1080x1920)
 // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
-// All margin values must be scaled to this coordinate system
-// For 1080x1920 (9:16): Target captions in lower third, avoiding buttons and engagement icons
+// Instagram safe zones: top ~250px (username), bottom ~480px (buttons/captions),
+// right ~120px (engagement icons). All margin values scaled to PlayRes coords.
 // Alignment=2 is bottom-center, MarginV is from bottom edge in PlayRes coordinates
 const CAPTION_STYLE_MAP: Record<string, string> = {
   // Instagram style - white text on semi-transparent dark background box
   // Clean, modern, refined look with better readability on busy backgrounds
-  // MarginV=70 ≈ 24% from bottom, MarginL=28, MarginR=53 for horizontal padding
-  instagram: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+  // MarginV=80 ≈ 28% from bottom, MarginR=58 avoids IG engagement icons on right
+  instagram: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,BackColour=&H80000000,BorderStyle=4,Outline=0,Shadow=0,Alignment=2,MarginV=80,MarginL=28,MarginR=58',
   // Minimal style - clean white text with thin black outline, no background box
   // Subtle, modern look that lets the video show through
-  minimal: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=70,MarginL=28,MarginR=53',
+  minimal: 'Fontname=Helvetica,FontSize=11,Bold=0,PrimaryColour=&HFFFFFF,OutlineColour=&H00000000,BackColour=&H00000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=80,MarginL=28,MarginR=58',
 };
 
 /**
@@ -1133,10 +1133,11 @@ export async function applyCombinedFilters(
       const headlineStyle = options.headlineStyle || 'speech-bubble';
       const position = options.headlinePosition || 'top';
 
+      // Instagram safe areas: top ~250px (username), bottom ~480px (UI buttons)
       const baseYPositions: Record<string, number> = {
-        top: 350,
+        top: 400,
         center: 860,
-        bottom: 1350,
+        bottom: 1250,
       };
 
       const { pngPath, imageHeight } = await generateHeadlinePNG(
