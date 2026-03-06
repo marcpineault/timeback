@@ -6,10 +6,8 @@ import { spawn } from 'child_process';
 import { logger } from './logger';
 import { runFFmpegCommand, runFFmpegWithRetry, runFFmpegSpawn, FFmpegProcessError, FFmpegProcessConfig, getMemoryEfficientOptions } from './ffmpegProcess';
 import { detectSilenceWithVad, isSileroVadAvailable, SpeechSegment, SileroVadConfig, DEFAULT_VAD_CONFIG } from './sileroVadDetection';
-import { refineWithWordBoundaries, refinedSegmentsToSilences, RefinedSpeechSegment, RefinementConfig, DEFAULT_REFINEMENT_CONFIG } from './hybridBoundaryRefinement';
-import { buildFinalSegments, GapProcessingConfig, DEFAULT_GAP_CONFIG } from './gapProcessing';
-import { buildCrossfadeFilterComplex, extractRoomTone, BoundaryRefinementConfig, DEFAULT_BOUNDARY_CONFIG } from './boundaryRefinement';
-import { SilencePresetName, SILENCE_PRESETS, getConfigsFromPreset, validatePresetName } from './silencePresets';
+import { buildCrossfadeFilterComplex, extractRoomTone } from './boundaryRefinement';
+import { SilencePresetName, SILENCE_PRESETS, validatePresetName } from './silencePresets';
 import type { TranscriptionWord } from './whisper';
 
 /**
@@ -634,16 +632,19 @@ export async function removeSilence(
   const duration = await getVideoDuration(inputPath);
   const presetName = validatePresetName(options.silencePreset);
   const preset = SILENCE_PRESETS[presetName];
-  const { vadConfig, refinementConfig, gapConfig } = getConfigsFromPreset(presetName);
 
-  logger.info(`[Silence Removal] Starting hybrid pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
+  const vadConfig: SileroVadConfig = {
+    ...DEFAULT_VAD_CONFIG,
+    threshold: preset.vadThreshold,
+    negThreshold: Math.round(preset.vadThreshold * 50) / 100,
+    speechPadMs: 0,
+    minSilenceDurationMs: Math.min(preset.minSilenceToRemoveMs, 80),
+  };
+
+  logger.info(`[Silence Removal] Starting pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
 
   onProgress?.('Analyzing audio...', 0);
-
-  // ── Hybrid pipeline: Silero VAD → word boundary refinement → gap processing ──
-  // This produces far more accurate cuts than FFmpeg silencedetect alone.
   let segments: SilenceInterval[];
-  let usedHybrid = false;
 
   const hasWords = wordTimestamps && wordTimestamps.length > 0;
 
@@ -700,8 +701,6 @@ export async function removeSilence(
     }
 
     segments = merged;
-    usedHybrid = true;
-
     const totalKept = segments.reduce((s, seg) => s + (seg.end - seg.start), 0);
     const removed = duration - totalKept;
     logger.info(`[Silence Removal] VAD-primary: ${segments.length} final segments`);
@@ -728,36 +727,19 @@ export async function removeSilence(
       return { outputPath, keptSegments: [{ start: 0, end: duration }] };
     }
 
-    // If we have word timestamps but no VAD, still use word boundary refinement
-    if (hasWords) {
-      logger.info('[Silence Removal] Using word boundaries to refine FFmpeg silences');
-      const ffmpegSpeechSegments = silencesToSpeechSegments(silences, duration);
-      const refinedSegments = refineWithWordBoundaries(
-        ffmpegSpeechSegments,
-        wordTimestamps!,
-        duration,
-        refinementConfig
-      );
-      segments = buildFinalSegments(refinedSegments, duration, gapConfig);
-    } else {
-      segments = getNonSilentSegments(silences, duration, {
-        padding: 0,
-        minSegmentDuration: 0.1,
-        mergeGap: 0.05,
-        timebackPadding: preset.prePadMs / 1000,
-        timebackPaddingEnd: preset.postPadMs / 1000,
-      });
-    }
+    segments = getNonSilentSegments(silences, duration, {
+      padding: 0,
+      minSegmentDuration: 0.1,
+      mergeGap: 0.05,
+      timebackPadding: preset.prePadMs / 1000,
+      timebackPaddingEnd: preset.postPadMs / 1000,
+    });
   }
 
   onProgress?.('Detecting silence...', 30);
 
-  // Validate word coverage (regardless of path)
+  // Validate word coverage
   if (hasWords) {
-    if (!usedHybrid) {
-      // Only apply word protection in the legacy path without refinement
-      segments = protectWordsFromClipping(segments, wordTimestamps!, duration, preset.postPadMs / 1000);
-    }
     validateTranscriptCoverage(segments, wordTimestamps!);
   }
 
@@ -919,149 +901,6 @@ export async function removeSilence(
   }
 }
 
-
-/**
- * Convert silence intervals to speech segments (inverse operation)
- * Used when falling back from Silero VAD to FFmpeg silencedetect
- */
-function silencesToSpeechSegments(
-  silences: SilenceInterval[],
-  totalDuration: number
-): SpeechSegment[] {
-  const segments: SpeechSegment[] = [];
-
-  if (silences.length === 0) {
-    // No silences = everything is speech
-    return [{ start: 0, end: totalDuration, confidence: 1.0 }];
-  }
-
-  // Speech before first silence
-  if (silences[0].start > 0.01) {
-    segments.push({ start: 0, end: silences[0].start, confidence: 0.8 });
-  }
-
-  // Speech between silences
-  for (let i = 0; i < silences.length - 1; i++) {
-    const speechStart = silences[i].end;
-    const speechEnd = silences[i + 1].start;
-    if (speechEnd - speechStart > 0.01) {
-      segments.push({ start: speechStart, end: speechEnd, confidence: 0.8 });
-    }
-  }
-
-  // Speech after last silence
-  const lastSilence = silences[silences.length - 1];
-  if (totalDuration - lastSilence.end > 0.01) {
-    segments.push({ start: lastSilence.end, end: totalDuration, confidence: 0.8 });
-  }
-
-  return segments;
-}
-
-/**
- * Protect words from being clipped by extending the nearest segment to cover them.
- * Focuses on sentence-ending words (trailing punctuation) which are most noticeable
- * when clipped, but also catches any other words that fall outside segments.
- *
- * This keeps the FFmpeg silence-detection approach as primary — the transcript
- * is only used as a safety net to extend segments where speech got misclassified
- * as silence.
- */
-function protectWordsFromClipping(
-  segments: SilenceInterval[],
-  words: TranscriptionWord[],
-  totalDuration: number,
-  postPadSec: number
-): SilenceInterval[] {
-  if (words.length === 0 || segments.length === 0) return segments;
-
-  // Work on a mutable copy
-  const result = segments.map(s => ({ ...s }));
-  let extended = 0;
-
-  for (const word of words) {
-    const wordEnd = word.end;
-    const wordStart = word.start;
-
-    // Find the segment that contains or is closest to this word
-    let bestIdx = -1;
-    let bestDist = Infinity;
-
-    for (let i = 0; i < result.length; i++) {
-      const seg = result[i];
-
-      // Word is fully inside this segment — no action needed
-      if (seg.start <= wordStart && wordEnd <= seg.end) {
-        bestIdx = -1;
-        break;
-      }
-
-      // Word overlaps the end of this segment (partially clipped) or
-      // falls just after it — this is the sentence-ending clipping case
-      if (wordStart < seg.end + 0.3 && wordEnd > seg.end) {
-        bestIdx = i;
-        break;
-      }
-
-      // Word overlaps the start of this segment (partially clipped) or
-      // falls just before it
-      if (wordEnd > seg.start - 0.3 && wordStart < seg.start) {
-        bestIdx = i;
-        break;
-      }
-
-      // Track closest segment for words that fall in gaps
-      const dist = Math.min(
-        Math.abs(wordStart - seg.end),
-        Math.abs(seg.start - wordEnd)
-      );
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestIdx = i;
-      }
-    }
-
-    // Only extend if the word is reasonably close to a segment (within 0.5s)
-    // Words far from any segment are likely transcription artifacts
-    if (bestIdx >= 0 && bestDist <= 0.5) {
-      const seg = result[bestIdx];
-      const newStart = Math.max(0, Math.min(seg.start, wordStart - 0.03));
-      const newEnd = Math.min(totalDuration, Math.max(seg.end, wordEnd + postPadSec));
-
-      if (newStart < seg.start || newEnd > seg.end) {
-        extended++;
-        const trimmedWord = word.word.trim();
-        const isSentenceEnd = /[.!?]$/.test(trimmedWord);
-        logger.debug(
-          `[Word Protection] Extended segment to cover "${trimmedWord}" at ${wordStart.toFixed(2)}s-${wordEnd.toFixed(2)}s` +
-          (isSentenceEnd ? ' (sentence ending)' : '')
-        );
-        seg.start = newStart;
-        seg.end = newEnd;
-      }
-    }
-  }
-
-  if (extended > 0) {
-    logger.info(`[Word Protection] Extended ${extended} segment boundaries to protect words from clipping`);
-
-    // Re-merge any segments that now overlap after extension
-    result.sort((a, b) => a.start - b.start);
-    const merged: SilenceInterval[] = [result[0]];
-    for (let i = 1; i < result.length; i++) {
-      const prev = merged[merged.length - 1];
-      const curr = result[i];
-      if (curr.start <= prev.end) {
-        prev.end = Math.max(prev.end, curr.end);
-      } else {
-        merged.push(curr);
-      }
-    }
-    return merged;
-  }
-
-  return result;
-}
 
 /**
  * Validate that every transcription word falls within a kept segment.
