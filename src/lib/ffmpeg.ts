@@ -84,6 +84,21 @@ function creationTimestamp(): string[] {
   return ['-metadata', `creation_time=${new Date().toISOString()}`];
 }
 
+/**
+ * Instagram-optimized video output options.
+ * H.264 High@4.0 ensures Instagram won't re-encode (quality loss).
+ * 30fps is Instagram's preferred frame rate for Reels.
+ */
+const INSTAGRAM_VIDEO_OPTS = ['-profile:v', 'high', '-level:v', '4.0', '-r', '30'];
+
+/**
+ * Instagram-optimized audio output options.
+ * Normalizes to -14 LUFS (Instagram's target) so IG won't re-process audio.
+ * 192k AAC gives headroom after Instagram's re-compression.
+ */
+const INSTAGRAM_AUDIO_OPTS = ['-c:a', 'aac', '-b:a', '192k'];
+const INSTAGRAM_LOUDNORM = 'loudnorm=I=-14:TP=-1:LRA=11';
+
 // Caption styles positioned for Instagram Reels safe areas (9:16, 1080x1920)
 // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
 // Instagram safe zones: top ~250px (username), bottom ~480px (buttons/captions),
@@ -755,8 +770,12 @@ export async function removeSilence(
   const isIntermediate = options.isIntermediate === true;
 
   // Build FFmpeg filter complex with crossfades at splice points
+  // Apply loudnorm on final output so Instagram won't re-process audio
   const crossfadeMs = 20;
-  const { filterComplex } = buildCrossfadeFilterComplex(segments, crossfadeMs, false);
+  const { filterComplex } = buildCrossfadeFilterComplex(
+    segments, crossfadeMs, false,
+    isIntermediate ? undefined : INSTAGRAM_LOUDNORM
+  );
 
   if (!filterComplex) {
     logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
@@ -770,10 +789,9 @@ export async function removeSilence(
   // Calculate expected output duration for progress reporting
   const expectedDuration = segments.reduce((sum, s) => sum + (s.end - s.start), 0);
 
-  // Encoding settings: lossless for intermediate files, quality for final output
+  // Encoding settings: lossless for intermediate files, Instagram-optimized for final output
   const videoCrf = isIntermediate ? '0' : naturalCrf();
   const videoPreset = isIntermediate ? 'ultrafast' : 'fast';
-  const audioBitrate = isIntermediate ? '256k' : '128k';
   if (isIntermediate) {
     logger.info(`[Silence Removal] Using lossless intermediate encoding (CRF 0, audio 256k) — will be re-encoded later`);
   }
@@ -798,8 +816,8 @@ export async function removeSilence(
           '-threads', '0',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
-          '-c:a', 'aac',
-          '-b:a', audioBitrate,
+          // Intermediate: lossless audio pass-through; Final: Instagram-optimized
+          ...(isIntermediate ? ['-c:a', 'aac', '-b:a', '256k'] : [...INSTAGRAM_VIDEO_OPTS, ...INSTAGRAM_AUDIO_OPTS]),
           // faststart moves moov atom to the front for instant mobile playback/preview.
           // Skip for intermediate files since they'll be re-encoded anyway.
           ...(isIntermediate ? [] : ['-movflags', '+faststart', '-pix_fmt', 'yuv420p']),
@@ -1166,21 +1184,25 @@ export async function applyCombinedFilters(
       const filterComplex = filterParts.join(';');
       logger.debug(`[Combined] Applying ${hasCaptions ? 'captions + ' : ''}headline overlay in single pass`);
 
+      // Add loudnorm to the filter chain for audio normalization
+      const fullFilter = filterComplex + `;[0:a]${INSTAGRAM_LOUDNORM}[outa]`;
+
       const args = [
         '-y',
         '-i', inputPath,
         '-loop', '1', '-t', '5', '-i', pngPath,
-        '-filter_complex', filterComplex,
+        '-filter_complex', fullFilter,
         '-map', '[out]',
-        '-map', '0:a?',
+        '-map', '[outa]',
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', naturalCrf(),
         '-pix_fmt', 'yuv420p',
+        ...INSTAGRAM_VIDEO_OPTS,
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
-        '-c:a', 'copy',
+        ...INSTAGRAM_AUDIO_OPTS,
         '-movflags', '+faststart',
         ...creationTimestamp(),
         '-shortest',
@@ -1195,15 +1217,17 @@ export async function applyCombinedFilters(
       await runFFmpegWithRetry(() => {
         return ffmpeg(inputPath)
           .videoFilters(captionFilter!)
+          .audioFilters(INSTAGRAM_LOUDNORM)
           .outputOptions([
             '-c:v', 'libx264',
             '-preset', 'fast',
             '-crf', naturalCrf(),
             '-pix_fmt', 'yuv420p',
+            ...INSTAGRAM_VIDEO_OPTS,
             '-threads', '0',
             '-max_muxing_queue_size', '512',
             '-bufsize', '1M',
-            '-c:a', 'copy',
+            ...INSTAGRAM_AUDIO_OPTS,
             '-movflags', '+faststart',
             ...creationTimestamp(),
           ])
@@ -1248,16 +1272,17 @@ export async function trimVideo(
     ffmpeg(inputPath)
       .setStartTime(startTime)
       .setDuration(duration)
+      .audioFilters(INSTAGRAM_LOUDNORM)
       .outputOptions([
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', naturalCrf(),
         '-pix_fmt', 'yuv420p',
+        ...INSTAGRAM_VIDEO_OPTS,
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
-        '-c:a', 'aac',
-        '-b:a', '128k',
+        ...INSTAGRAM_AUDIO_OPTS,
         '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
         ...creationTimestamp(),
@@ -1316,16 +1341,17 @@ export async function splitVideo(
       ffmpeg(inputPath)
         .setStartTime(segment.startTime)
         .setDuration(segmentDuration)
+        .audioFilters(INSTAGRAM_LOUDNORM)
         .outputOptions([
           '-c:v', 'libx264',
           '-preset', 'fast',
           '-crf', naturalCrf(),
           '-pix_fmt', 'yuv420p',
+          ...INSTAGRAM_VIDEO_OPTS,
           '-threads', '0',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
-          '-c:a', 'aac',
-          '-b:a', '128k',
+          ...INSTAGRAM_AUDIO_OPTS,
           '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
           ...creationTimestamp(),
