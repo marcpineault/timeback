@@ -79,25 +79,48 @@ function naturalCrf(): string {
   return String(17 + Math.floor(Math.random() * 3));
 }
 
-/** Returns metadata flags embedding the current timestamp as creation_time. */
-function creationTimestamp(): string[] {
-  return ['-metadata', `creation_time=${new Date().toISOString()}`];
+/** Returns flags to strip all FFmpeg encoding fingerprints from the output MP4. */
+function antiFingerprint(): string[] {
+  return [
+    '-map_metadata', '-1',
+    '-fflags', '+bitexact',
+    '-flags:v', '+bitexact',
+    '-flags:a', '+bitexact',
+    '-metadata:s:v', 'handler_name=',
+    '-metadata:s:a', 'handler_name=',
+    '-metadata:s:v', 'vendor_id=',
+    '-metadata:s:v', 'encoder=',
+    '-metadata:s:a', 'encoder=',
+  ];
 }
 
 /**
  * Instagram-optimized video output options.
- * H.264 High@4.0 ensures Instagram won't re-encode (quality loss).
+ * H.264 Main@4.0 mimics phone encoding (phones use main, not high).
  * 30fps is Instagram's preferred frame rate for Reels.
  */
-const INSTAGRAM_VIDEO_OPTS = ['-profile:v', 'high', '-level:v', '4.0', '-r', '30'];
+const INSTAGRAM_VIDEO_OPTS = ['-profile:v', 'main', '-level:v', '4.0', '-r', '30'];
 
 /**
- * Instagram-optimized audio output options.
- * Normalizes to -14 LUFS (Instagram's target) so IG won't re-process audio.
- * 192k AAC gives headroom after Instagram's re-compression.
+ * Instagram-optimized audio output options with randomized bitrate.
+ * Randomizes AAC bitrate per video to avoid fixed-bitrate fingerprint.
  */
-const INSTAGRAM_AUDIO_OPTS = ['-c:a', 'aac', '-b:a', '192k'];
-const INSTAGRAM_LOUDNORM = 'loudnorm=I=-14:TP=-1:LRA=11';
+function instagramAudioOpts(): string[] {
+  const bitrates = ['176k', '184k', '192k', '200k', '208k'];
+  const bitrate = bitrates[Math.floor(Math.random() * bitrates.length)];
+  return ['-c:a', 'aac', '-b:a', bitrate];
+}
+
+/**
+ * Returns loudnorm filter string with randomized parameters.
+ * Prevents identical audio fingerprint across all videos.
+ */
+function instagramLoudnorm(): string {
+  const lufs = (-14 + (Math.random() * 1.6 - 0.8)).toFixed(1);
+  const tp = (-1 + (Math.random() * 0.6 - 0.3)).toFixed(1);
+  const lra = (11 + (Math.random() * 4 - 2)).toFixed(1);
+  return `loudnorm=I=${lufs}:TP=${tp}:LRA=${lra}`;
+}
 
 // Caption styles positioned for Instagram Reels safe areas (9:16, 1080x1920)
 // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
@@ -774,7 +797,7 @@ export async function removeSilence(
   const crossfadeMs = 20;
   const { filterComplex } = buildCrossfadeFilterComplex(
     segments, crossfadeMs, false,
-    isIntermediate ? undefined : INSTAGRAM_LOUDNORM
+    isIntermediate ? undefined : instagramLoudnorm()
   );
 
   if (!filterComplex) {
@@ -817,11 +840,11 @@ export async function removeSilence(
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
           // Intermediate: lossless audio pass-through; Final: Instagram-optimized
-          ...(isIntermediate ? ['-c:a', 'aac', '-b:a', '256k'] : [...INSTAGRAM_VIDEO_OPTS, ...INSTAGRAM_AUDIO_OPTS]),
+          ...(isIntermediate ? ['-c:a', 'aac', '-b:a', '256k'] : [...INSTAGRAM_VIDEO_OPTS, ...instagramAudioOpts()]),
           // faststart moves moov atom to the front for instant mobile playback/preview.
           // Skip for intermediate files since they'll be re-encoded anyway.
           ...(isIntermediate ? [] : ['-movflags', '+faststart', '-pix_fmt', 'yuv420p']),
-          ...(isIntermediate ? [] : creationTimestamp()),
+          ...(isIntermediate ? [] : antiFingerprint()),
         ])
         .output(outputPath);
 
@@ -1185,7 +1208,7 @@ export async function applyCombinedFilters(
       logger.debug(`[Combined] Applying ${hasCaptions ? 'captions + ' : ''}headline overlay in single pass`);
 
       // Add loudnorm to the filter chain for audio normalization
-      const fullFilter = filterComplex + `;[0:a]${INSTAGRAM_LOUDNORM}[outa]`;
+      const fullFilter = filterComplex + `;[0:a]${instagramLoudnorm()}[outa]`;
 
       const args = [
         '-y',
@@ -1202,9 +1225,9 @@ export async function applyCombinedFilters(
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
-        ...INSTAGRAM_AUDIO_OPTS,
+        ...instagramAudioOpts(),
         '-movflags', '+faststart',
-        ...creationTimestamp(),
+        ...antiFingerprint(),
         '-shortest',
         outputPath
       ];
@@ -1217,7 +1240,7 @@ export async function applyCombinedFilters(
       await runFFmpegWithRetry(() => {
         return ffmpeg(inputPath)
           .videoFilters(captionFilter!)
-          .audioFilters(INSTAGRAM_LOUDNORM)
+          .audioFilters(instagramLoudnorm())
           .outputOptions([
             '-c:v', 'libx264',
             '-preset', 'fast',
@@ -1227,9 +1250,9 @@ export async function applyCombinedFilters(
             '-threads', '0',
             '-max_muxing_queue_size', '512',
             '-bufsize', '1M',
-            ...INSTAGRAM_AUDIO_OPTS,
+            ...instagramAudioOpts(),
             '-movflags', '+faststart',
-            ...creationTimestamp(),
+            ...antiFingerprint(),
           ])
           .output(outputPath);
       }, processConfig);
@@ -1272,7 +1295,7 @@ export async function trimVideo(
     ffmpeg(inputPath)
       .setStartTime(startTime)
       .setDuration(duration)
-      .audioFilters(INSTAGRAM_LOUDNORM)
+      .audioFilters(instagramLoudnorm())
       .outputOptions([
         '-c:v', 'libx264',
         '-preset', 'fast',
@@ -1282,10 +1305,10 @@ export async function trimVideo(
         '-threads', '0',
         '-max_muxing_queue_size', '512',
         '-bufsize', '1M',
-        ...INSTAGRAM_AUDIO_OPTS,
+        ...instagramAudioOpts(),
         '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
-        ...creationTimestamp(),
+        ...antiFingerprint(),
       ])
       .output(outputPath)
       .on('end', () => {
@@ -1341,7 +1364,7 @@ export async function splitVideo(
       ffmpeg(inputPath)
         .setStartTime(segment.startTime)
         .setDuration(segmentDuration)
-        .audioFilters(INSTAGRAM_LOUDNORM)
+        .audioFilters(instagramLoudnorm())
         .outputOptions([
           '-c:v', 'libx264',
           '-preset', 'fast',
@@ -1351,10 +1374,10 @@ export async function splitVideo(
           '-threads', '0',
           '-max_muxing_queue_size', '512',
           '-bufsize', '1M',
-          ...INSTAGRAM_AUDIO_OPTS,
+          ...instagramAudioOpts(),
           '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
-          ...creationTimestamp(),
+          ...antiFingerprint(),
         ])
         .output(segment.outputPath)
         .on('end', () => {

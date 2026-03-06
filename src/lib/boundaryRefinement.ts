@@ -16,12 +16,15 @@ export function buildCrossfadeFilterComplex(
     return { filterComplex: '', outputLabels: { video: 'outv', audio: 'outa' } };
   }
 
-  const crossfadeSec = crossfadeMs / 1000;
   const filterParts: string[] = [];
   const concatInputs: string[] = [];
 
   // Generate trim filters for each segment
   segments.forEach((segment, index) => {
+    // Randomize crossfade per segment (0.6–1.4x base) to avoid uniform pattern
+    const jitter = 0.6 + Math.random() * 0.8;
+    const crossfadeSec = (crossfadeMs / 1000) * jitter;
+
     // Video: trim and reset PTS
     filterParts.push(
       `[0:v]trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS[v${index}]`
