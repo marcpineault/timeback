@@ -10,7 +10,6 @@ export function buildCrossfadeFilterComplex(
   segments: SilenceInterval[],
   crossfadeMs: number = 20,
   hasRoomTone: boolean = false,
-  audioNormFilter?: string
 ): { filterComplex: string; outputLabels: { video: string; audio: string } } {
   if (segments.length === 0) {
     return { filterComplex: '', outputLabels: { video: 'outv', audio: 'outa' } };
@@ -54,11 +53,6 @@ export function buildCrossfadeFilterComplex(
     filterParts.push(
       `[outa_raw][rt]amix=inputs=2:duration=first:weights=1 0.04[outa]`
     );
-  } else if (audioNormFilter) {
-    filterParts.push(
-      `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa_raw]`
-    );
-    filterParts.push(`[outa_raw]${audioNormFilter}[outa]`);
   } else {
     filterParts.push(
       `${concatInputs.join('')}concat=n=${segments.length}:v=1:a=1[outv][outa]`

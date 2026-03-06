@@ -111,16 +111,6 @@ function instagramAudioOpts(): string[] {
   return ['-c:a', 'aac', '-b:a', bitrate];
 }
 
-/**
- * Returns loudnorm filter string with randomized parameters.
- * Prevents identical audio fingerprint across all videos.
- */
-function instagramLoudnorm(): string {
-  const lufs = (-14 + (Math.random() * 1.6 - 0.8)).toFixed(1);
-  const tp = (-1 + (Math.random() * 0.6 - 0.3)).toFixed(1);
-  const lra = (11 + (Math.random() * 4 - 2)).toFixed(1);
-  return `loudnorm=I=${lufs}:TP=${tp}:LRA=${lra}`;
-}
 
 // Caption styles positioned for Instagram Reels safe areas (9:16, 1080x1920)
 // FFmpeg subtitles filter uses default PlayRes of 384x288 for SRT files
@@ -793,11 +783,9 @@ export async function removeSilence(
   const isIntermediate = options.isIntermediate === true;
 
   // Build FFmpeg filter complex with crossfades at splice points
-  // Apply loudnorm on final output so Instagram won't re-process audio
   const crossfadeMs = 20;
   const { filterComplex } = buildCrossfadeFilterComplex(
-    segments, crossfadeMs, false,
-    isIntermediate ? undefined : instagramLoudnorm()
+    segments, crossfadeMs, false
   );
 
   if (!filterComplex) {
@@ -1207,16 +1195,13 @@ export async function applyCombinedFilters(
       const filterComplex = filterParts.join(';');
       logger.debug(`[Combined] Applying ${hasCaptions ? 'captions + ' : ''}headline overlay in single pass`);
 
-      // Add loudnorm to the filter chain for audio normalization
-      const fullFilter = filterComplex + `;[0:a]${instagramLoudnorm()}[outa]`;
-
       const args = [
         '-y',
         '-i', inputPath,
         '-loop', '1', '-t', '5', '-i', pngPath,
-        '-filter_complex', fullFilter,
+        '-filter_complex', filterComplex,
         '-map', '[out]',
-        '-map', '[outa]',
+        '-map', '0:a',
         '-c:v', 'libx264',
         '-preset', 'fast',
         '-crf', naturalCrf(),
@@ -1240,7 +1225,6 @@ export async function applyCombinedFilters(
       await runFFmpegWithRetry(() => {
         return ffmpeg(inputPath)
           .videoFilters(captionFilter!)
-          .audioFilters(instagramLoudnorm())
           .outputOptions([
             '-c:v', 'libx264',
             '-preset', 'fast',
@@ -1295,7 +1279,6 @@ export async function trimVideo(
     ffmpeg(inputPath)
       .setStartTime(startTime)
       .setDuration(duration)
-      .audioFilters(instagramLoudnorm())
       .outputOptions([
         '-c:v', 'libx264',
         '-preset', 'fast',
@@ -1364,7 +1347,6 @@ export async function splitVideo(
       ffmpeg(inputPath)
         .setStartTime(segment.startTime)
         .setDuration(segmentDuration)
-        .audioFilters(instagramLoudnorm())
         .outputOptions([
           '-c:v', 'libx264',
           '-preset', 'fast',
