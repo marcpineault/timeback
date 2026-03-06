@@ -31,8 +31,8 @@ export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
   natural: {
     name: 'Natural',
     description: 'Conversational, podcast style (default) — tight editing',
-    prePadMs: 40,
-    postPadMs: 70,
+    prePadMs: 25,
+    postPadMs: 50,
     minSilenceToRemoveMs: 120,
     vadThreshold: 0.50,
   },
