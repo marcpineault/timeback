@@ -97,19 +97,36 @@ export function refineWithWordBoundaries(
       // onsets / trailing consonants. Do NOT extend to VAD boundaries — the
       // VAD can overshoot by hundreds of milliseconds, embedding silence
       // inside the kept segment where gap processing can never reach it.
-      const earliestWord = Math.min(...overlappingWords.map(w => w.start));
-      const latestWord = Math.max(...overlappingWords.map(w => w.end));
+      //
+      // Split at within-segment word gaps so gap processing can shorten them.
+      // Without this, a VAD segment spanning multiple phrases keeps all the
+      // internal silence untouched.
+      const wordGroups: TranscriptionWord[][] = [[]];
+      for (let w = 0; w < overlappingWords.length; w++) {
+        wordGroups[wordGroups.length - 1].push(overlappingWords[w]);
+        if (w < overlappingWords.length - 1) {
+          const gap = overlappingWords[w + 1].start - overlappingWords[w].end;
+          // Split if gap between words exceeds prePad + postPad (the padding
+          // would overlap if we don't split, and the silence is significant)
+          if (gap > prePad + postPad) {
+            wordGroups.push([]);
+          }
+        }
+      }
 
-      const refinedStart = Math.max(0, earliestWord - prePad);
-      const refinedEnd = Math.min(totalDuration, latestWord + postPad);
+      for (const group of wordGroups) {
+        if (group.length === 0) continue;
+        const earliestWord = Math.min(...group.map(w => w.start));
+        const latestWord = Math.max(...group.map(w => w.end));
 
-      refined.push({
-        start: refinedStart,
-        end: refinedEnd,
-        confidence: seg.confidence,
-        words: overlappingWords,
-        isNonVerbal: false,
-      });
+        refined.push({
+          start: Math.max(0, earliestWord - prePad),
+          end: Math.min(totalDuration, latestWord + postPad),
+          confidence: seg.confidence,
+          words: group,
+          isNonVerbal: false,
+        });
+      }
     }
   }
 
