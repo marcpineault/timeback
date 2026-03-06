@@ -30,11 +30,11 @@ export interface SileroVadConfig {
 }
 
 /**
- * Default conservative VAD config — biased toward keeping speech
+ * Default VAD config — balanced speech detection
  */
 export const DEFAULT_VAD_CONFIG: SileroVadConfig = {
   threshold: 0.35,
-  negThreshold: 0.15,
+  negThreshold: 0.25,
   minSpeechDurationMs: 100,
   minSilenceDurationMs: 80,
   speechPadMs: 0,

@@ -197,6 +197,9 @@ export function buildFinalSegments(
 
   // Start with the speech segments themselves
   const keepSegments: SilenceInterval[] = [];
+  let gapsKept = 0;
+  let gapsShortened = 0;
+  let totalRemoved = 0;
 
   for (let i = 0; i < speechSegments.length; i++) {
     const seg = speechSegments[i];
@@ -209,6 +212,7 @@ export function buildFinalSegments(
       if (gapDuration > 0 && gapDuration < minSilenceToRemove) {
         // Gap is too short to remove — extend this segment to include it
         logger.debug(`[Gap Processing] Segment ${i}: gap ${(gapDuration * 1000).toFixed(0)}ms — KEPT (below ${config.minSilenceToRemoveMs}ms threshold)`);
+        gapsKept++;
         segEntry.end = nextSeg.start;
       } else if (gapDuration >= minSilenceToRemove) {
         // Gap is long enough to process — determine target gap
@@ -226,13 +230,15 @@ export function buildFinalSegments(
 
         // Add the retained gap as part of the segment
         segEntry.end = retainedGapEnd;
-
-        // The next segment's start will handle the cut
+        gapsShortened++;
+        totalRemoved += gapDuration - targetGap;
       }
     }
 
     keepSegments.push(segEntry);
   }
+
+  logger.info(`[Gap Processing] ${gapsKept + gapsShortened} gaps: ${gapsShortened} shortened (removed ${totalRemoved.toFixed(1)}s), ${gapsKept} kept (below ${config.minSilenceToRemoveMs}ms)`);
 
   // Merge overlapping segments
   const merged: SilenceInterval[] = [];

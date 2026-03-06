@@ -663,6 +663,8 @@ export async function removeSilence(
       const vadResult = await detectSilenceWithVad(inputPath, duration, vadConfig);
       speechSegments = vadResult.speechSegments;
       logger.info(`[Silence Removal] ${vadResult.analysisInfo}`);
+      const totalSpeech = speechSegments.reduce((s, seg) => s + (seg.end - seg.start), 0);
+      logger.info(`[Silence Removal] VAD: ${totalSpeech.toFixed(1)}s speech / ${(duration - totalSpeech).toFixed(1)}s silence out of ${duration.toFixed(1)}s (threshold=${vadConfig.threshold}, negThreshold=${vadConfig.negThreshold})`);
     } catch (vadErr) {
       logger.warn('[Silence Removal] Silero VAD failed, falling back to FFmpeg silencedetect', {
         error: vadErr instanceof Error ? vadErr.message : String(vadErr),
@@ -699,7 +701,10 @@ export async function removeSilence(
     segments = buildFinalSegments(refinedSegments, duration, gapConfig);
     usedHybrid = true;
 
+    const totalKept = segments.reduce((s, seg) => s + (seg.end - seg.start), 0);
+    const removed = duration - totalKept;
     logger.info(`[Silence Removal] Hybrid pipeline: ${refinedSegments.length} refined → ${segments.length} final segments`);
+    logger.info(`[Silence Removal] Duration: ${duration.toFixed(1)}s → ${totalKept.toFixed(1)}s kept, ${removed.toFixed(1)}s removed (${((removed / duration) * 100).toFixed(0)}%)`);
   } else if (speechSegments && speechSegments.length > 0) {
     // ── VAD-only path (no word timestamps): use VAD segments with preset padding ──
     logger.info(`[Silence Removal] VAD-only path (no word timestamps): ${speechSegments.length} segments`);

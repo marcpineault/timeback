@@ -46,10 +46,10 @@ export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
     speechPadMs: 30,
     prePadMs: 40,
     postPadMs: 70,
-    minSilenceToRemoveMs: 250,
-    sentenceGapMs: 160,
+    minSilenceToRemoveMs: 120,
+    sentenceGapMs: 140,
     breathHandling: 'remove',
-    vadThreshold: 0.40,
+    vadThreshold: 0.50,
   },
   gentle: {
     name: 'Gentle',
@@ -57,10 +57,10 @@ export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
     speechPadMs: 50,
     prePadMs: 60,
     postPadMs: 100,
-    minSilenceToRemoveMs: 600,
-    sentenceGapMs: 350,
+    minSilenceToRemoveMs: 400,
+    sentenceGapMs: 300,
     breathHandling: 'remove',
-    vadThreshold: 0.35,
+    vadThreshold: 0.45,
   },
 };
 
@@ -83,6 +83,9 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
   const vadConfig: SileroVadConfig = {
     ...DEFAULT_VAD_CONFIG,
     threshold: preset.vadThreshold,
+    // Tighter hysteresis: speech ends when probability drops below half the
+    // onset threshold. Prevents background noise from bridging silences.
+    negThreshold: Math.round(preset.vadThreshold * 50) / 100,
     speechPadMs: 0,
     // VAD must report gaps shorter than the removal threshold, otherwise they
     // get bridged before gap processing ever sees them.
