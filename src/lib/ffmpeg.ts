@@ -676,45 +676,20 @@ export async function removeSilence(
 
   onProgress?.('Detecting silence...', 20);
 
-  if (speechSegments && speechSegments.length > 0 && hasWords) {
-    // ── Full hybrid path: VAD + word boundaries + gap processing ──
-    logger.info(`[Silence Removal] Hybrid path: ${speechSegments.length} VAD segments + ${wordTimestamps!.length} words`);
+  if (speechSegments && speechSegments.length > 0) {
+    // ── VAD-primary path: trust VAD segments directly ──
+    const prePad = preset.prePadMs / 1000;
+    const postPad = preset.postPadMs / 1000;
 
-    // Layer 2: Refine VAD boundaries using word-level timestamps
-    let refinedSegments = refineWithWordBoundaries(
-      speechSegments,
-      wordTimestamps!,
-      duration,
-      refinementConfig
-    );
+    logger.info(`[Silence Removal] VAD-primary path: ${speechSegments.length} segments (pad: ${preset.prePadMs}ms pre / ${preset.postPadMs}ms post)`);
 
-    // Drop non-verbal segments (breaths, laughs) when breathHandling='remove'
-    if (gapConfig.breathHandling === 'remove') {
-      const before = refinedSegments.length;
-      refinedSegments = refinedSegments.filter(s => !s.isNonVerbal);
-      if (before !== refinedSegments.length) {
-        logger.info(`[Silence Removal] Removed ${before - refinedSegments.length} non-verbal segments (breaths/sounds)`);
-      }
-    }
-
-    // Layer 3: Intelligent gap processing with context-aware pause sizing
-    segments = buildFinalSegments(refinedSegments, duration, gapConfig);
-    usedHybrid = true;
-
-    const totalKept = segments.reduce((s, seg) => s + (seg.end - seg.start), 0);
-    const removed = duration - totalKept;
-    logger.info(`[Silence Removal] Hybrid pipeline: ${refinedSegments.length} refined → ${segments.length} final segments`);
-    logger.info(`[Silence Removal] Duration: ${duration.toFixed(1)}s → ${totalKept.toFixed(1)}s kept, ${removed.toFixed(1)}s removed (${((removed / duration) * 100).toFixed(0)}%)`);
-  } else if (speechSegments && speechSegments.length > 0) {
-    // ── VAD-only path (no word timestamps): use VAD segments with preset padding ──
-    logger.info(`[Silence Removal] VAD-only path (no word timestamps): ${speechSegments.length} segments`);
-    const fallbackPadMs = preset.speechPadMs;
+    // Apply minimal padding to VAD segments for clean cuts
     const paddedSegments = speechSegments.map(seg => ({
-      start: Math.max(0, seg.start - fallbackPadMs / 1000),
-      end: Math.min(duration, seg.end + fallbackPadMs / 1000),
+      start: Math.max(0, seg.start - prePad),
+      end: Math.min(duration, seg.end + postPad),
     }));
 
-    // Merge overlapping after padding
+    // Merge overlapping/adjacent segments after padding
     const merged: SilenceInterval[] = [];
     for (const seg of paddedSegments) {
       if (merged.length === 0 || seg.start > merged[merged.length - 1].end) {
@@ -723,8 +698,60 @@ export async function removeSilence(
         merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, seg.end);
       }
     }
-    segments = merged;
+
+    // Safety net: if we have word timestamps, extend segments that would clip a word
+    if (hasWords) {
+      for (const word of wordTimestamps!) {
+        const wordStart = word.start - prePad;
+        const wordEnd = word.end + postPad;
+        let covered = false;
+        for (const seg of merged) {
+          if (wordStart >= seg.start && wordEnd <= seg.end) {
+            covered = true;
+            break;
+          }
+        }
+        if (!covered) {
+          // Find nearest segment and extend it, or add a new one
+          let nearest: SilenceInterval | null = null;
+          let nearestDist = Infinity;
+          for (const seg of merged) {
+            const dist = Math.min(Math.abs(seg.start - wordEnd), Math.abs(seg.end - wordStart));
+            if (dist < nearestDist) {
+              nearestDist = dist;
+              nearest = seg;
+            }
+          }
+          if (nearest && nearestDist < 0.5) {
+            nearest.start = Math.min(nearest.start, Math.max(0, wordStart));
+            nearest.end = Math.max(nearest.end, Math.min(duration, wordEnd));
+          } else {
+            merged.push({ start: Math.max(0, wordStart), end: Math.min(duration, wordEnd) });
+          }
+          logger.debug(`[Silence Removal] Word safety net: extended segment for "${word.word}" at ${word.start.toFixed(2)}s`);
+        }
+      }
+      // Re-sort and re-merge after word extensions
+      merged.sort((a, b) => a.start - b.start);
+      const reMerged: SilenceInterval[] = [];
+      for (const seg of merged) {
+        if (reMerged.length === 0 || seg.start > reMerged[reMerged.length - 1].end) {
+          reMerged.push({ ...seg });
+        } else {
+          reMerged[reMerged.length - 1].end = Math.max(reMerged[reMerged.length - 1].end, seg.end);
+        }
+      }
+      segments = reMerged;
+    } else {
+      segments = merged;
+    }
+
     usedHybrid = true;
+
+    const totalKept = segments.reduce((s, seg) => s + (seg.end - seg.start), 0);
+    const removed = duration - totalKept;
+    logger.info(`[Silence Removal] VAD-primary: ${segments.length} final segments`);
+    logger.info(`[Silence Removal] Duration: ${duration.toFixed(1)}s → ${totalKept.toFixed(1)}s kept, ${removed.toFixed(1)}s removed (${((removed / duration) * 100).toFixed(0)}%)`);
   } else {
     // ── Fallback: FFmpeg silencedetect (legacy path) ──
     logger.info('[Silence Removal] Falling back to FFmpeg silencedetect');
