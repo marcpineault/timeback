@@ -71,40 +71,58 @@ export async function generateCaption(input: CaptionGenerationInput): Promise<Ge
     ? `\n- Include a clear CTA at the end${defaultCTA ? ` (preferred CTA: "${defaultCTA}")` : ''}`
     : '\n- Do NOT include a call-to-action';
 
-  const prompt = `You are a social media copywriter specializing in Instagram.
-Write an engaging Instagram caption for a video with this transcript:
+  const prompt = `You write Instagram captions that sound like a real person typed them on their phone — not a marketing agency.
+
+Here's the transcript of a video someone just recorded:
 
 ---
 ${transcript.slice(0, 3000)}
 ---
 ${videoTitle ? `\nVideo title: "${videoTitle}"` : ''}
 
-Brand voice: ${brandVoice}
-Niche: ${niche}
-Caption style: ${captionStyle}
+Their vibe: ${brandVoice}
+What they talk about: ${niche}
+Style: ${captionStyle}
 
-Requirements:
-- First line must be a scroll-stopping hook (under 125 characters, this appears before "...more")
-- Body should provide value or context (2-4 short paragraphs)${ctaSection}
-- Generate ${hashtagCount} relevant hashtags (mix of high-volume and niche-specific)${customHashtagSection}
-- Keep total caption under 2,200 characters (Instagram limit)
-- Use line breaks between sections for readability
-- Match the tone and energy of the video content${exampleSection}
+Write a caption that sounds like THEM, not like an AI. Follow these rules strictly:
+
+VOICE & TONE:
+- Write like you're texting a friend who's interested in this topic
+- Use the same words and phrases they used in the transcript — mirror their vocabulary
+- NO generic motivational filler ("In today's fast-paced world...", "Here's the thing...", "Let me break this down...")
+- NO corporate buzzwords ("leverage", "optimize", "game-changer", "unlock", "elevate")
+- NO emoji spam — use 0-2 emojis MAX, only if it fits naturally
+- Imperfect grammar is fine if it matches how they talk. Fragments are good. Start sentences with "And" or "But"
+- Be specific — use actual numbers, names, or details from the transcript
+
+STRUCTURE:
+- First line: a short, punchy opener under 125 chars (this shows before "...more"). NOT a question unless the speaker actually asked one. NOT clickbait. Just the most interesting specific thing from the video
+- Body: 1-3 short paragraphs. Get to the point. Say what they said in the video but shorter. Don't pad it
+- Keep it under 800 characters for the hook+body (people don't read long captions)${ctaSection}
+- ${hashtagCount} hashtags (mix niche + broad). Put them at the bottom after dot separators${customHashtagSection}
+
+THINGS TO AVOID:
+- Starting with "Ever wondered..." or any rhetorical question opener
+- "Here's what nobody tells you about..."
+- Listicles in the caption body (save that for carousels)
+- Overly polished sentences — this should feel dashed off, not workshopped
+- Making claims they didn't make in the transcript
+- Adding context or opinions they didn't express${exampleSection}
 
 Return ONLY valid JSON (no markdown, no code fences):
 {
-  "hook": "the scroll-stopping first line",
-  "body": "the main caption body with line breaks",
-  "cta": "the call to action line (empty string if no CTA)",
+  "hook": "the opener line",
+  "body": "caption body with \\n line breaks between paragraphs",
+  "cta": "call to action or empty string",
   "hashtags": ["hashtag1", "hashtag2"],
-  "altText": "brief description of video content for accessibility"
+  "altText": "brief video description for accessibility"
 }`;
 
   try {
     const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.8,
+      temperature: 0.7,
       max_tokens: 1500,
     });
 
