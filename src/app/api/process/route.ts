@@ -302,18 +302,24 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // OPTIMIZATION: Run early transcription WITH word-level timestamps in parallel
-    // Word timestamps are used by the hybrid silence removal pipeline for boundary refinement,
-    // and also for hook/B-roll detection
-    let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] }> | null = null;
+    // Run transcription in parallel with silence removal
+    let earlyTranscriptionPromise: Promise<{ text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] } | null> | null = null;
 
     if (needsEarlyTranscription) {
-      // Start transcribing original video in parallel with silence removal
       logger.info('Starting parallel transcription of original video');
       earlyTranscriptionPromise = transcribeVideo(inputPath, processedDir, {
         animated: false,
         forSpeechCorrection: false,
-      }).then(t => ({ text: t.text, segments: t.segments, words: t.words }));
+      })
+        .then(t => ({ text: t.text, segments: t.segments, words: t.words }))
+        .catch(err => {
+          // Catch here to prevent unhandled rejection if silence removal
+          // fails before we await this promise
+          logger.warn('Early transcription failed (background)', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
     }
 
     // Step 1: Remove silence using VAD-primary pipeline
@@ -334,17 +340,13 @@ export async function POST(request: NextRequest) {
     }
     currentInput = stepOutput;
 
-    // Get early transcription result if we started one (may already be resolved from hybrid mode)
+    // Get early transcription result (already has .catch(), so await is safe)
     let earlyTranscription: { text: string; segments: { start: number; end: number; text: string }[]; words?: TranscriptionWord[] } | null = null;
     if (earlyTranscriptionPromise) {
-      try {
-        logger.info('Getting parallel transcription result');
-        earlyTranscription = await earlyTranscriptionPromise;
+      logger.info('Getting parallel transcription result');
+      earlyTranscription = await earlyTranscriptionPromise;
+      if (earlyTranscription) {
         logger.info('Parallel transcription completed');
-      } catch (earlyTranscriptionErr) {
-        logger.warn('Early transcription failed', {
-          error: earlyTranscriptionErr instanceof Error ? earlyTranscriptionErr.message : String(earlyTranscriptionErr),
-        });
       }
     }
 
@@ -536,8 +538,21 @@ export async function POST(request: NextRequest) {
     let processedUrl: string;
     if (isS3Configured()) {
       logger.info('Uploading processed video to R2');
-      const processedS3Key = await uploadProcessedVideo(finalOutput, outputFilename);
-      processedUrl = processedS3Key; // Store S3 key in database
+      // Retry upload up to 2 times on transient failures
+      let processedS3Key: string | null = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          processedS3Key = await uploadProcessedVideo(finalOutput, outputFilename);
+          break;
+        } catch (uploadErr) {
+          logger.warn(`R2 upload attempt ${attempt}/3 failed`, {
+            error: uploadErr instanceof Error ? uploadErr.message : String(uploadErr),
+          });
+          if (attempt === 3) throw uploadErr;
+          await new Promise(r => setTimeout(r, attempt * 2000)); // 2s, 4s backoff
+        }
+      }
+      processedUrl = processedS3Key!; // Store S3 key in database
 
       // Delete local processed file after upload
       try {
@@ -567,7 +582,14 @@ export async function POST(request: NextRequest) {
       }
 
       // Update video record to COMPLETED with the processed URL and transcript
-      await updateVideoStatus('COMPLETED', { processedUrl, transcript: fullTranscript });
+      // Retry once on transient DB errors — if the record isn't updated, the
+      // client won't be able to find the processed video.
+      try {
+        await updateVideoStatus('COMPLETED', { processedUrl, transcript: fullTranscript });
+      } catch (dbErr) {
+        logger.warn('First COMPLETED status update failed, retrying...', { error: String(dbErr) });
+        await updateVideoStatus('COMPLETED', { processedUrl, transcript: fullTranscript });
+      }
     }
 
     // Clean up the original uploaded file

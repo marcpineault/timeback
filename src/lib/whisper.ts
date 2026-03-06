@@ -691,7 +691,7 @@ export async function transcribeVideo(
   }
 
   // Clean up audio file
-  fs.unlinkSync(audioPath);
+  try { fs.unlinkSync(audioPath); } catch { /* ignore cleanup errors */ }
 
   return {
     text,
