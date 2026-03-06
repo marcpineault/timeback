@@ -699,53 +699,7 @@ export async function removeSilence(
       }
     }
 
-    // Safety net: if we have word timestamps, extend segments that would clip a word
-    if (hasWords) {
-      for (const word of wordTimestamps!) {
-        const wordStart = word.start - prePad;
-        const wordEnd = word.end + postPad;
-        let covered = false;
-        for (const seg of merged) {
-          if (wordStart >= seg.start && wordEnd <= seg.end) {
-            covered = true;
-            break;
-          }
-        }
-        if (!covered) {
-          // Find nearest segment and extend it, or add a new one
-          let nearest: SilenceInterval | null = null;
-          let nearestDist = Infinity;
-          for (const seg of merged) {
-            const dist = Math.min(Math.abs(seg.start - wordEnd), Math.abs(seg.end - wordStart));
-            if (dist < nearestDist) {
-              nearestDist = dist;
-              nearest = seg;
-            }
-          }
-          if (nearest && nearestDist < 0.5) {
-            nearest.start = Math.min(nearest.start, Math.max(0, wordStart));
-            nearest.end = Math.max(nearest.end, Math.min(duration, wordEnd));
-          } else {
-            merged.push({ start: Math.max(0, wordStart), end: Math.min(duration, wordEnd) });
-          }
-          logger.debug(`[Silence Removal] Word safety net: extended segment for "${word.word}" at ${word.start.toFixed(2)}s`);
-        }
-      }
-      // Re-sort and re-merge after word extensions
-      merged.sort((a, b) => a.start - b.start);
-      const reMerged: SilenceInterval[] = [];
-      for (const seg of merged) {
-        if (reMerged.length === 0 || seg.start > reMerged[reMerged.length - 1].end) {
-          reMerged.push({ ...seg });
-        } else {
-          reMerged[reMerged.length - 1].end = Math.max(reMerged[reMerged.length - 1].end, seg.end);
-        }
-      }
-      segments = reMerged;
-    } else {
-      segments = merged;
-    }
-
+    segments = merged;
     usedHybrid = true;
 
     const totalKept = segments.reduce((s, seg) => s + (seg.end - seg.start), 0);

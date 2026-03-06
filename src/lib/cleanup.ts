@@ -84,13 +84,19 @@ export async function cleanupOldFiles(): Promise<void> {
 }
 
 /**
- * Clean up S3/R2 video files for posts that have reached a terminal state
- * (PUBLISHED, FAILED, or CANCELLED).
+ * Clean up S3/R2 video files that are no longer needed.
+ *
+ * Targets three categories:
+ * 1. Published/terminal: ALL scheduled posts are PUBLISHED/FAILED/CANCELLED
+ *    and the grace period has passed.
+ * 2. Unscheduled: Video is COMPLETED but has zero scheduled posts and has
+ *    been sitting for longer than the grace period (user never scheduled it).
+ * 3. Failed: Video processing failed and the grace period has passed — clean
+ *    up both the original upload and any partial processed file.
  *
  * Safety rules:
- * - Only deletes when ALL scheduled posts for a video are in terminal states
- * - Waits VIDEO_CLEANUP_GRACE_HOURS after the last post was updated
- * - Only targets S3 keys (processedUrl starting with "processed/")
+ * - Never deletes videos with pending/scheduled posts
+ * - Waits VIDEO_CLEANUP_GRACE_HOURS after last activity
  * - Clears the URL fields in the database after deletion
  */
 export async function cleanupPublishedVideoStorage(): Promise<{ deleted: number; errors: number }> {
@@ -100,14 +106,13 @@ export async function cleanupPublishedVideoStorage(): Promise<{ deleted: number;
 
   const graceCutoff = new Date(Date.now() - VIDEO_CLEANUP_GRACE_HOURS * 60 * 60 * 1000);
 
-  // Find videos where:
-  // 1. processedUrl is an S3 key (starts with "processed/")
-  // 2. At least one ScheduledPost exists
-  // 3. ALL ScheduledPosts are in terminal states
-  // 4. ALL ScheduledPosts were last updated before the grace cutoff
-  const videos = await prisma.video.findMany({
+  // Category 1: Videos where ALL scheduled posts are in terminal states
+  const terminalVideos = await prisma.video.findMany({
     where: {
-      processedUrl: { startsWith: 'processed/' },
+      OR: [
+        { processedUrl: { startsWith: 'processed/' } },
+        { originalUrl: { startsWith: 'uploads/' } },
+      ],
       scheduledPosts: {
         some: {},
         every: {
@@ -116,18 +121,51 @@ export async function cleanupPublishedVideoStorage(): Promise<{ deleted: number;
         },
       },
     },
-    select: {
-      id: true,
-      processedUrl: true,
-      originalUrl: true,
-    },
+    select: { id: true, processedUrl: true, originalUrl: true },
   });
+
+  // Category 2: Completed videos with no scheduled posts (never scheduled)
+  const unscheduledVideos = await prisma.video.findMany({
+    where: {
+      OR: [
+        { processedUrl: { startsWith: 'processed/' } },
+        { originalUrl: { startsWith: 'uploads/' } },
+      ],
+      status: 'COMPLETED',
+      scheduledPosts: { none: {} },
+      updatedAt: { lte: graceCutoff },
+    },
+    select: { id: true, processedUrl: true, originalUrl: true },
+  });
+
+  // Category 3: Failed videos — clean up original uploads and any partial files
+  const failedVideos = await prisma.video.findMany({
+    where: {
+      OR: [
+        { processedUrl: { startsWith: 'processed/' } },
+        { originalUrl: { startsWith: 'uploads/' } },
+      ],
+      status: 'FAILED',
+      updatedAt: { lte: graceCutoff },
+    },
+    select: { id: true, processedUrl: true, originalUrl: true },
+  });
+
+  // Deduplicate by id
+  const seen = new Set<string>();
+  const videos: typeof terminalVideos = [];
+  for (const v of [...terminalVideos, ...unscheduledVideos, ...failedVideos]) {
+    if (!seen.has(v.id)) {
+      seen.add(v.id);
+      videos.push(v);
+    }
+  }
 
   if (videos.length === 0) {
     return { deleted: 0, errors: 0 };
   }
 
-  logger.info(`Found ${videos.length} video(s) eligible for S3 cleanup`);
+  logger.info(`Found ${videos.length} video(s) eligible for S3 cleanup (${terminalVideos.length} terminal, ${unscheduledVideos.length} unscheduled, ${failedVideos.length} failed)`);
 
   let deleted = 0;
   let errors = 0;
@@ -135,12 +173,12 @@ export async function cleanupPublishedVideoStorage(): Promise<{ deleted: number;
   for (const video of videos) {
     try {
       // Delete processed video from S3
-      if (video.processedUrl) {
+      if (video.processedUrl?.startsWith('processed/')) {
         await deleteS3Object(video.processedUrl);
         logger.info('Deleted processed video from S3', { videoId: video.id, key: video.processedUrl });
       }
 
-      // Delete original upload from S3 if it's also an S3 key
+      // Delete original upload from S3
       if (video.originalUrl?.startsWith('uploads/')) {
         await deleteS3Object(video.originalUrl);
         logger.info('Deleted original upload from S3', { videoId: video.id, key: video.originalUrl });
