@@ -634,49 +634,139 @@ export async function removeSilence(
   const duration = await getVideoDuration(inputPath);
   const presetName = validatePresetName(options.silencePreset);
   const preset = SILENCE_PRESETS[presetName];
+  const { vadConfig, refinementConfig, gapConfig } = getConfigsFromPreset(presetName);
 
-  logger.info(`[Silence Removal] Starting FFmpeg pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
-
-  // Step 1: Detect silences with FFmpeg adaptive threshold
-  const minDuration = preset.minSilenceToRemoveMs / 1000;
-  let silences: SilenceInterval[];
-
-  if (options.autoSilenceThreshold !== false) {
-    const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
-    silences = adaptiveResult.silences;
-    logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
-  } else {
-    const threshold = options.silenceThreshold ?? -20;
-    silences = await detectSilence(inputPath, threshold, options.silenceDuration ?? minDuration);
-    logger.info(`[Silence Removal] Manual threshold: ${threshold}dB, found ${silences.length} silences`);
-  }
+  logger.info(`[Silence Removal] Starting hybrid pipeline (preset: ${presetName}, duration: ${duration.toFixed(1)}s)`);
 
   onProgress?.('Analyzing audio...', 0);
 
-  if (silences.length === 0) {
-    logger.debug(`[Silence Removal] No silences found, copying original file`);
-    fs.copyFileSync(inputPath, outputPath);
-    return { outputPath, keptSegments: [{ start: 0, end: duration }] };
+  // ── Hybrid pipeline: Silero VAD → word boundary refinement → gap processing ──
+  // This produces far more accurate cuts than FFmpeg silencedetect alone.
+  let segments: SilenceInterval[];
+  let usedHybrid = false;
+
+  const hasWords = wordTimestamps && wordTimestamps.length > 0;
+
+  // Try Silero VAD first (neural speech detection)
+  let speechSegments: SpeechSegment[] | null = null;
+  let vadAvailable = false;
+
+  try {
+    vadAvailable = await isSileroVadAvailable();
+  } catch {
+    logger.warn('[Silence Removal] Silero VAD availability check failed');
+  }
+
+  if (vadAvailable) {
+    try {
+      logger.info('[Silence Removal] Running Silero VAD for neural speech detection...');
+      const vadResult = await detectSilenceWithVad(inputPath, duration, vadConfig);
+      speechSegments = vadResult.speechSegments;
+      logger.info(`[Silence Removal] ${vadResult.analysisInfo}`);
+    } catch (vadErr) {
+      logger.warn('[Silence Removal] Silero VAD failed, falling back to FFmpeg silencedetect', {
+        error: vadErr instanceof Error ? vadErr.message : String(vadErr),
+      });
+    }
+  } else {
+    logger.info('[Silence Removal] Silero VAD not available, using FFmpeg silencedetect');
+  }
+
+  onProgress?.('Detecting silence...', 20);
+
+  if (speechSegments && speechSegments.length > 0 && hasWords) {
+    // ── Full hybrid path: VAD + word boundaries + gap processing ──
+    logger.info(`[Silence Removal] Hybrid path: ${speechSegments.length} VAD segments + ${wordTimestamps!.length} words`);
+
+    // Layer 2: Refine VAD boundaries using word-level timestamps
+    const refinedSegments = refineWithWordBoundaries(
+      speechSegments,
+      wordTimestamps!,
+      duration,
+      refinementConfig
+    );
+
+    // Layer 3: Intelligent gap processing with context-aware pause sizing
+    segments = buildFinalSegments(refinedSegments, duration, gapConfig);
+    usedHybrid = true;
+
+    logger.info(`[Silence Removal] Hybrid pipeline: ${refinedSegments.length} refined → ${segments.length} final segments`);
+  } else if (speechSegments && speechSegments.length > 0) {
+    // ── VAD-only path (no word timestamps): use VAD segments with preset padding ──
+    logger.info(`[Silence Removal] VAD-only path (no word timestamps): ${speechSegments.length} segments`);
+    const fallbackPadMs = preset.speechPadMs;
+    const paddedSegments = speechSegments.map(seg => ({
+      start: Math.max(0, seg.start - fallbackPadMs / 1000),
+      end: Math.min(duration, seg.end + fallbackPadMs / 1000),
+    }));
+
+    // Merge overlapping after padding
+    const merged: SilenceInterval[] = [];
+    for (const seg of paddedSegments) {
+      if (merged.length === 0 || seg.start > merged[merged.length - 1].end) {
+        merged.push({ ...seg });
+      } else {
+        merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, seg.end);
+      }
+    }
+    segments = merged;
+    usedHybrid = true;
+  } else {
+    // ── Fallback: FFmpeg silencedetect (legacy path) ──
+    logger.info('[Silence Removal] Falling back to FFmpeg silencedetect');
+    const minDuration = preset.minSilenceToRemoveMs / 1000;
+    let silences: SilenceInterval[];
+
+    if (options.autoSilenceThreshold !== false) {
+      const adaptiveResult = await detectSilenceAdaptive(inputPath, minDuration);
+      silences = adaptiveResult.silences;
+      logger.info(`[Silence Removal] ${adaptiveResult.analysisInfo}`);
+    } else {
+      const threshold = options.silenceThreshold ?? -20;
+      silences = await detectSilence(inputPath, threshold, options.silenceDuration ?? minDuration);
+      logger.info(`[Silence Removal] Manual threshold: ${threshold}dB, found ${silences.length} silences`);
+    }
+
+    if (silences.length === 0) {
+      logger.debug(`[Silence Removal] No silences found, copying original file`);
+      fs.copyFileSync(inputPath, outputPath);
+      return { outputPath, keptSegments: [{ start: 0, end: duration }] };
+    }
+
+    // If we have word timestamps but no VAD, still use word boundary refinement
+    if (hasWords) {
+      logger.info('[Silence Removal] Using word boundaries to refine FFmpeg silences');
+      const ffmpegSpeechSegments = silencesToSpeechSegments(silences, duration);
+      const refinedSegments = refineWithWordBoundaries(
+        ffmpegSpeechSegments,
+        wordTimestamps!,
+        duration,
+        refinementConfig
+      );
+      segments = buildFinalSegments(refinedSegments, duration, gapConfig);
+    } else {
+      segments = getNonSilentSegments(silences, duration, {
+        padding: 0,
+        minSegmentDuration: 0.1,
+        mergeGap: 0.05,
+        timebackPadding: preset.prePadMs / 1000,
+        timebackPaddingEnd: preset.postPadMs / 1000,
+      });
+    }
   }
 
   onProgress?.('Detecting silence...', 30);
 
-  // Step 2: Convert silences to keep-segments using FFmpeg-based approach
-  let segments = getNonSilentSegments(silences, duration, {
-    padding: 0,                                // Don't trim into speech edges
-    minSegmentDuration: 0.1,                   // Ignore segments shorter than 100ms
-    mergeGap: 0.05,                            // Merge segments less than 50ms apart
-    timebackPadding: preset.prePadMs / 1000,   // Pre-speech padding from preset
-    timebackPaddingEnd: preset.postPadMs / 1000, // Post-speech padding from preset
-  });
-
-  // Step 2b: When transcript is available, protect sentence endings from being clipped
-  if (wordTimestamps && wordTimestamps.length > 0) {
-    segments = protectWordsFromClipping(segments, wordTimestamps, duration, preset.postPadMs / 1000);
-    validateTranscriptCoverage(segments, wordTimestamps);
+  // Validate word coverage (regardless of path)
+  if (hasWords) {
+    if (!usedHybrid) {
+      // Only apply word protection in the legacy path without refinement
+      segments = protectWordsFromClipping(segments, wordTimestamps!, duration, preset.postPadMs / 1000);
+    }
+    validateTranscriptCoverage(segments, wordTimestamps!);
   }
 
-  logger.info(`[Silence Removal] ${segments.length} segments to keep from ${silences.length} silences`);
+  logger.info(`[Silence Removal] ${segments.length} segments to keep`);
 
   // If no segments to keep, copy the original file
   if (segments.length === 0) {
@@ -690,9 +780,26 @@ export async function removeSilence(
   const isIntermediate = options.isIntermediate === true;
   const outputDir = path.dirname(outputPath);
   let roomTonePath: string | null = null;
+  // Derive silence intervals from kept segments for room tone extraction
+  const silenceIntervalsForRoomTone: SilenceInterval[] = [];
+  if (segments.length > 0) {
+    if (segments[0].start > 0.1) {
+      silenceIntervalsForRoomTone.push({ start: 0, end: segments[0].start });
+    }
+    for (let i = 0; i < segments.length - 1; i++) {
+      const gapStart = segments[i].end;
+      const gapEnd = segments[i + 1].start;
+      if (gapEnd - gapStart > 0.1) {
+        silenceIntervalsForRoomTone.push({ start: gapStart, end: gapEnd });
+      }
+    }
+    if (duration - segments[segments.length - 1].end > 0.1) {
+      silenceIntervalsForRoomTone.push({ start: segments[segments.length - 1].end, end: duration });
+    }
+  }
   if (!isIntermediate) {
     try {
-      roomTonePath = await extractRoomTone(inputPath, silences, outputDir);
+      roomTonePath = await extractRoomTone(inputPath, silenceIntervalsForRoomTone, outputDir);
       if (roomTonePath) {
         logger.info(`[Silence Removal] Room tone extracted for ambient bed`);
       }
