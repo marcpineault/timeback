@@ -10,21 +10,25 @@ export type SilencePresetName = 'natural' | 'gentle';
 
 /**
  * Complete silence removal preset configuration
+ *
+ * Gap values (sentenceGapMs, etc.) represent the TOTAL desired silence
+ * between speech segments — including the prePadMs/postPadMs padding that
+ * protects word boundaries. getConfigsFromPreset() subtracts the padding
+ * to compute the effective additional gap. This means:
+ *   actual output silence = postPadMs + effectiveGap + prePadMs = sentenceGapMs
  */
 export interface SilencePreset {
   name: string;
   description: string;
   /** Silero VAD speech padding (ms) — used as fallback when word timestamps unavailable */
   speechPadMs: number;
-  /** Padding before speech segments (ms) — applied by word boundary refinement */
+  /** Padding before first word to catch plosive onsets (ms) */
   prePadMs: number;
-  /** Padding after speech segments (ms) — applied by word boundary refinement */
+  /** Padding after last word to catch trailing consonants (ms) */
   postPadMs: number;
   /** Minimum silence duration to trigger removal (ms) */
   minSilenceToRemoveMs: number;
-  /** Minimum gap to retain between speech segments (ms) */
-  minRetainedGapMs: number;
-  /** Gap after sentence-ending punctuation (ms) */
+  /** TOTAL desired silence at sentence-ending punctuation (. ! ?) (ms) */
   sentenceGapMs: number;
   /** How to handle breaths: 'keep' | 'reduce' | 'remove' */
   breathHandling: 'keep' | 'reduce' | 'remove';
@@ -39,26 +43,24 @@ export const SILENCE_PRESETS: Record<SilencePresetName, SilencePreset> = {
   natural: {
     name: 'Natural',
     description: 'Conversational, podcast style (default) — tight editing',
-    speechPadMs: 40,
-    prePadMs: 100,
-    postPadMs: 180,
-    minSilenceToRemoveMs: 300,
-    minRetainedGapMs: 40,
-    sentenceGapMs: 100,
+    speechPadMs: 30,
+    prePadMs: 40,
+    postPadMs: 70,
+    minSilenceToRemoveMs: 250,
+    sentenceGapMs: 160,
     breathHandling: 'remove',
-    vadThreshold: 0.45,
+    vadThreshold: 0.40,
   },
   gentle: {
     name: 'Gentle',
     description: 'Light editing, presentations/lectures — brief pauses kept',
-    speechPadMs: 60,
-    prePadMs: 120,
-    postPadMs: 200,
-    minSilenceToRemoveMs: 800,
-    minRetainedGapMs: 80,
-    sentenceGapMs: 180,
+    speechPadMs: 50,
+    prePadMs: 60,
+    postPadMs: 100,
+    minSilenceToRemoveMs: 600,
+    sentenceGapMs: 350,
     breathHandling: 'remove',
-    vadThreshold: 0.40,
+    vadThreshold: 0.35,
   },
 };
 
@@ -96,19 +98,23 @@ export function getConfigsFromPreset(presetName: SilencePresetName): {
     mergeGapMs: 15,
   };
 
-  // Word boundary refinement (Layer 2) extends segments by prePadMs/postPadMs,
-  // shrinking the gaps between them. Gap processing (Layer 3) must compensate
-  // for this shrinkage, otherwise the effective removal threshold becomes
-  // minSilenceToRemoveMs + prePadMs + postPadMs — far higher than intended.
+  // The total output silence at a cut = postPad + effectiveGap + prePad.
+  // Preset gap values represent TOTAL desired silence, so we subtract the
+  // padding that's already baked into the segments to get the effective gap.
   const totalPaddingMs = preset.prePadMs + preset.postPadMs;
   const compensatedMinSilence = Math.max(20, preset.minSilenceToRemoveMs - totalPaddingMs);
 
+  // Compute effective gaps: total desired silence minus padding already present
+  const effectiveSentenceGap = Math.max(0, preset.sentenceGapMs - totalPaddingMs);
+  const effectiveClauseGap = Math.max(0, Math.round(preset.sentenceGapMs * 0.6) - totalPaddingMs);
+  const effectiveMidSentenceGap = 0; // Padding alone is sufficient mid-sentence
+
   const gapConfig: GapProcessingConfig = {
-    minRetainedGapMs: preset.minRetainedGapMs,
-    sentenceGapMs: preset.sentenceGapMs,
-    clauseGapMs: Math.round(preset.sentenceGapMs * 0.67),
-    midSentenceGapMs: Math.round(preset.minRetainedGapMs * 0.83),
-    paragraphGapMs: Math.round(preset.sentenceGapMs * 1.33),
+    minRetainedGapMs: 0,
+    sentenceGapMs: effectiveSentenceGap,
+    clauseGapMs: effectiveClauseGap,
+    midSentenceGapMs: effectiveMidSentenceGap,
+    paragraphGapMs: Math.max(0, Math.round(preset.sentenceGapMs * 1.3) - totalPaddingMs),
     maxGapMs: 500,
     minSilenceToRemoveMs: compensatedMinSilence,
     breathHandling: preset.breathHandling,
