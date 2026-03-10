@@ -79,18 +79,19 @@ function naturalCrf(): string {
   return String(17 + Math.floor(Math.random() * 3));
 }
 
-/** Returns flags to strip all FFmpeg encoding fingerprints from the output MP4. */
-function antiFingerprint(): string[] {
+/**
+ * Write phone-like metadata so the output looks like it came from an iPhone.
+ * Stripping all metadata (the old approach) is a louder automation signal
+ * than having natural device metadata — no real device produces blank metadata.
+ */
+function phoneMetadata(): string[] {
   return [
     '-map_metadata', '-1',
-    '-fflags', '+bitexact',
-    '-flags:v', '+bitexact',
-    '-flags:a', '+bitexact',
-    '-metadata:s:v', 'handler_name=',
-    '-metadata:s:a', 'handler_name=',
-    '-metadata:s:v', 'vendor_id=',
+    '-metadata:s:v', 'handler_name=Core Media Video',
+    '-metadata:s:a', 'handler_name=Core Media Audio',
     '-metadata:s:v', 'encoder=',
     '-metadata:s:a', 'encoder=',
+    '-brand', 'isom',
   ];
 }
 
@@ -98,17 +99,24 @@ function antiFingerprint(): string[] {
  * Instagram-optimized video output options.
  * H.264 Main@4.0 mimics phone encoding (phones use main, not high).
  * 30fps is Instagram's preferred frame rate for Reels.
+ * GOP of 60 = keyframe every 2 seconds at 30fps (Instagram's expected interval).
+ * maxrate 8M caps bitrate spikes that trigger heavier Instagram re-compression.
  */
-const INSTAGRAM_VIDEO_OPTS = ['-profile:v', 'main', '-level:v', '4.0', '-r', '30'];
+const INSTAGRAM_VIDEO_OPTS = [
+  '-profile:v', 'main', '-level:v', '4.0', '-r', '30',
+  '-g', '60', '-keyint_min', '60',
+  '-maxrate', '8M', '-bufsize', '16M',
+];
 
 /**
- * Instagram-optimized audio output options with randomized bitrate.
- * Randomizes AAC bitrate per video to avoid fixed-bitrate fingerprint.
+ * Instagram-optimized audio output options.
+ * 48kHz sample rate matches CapCut/phone output and avoids Instagram audio re-encoding.
+ * Randomized bitrate in the 256-320k range matches consumer editor output.
  */
 function instagramAudioOpts(): string[] {
-  const bitrates = ['176k', '184k', '192k', '200k', '208k'];
+  const bitrates = ['256k', '272k', '288k', '304k', '320k'];
   const bitrate = bitrates[Math.floor(Math.random() * bitrates.length)];
-  return ['-c:a', 'aac', '-b:a', bitrate];
+  return ['-c:a', 'aac', '-b:a', bitrate, '-ar', '48000'];
 }
 
 
@@ -826,13 +834,12 @@ export async function removeSilence(
           '-crf', videoCrf,
           '-threads', '0',
           '-max_muxing_queue_size', '512',
-          '-bufsize', '1M',
           // Intermediate: lossless audio pass-through; Final: Instagram-optimized
-          ...(isIntermediate ? ['-c:a', 'aac', '-b:a', '256k'] : [...INSTAGRAM_VIDEO_OPTS, ...instagramAudioOpts()]),
+          ...(isIntermediate ? ['-bufsize', '1M', '-c:a', 'aac', '-b:a', '256k', '-ar', '48000'] : [...INSTAGRAM_VIDEO_OPTS, ...instagramAudioOpts()]),
           // faststart moves moov atom to the front for instant mobile playback/preview.
           // Skip for intermediate files since they'll be re-encoded anyway.
           ...(isIntermediate ? [] : ['-movflags', '+faststart', '-pix_fmt', 'yuv420p']),
-          ...(isIntermediate ? [] : antiFingerprint()),
+          ...(isIntermediate ? [] : phoneMetadata()),
         ])
         .output(outputPath);
 
@@ -1209,10 +1216,9 @@ export async function applyCombinedFilters(
         ...INSTAGRAM_VIDEO_OPTS,
         '-threads', '0',
         '-max_muxing_queue_size', '512',
-        '-bufsize', '1M',
         ...instagramAudioOpts(),
         '-movflags', '+faststart',
-        ...antiFingerprint(),
+        ...phoneMetadata(),
         '-shortest',
         outputPath
       ];
@@ -1233,10 +1239,9 @@ export async function applyCombinedFilters(
             ...INSTAGRAM_VIDEO_OPTS,
             '-threads', '0',
             '-max_muxing_queue_size', '512',
-            '-bufsize', '1M',
             ...instagramAudioOpts(),
             '-movflags', '+faststart',
-            ...antiFingerprint(),
+            ...phoneMetadata(),
           ])
           .output(outputPath);
       }, processConfig);
@@ -1287,11 +1292,10 @@ export async function trimVideo(
         ...INSTAGRAM_VIDEO_OPTS,
         '-threads', '0',
         '-max_muxing_queue_size', '512',
-        '-bufsize', '1M',
         ...instagramAudioOpts(),
         '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
-        ...antiFingerprint(),
+        ...phoneMetadata(),
       ])
       .output(outputPath)
       .on('end', () => {
@@ -1355,11 +1359,10 @@ export async function splitVideo(
           ...INSTAGRAM_VIDEO_OPTS,
           '-threads', '0',
           '-max_muxing_queue_size', '512',
-          '-bufsize', '1M',
           ...instagramAudioOpts(),
           '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
-          ...antiFingerprint(),
+          ...phoneMetadata(),
         ])
         .output(segment.outputPath)
         .on('end', () => {
