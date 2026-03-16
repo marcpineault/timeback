@@ -6,29 +6,21 @@ import Link from 'next/link'
 const DISMISS_KEY = 'timeback_onboarding_dismissed'
 
 interface OnboardingBannerProps {
-  /** Which step is currently active: 'ideate' | 'editor' | 'schedule' */
-  activeStep: 'ideate' | 'editor' | 'schedule'
+  /** Which step is currently active: 'editor' | 'schedule' */
+  activeStep: 'editor' | 'schedule'
 }
 
 const steps = [
   {
     number: 1,
-    key: 'ideate' as const,
-    title: 'Generate Scripts',
-    description: 'Tell us your industry. AI writes scroll-stopping video scripts.',
-    href: '/dashboard/ideate',
-    badge: '5 minutes',
-  },
-  {
-    number: 2,
     key: 'editor' as const,
     title: 'Record & Upload',
     description: 'Film your videos and upload them here. AI handles the editing.',
-    href: '/dashboard',
+    href: '/dashboard/editor',
     badge: '1 hour',
   },
   {
-    number: 3,
+    number: 2,
     key: 'schedule' as const,
     title: 'Schedule & Post',
     description: 'Your finished videos get auto-scheduled to Instagram.',
@@ -81,7 +73,7 @@ export default function OnboardingBanner({ activeStep }: OnboardingBannerProps) 
         Your first month of content starts here
       </h2>
       <p className="text-[#8a8580] text-sm mb-4 sm:mb-5">
-        Follow these three steps to create and publish your first videos.
+        Follow these two steps to create and publish your first videos.
       </p>
 
       {/* Steps */}

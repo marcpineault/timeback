@@ -105,12 +105,10 @@ export default async function SubscriptionPage() {
         <Link href="/" className="nav-logo">TimeBack</Link>
         <MobileMenuToggle />
         <div className="nav-links">
-          <Link href="/dashboard">Editor</Link>
+          <Link href="/dashboard">Dashboard</Link>
+          <Link href="/dashboard/editor">Editor</Link>
           {features.instagramScheduling && (
             <Link href="/dashboard/schedule">Schedule</Link>
-          )}
-          {features.ideate && (
-            <Link href="/dashboard/ideate">Ideate</Link>
           )}
           <Link href="/account/subscription" style={{ color: '#0a0a0a', fontWeight: 600 }}>Subscription</Link>
           <UserButton afterSignOutUrl="/" />

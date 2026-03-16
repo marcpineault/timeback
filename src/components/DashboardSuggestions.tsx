@@ -133,7 +133,7 @@ export default function DashboardSuggestions() {
 
             {weeklySuggestion.template && (
               <Link
-                href="/dashboard/ideate"
+                href="/dashboard/editor"
                 onClick={() => analytics.trackDashboardSuggestionClicked(
                   weeklySuggestion.type === 'dated' ? 'weekly_suggestion' : 'rotating_suggestion',
                   weeklySuggestion.calendarEntry?.category || weeklySuggestion.template?.category

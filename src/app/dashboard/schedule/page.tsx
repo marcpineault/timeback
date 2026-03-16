@@ -33,13 +33,11 @@ export default async function SchedulePage() {
         <Link href="/" className="nav-logo">TimeBack</Link>
         <MobileMenuToggle />
         <div className="nav-links">
-          {features.ideate && (
-            <Link href="/dashboard/ideate" className="nav-tab-link">
-              <span>Ideate</span>
-              <span className="nav-tab-subtitle">Scripts</span>
-            </Link>
-          )}
           <Link href="/dashboard" className="nav-tab-link">
+            <span>Dashboard</span>
+            <span className="nav-tab-subtitle">Overview</span>
+          </Link>
+          <Link href="/dashboard/editor" className="nav-tab-link">
             <span>Editor</span>
             <span className="nav-tab-subtitle">Upload &amp; Edit</span>
           </Link>

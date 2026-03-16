@@ -48,10 +48,8 @@ export function isFeatureEnabled(
  */
 export function getEnabledFeatures(email: string | null | undefined): {
   instagramScheduling: boolean;
-  ideate: boolean;
 } {
   return {
     instagramScheduling: isBetaTester(email),
-    ideate: true,
   };
 }

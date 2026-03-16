@@ -168,7 +168,7 @@ export default function VerticalOnboardingPage() {
         })
         if (!res.ok) throw new Error('Failed to save')
         analytics.trackVerticalOnboardingCompleted('OTHER')
-        router.push('/dashboard/ideate')
+        router.push('/dashboard')
       } catch {
         setError('Something went wrong. Please try again.')
         setSaving(false)
@@ -191,7 +191,7 @@ export default function VerticalOnboardingPage() {
         form.market,
         form.specialization
       )
-      router.push('/dashboard/ideate')
+      router.push('/dashboard')
     }
   }
 

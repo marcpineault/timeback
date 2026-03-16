@@ -3,14 +3,13 @@ import { UserButton } from '@clerk/nextjs'
 import { getOrCreateUser, getUserUsage } from '@/lib/user'
 import { PLANS } from '@/lib/plans'
 import { getEnabledFeatures } from '@/lib/featureFlags'
-import VideoProcessor from './VideoProcessor'
 import WelcomeOverlay from '@/components/WelcomeOverlay'
 import OnboardingBanner from '@/components/OnboardingBanner'
-import DashboardSuggestions from '@/components/DashboardSuggestions'
 import Link from 'next/link'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 import UpgradeBanner from '@/components/upgrade/UpgradeBanner'
 import UsageWarningBanner from '@/components/upgrade/UsageWarningBanner'
+import RecentVideos from '@/components/RecentVideos'
 
 export default async function DashboardPage() {
   let user
@@ -67,6 +66,11 @@ export default async function DashboardPage() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const displayName = usage.userName?.split(' ')[0] || ''
 
+  // Analytics: compute time saved from silence removal
+  const totalSilenceRemoved = usage.recentVideos.reduce((sum, v) => sum + (v.silenceRemoved || 0), 0)
+  const totalDuration = usage.recentVideos.reduce((sum, v) => sum + (v.duration || 0), 0)
+  const completedVideos = usage.recentVideos.filter(v => v.status === 'COMPLETED')
+
   return (
     <div className="landing-page min-h-screen">
       <WelcomeOverlay isNewUser={isNewUser} />
@@ -75,13 +79,11 @@ export default async function DashboardPage() {
         <Link href="/" className="nav-logo">TimeBack</Link>
         <MobileMenuToggle />
         <div className="nav-links">
-          {features.ideate && (
-            <Link href="/dashboard/ideate" className="nav-tab-link">
-              <span>Ideate</span>
-              <span className="nav-tab-subtitle">Scripts</span>
-            </Link>
-          )}
           <Link href="/dashboard" style={{ color: '#0a0a0a', fontWeight: 600 }} className="nav-tab-link">
+            <span>Dashboard</span>
+            <span className="nav-tab-subtitle">Overview</span>
+          </Link>
+          <Link href="/dashboard/editor" className="nav-tab-link">
             <span>Editor</span>
             <span className="nav-tab-subtitle">Upload &amp; Edit</span>
           </Link>
@@ -177,33 +179,6 @@ export default async function DashboardPage() {
                 : `${usage.videosRemaining} video${usage.videosRemaining !== 1 ? 's' : ''} remaining this month`}
             </p>
           )}
-          {/* AI generation usage for FREE users */}
-          {usage.plan === 'FREE' && usage.ideateRemaining !== null && usage.planDetails.ideateGenerationsPerMonth && (
-            <div className="mt-3 pt-3 border-t border-[#e0dbd4]">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[#8a8580] text-xs">
-                  {usage.ideateUsed} of {usage.planDetails.ideateGenerationsPerMonth} AI generations used
-                </p>
-                <span className={`text-xs ${
-                  usage.ideateRemaining <= 0 ? 'text-red-500 font-semibold' :
-                  usage.ideateRemaining <= 1 ? 'text-amber-500' :
-                  'text-[#8a8580]'
-                }`}>
-                  {usage.ideateRemaining} remaining
-                </span>
-              </div>
-              <div className="w-full bg-[#e0dbd4] rounded-full h-1.5">
-                <div
-                  className={`h-1.5 rounded-full transition-all ${
-                    usage.ideateRemaining <= 0 ? 'bg-red-500' :
-                    usage.ideateRemaining <= 1 ? 'bg-amber-500' :
-                    'bg-[#e85d26]'
-                  }`}
-                  style={{ width: `${Math.min((usage.ideateUsed / usage.planDetails.ideateGenerationsPerMonth) * 100, 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Usage Warning Banner — shows at 80%+ usage for FREE users */}
@@ -229,7 +204,7 @@ export default async function DashboardPage() {
         )}
 
         {/* Quick Stats Cards */}
-        <div className="flex gap-3 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 sm:mb-8">
           <div className="stat-card">
             <div className="stat-card-value">
               {usage.planDetails.videosPerMonth
@@ -246,11 +221,47 @@ export default async function DashboardPage() {
             <div className="stat-card-value">{usage.processingCount}</div>
             <div className="stat-card-label">Processing</div>
           </div>
+          <div className="stat-card">
+            <div className="stat-card-value">{completedVideos.length}</div>
+            <div className="stat-card-label">Completed</div>
+          </div>
         </div>
 
-        {/* Content Suggestions — only for specific verticals */}
-        {user.vertical && user.vertical !== 'OTHER' && (
-          <DashboardSuggestions />
+        {/* Time Saved Analytics */}
+        {completedVideos.length > 0 && (
+          <div className="bg-white border border-[#e0dbd4] rounded-2xl p-4 sm:p-6 mb-6">
+            <h2 className="text-base sm:text-lg font-semibold text-[#0a0a0a] mb-4" style={{ fontFamily: "'Instrument Serif', serif" }}>
+              Time Saved
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-[#f5f0e8] rounded-xl">
+                <div className="text-2xl sm:text-3xl font-bold text-[#e85d26]">
+                  {totalSilenceRemoved >= 60
+                    ? `${Math.floor(totalSilenceRemoved / 60)}m ${totalSilenceRemoved % 60}s`
+                    : `${totalSilenceRemoved}s`}
+                </div>
+                <div className="text-xs text-[#8a8580] mt-1">Silence removed</div>
+              </div>
+              <div className="text-center p-4 bg-[#f5f0e8] rounded-xl">
+                <div className="text-2xl sm:text-3xl font-bold text-[#0a0a0a]">
+                  {totalDuration >= 3600
+                    ? `${Math.floor(totalDuration / 3600)}h ${Math.floor((totalDuration % 3600) / 60)}m`
+                    : totalDuration >= 60
+                    ? `${Math.floor(totalDuration / 60)}m ${totalDuration % 60}s`
+                    : `${totalDuration}s`}
+                </div>
+                <div className="text-xs text-[#8a8580] mt-1">Total video duration</div>
+              </div>
+              <div className="text-center p-4 bg-[#f5f0e8] rounded-xl">
+                <div className="text-2xl sm:text-3xl font-bold text-[#0a0a0a]">
+                  {totalDuration > 0
+                    ? `${Math.round((totalSilenceRemoved / totalDuration) * 100)}%`
+                    : '0%'}
+                </div>
+                <div className="text-xs text-[#8a8580] mt-1">Avg. silence ratio</div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Personalization banner for users without a vertical */}
@@ -260,7 +271,7 @@ export default async function DashboardPage() {
               <span className="text-xl flex-shrink-0">🎯</span>
               <div>
                 <p className="text-sm font-semibold text-[#0a0a0a]">Personalize your experience</p>
-                <p className="text-xs text-[#8a8580]">Tell us your profession to unlock tailored scripts, content calendars, and posting ideas.</p>
+                <p className="text-xs text-[#8a8580]">Tell us your profession to unlock tailored content suggestions.</p>
               </div>
             </div>
             <Link
@@ -272,15 +283,21 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Video Processor */}
-        <VideoProcessor
-          userId={user.id}
-          canProcess={usage.videosRemaining === null || usage.videosRemaining > 0}
-          videosRemaining={usage.videosRemaining ?? Infinity}
-          hasWatermark={usage.planDetails.watermark}
-          enabledFeatures={features}
-          videosProcessed={usage.videosUsed}
-        />
+        {/* Recent Videos */}
+        <RecentVideos videos={completedVideos} />
+
+        {/* Quick Action */}
+        <div className="mt-6 text-center">
+          <Link
+            href="/dashboard/editor"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] text-white rounded-full text-sm font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Upload New Video
+          </Link>
+        </div>
       </div>
     </div>
   )
