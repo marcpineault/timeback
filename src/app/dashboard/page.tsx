@@ -9,7 +9,6 @@ import Link from 'next/link'
 import MobileMenuToggle from '@/components/MobileMenuToggle'
 import UpgradeBanner from '@/components/upgrade/UpgradeBanner'
 import UsageWarningBanner from '@/components/upgrade/UsageWarningBanner'
-import RecentVideos from '@/components/RecentVideos'
 
 export default async function DashboardPage() {
   let user
@@ -283,11 +282,19 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Recent Videos */}
-        <RecentVideos videos={completedVideos} />
-
-        {/* Quick Action */}
-        <div className="mt-6 text-center">
+        {/* Editor CTA */}
+        <div className="bg-white border border-[#e0dbd4] rounded-2xl p-6 sm:p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 bg-[rgba(232,93,38,0.08)] rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-[#e85d26]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 className="text-lg sm:text-xl font-semibold text-[#0a0a0a] mb-2" style={{ fontFamily: "'Instrument Serif', serif" }}>
+            Ready to create?
+          </h2>
+          <p className="text-sm text-[#8a8580] mb-5 max-w-md mx-auto">
+            Upload your video and let AI handle the editing — silence removal, captions, and more. Done in minutes.
+          </p>
           <Link
             href="/dashboard/editor"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#e85d26] hover:bg-[#d14d1a] text-white rounded-full text-sm font-medium transition-colors"
@@ -295,7 +302,7 @@ export default async function DashboardPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Upload New Video
+            Go to Editor
           </Link>
         </div>
       </div>
