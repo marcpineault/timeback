@@ -75,7 +75,7 @@ export interface RemoveSilenceResult {
 }
 
 /** Returns a random CRF between 17–19 for anti-fingerprinting. Visually indistinguishable but produces unique bitrate curves. */
-function naturalCrf(): string {
+export function naturalCrf(): string {
   return String(17 + Math.floor(Math.random() * 3));
 }
 
@@ -84,7 +84,7 @@ function naturalCrf(): string {
  * Stripping all metadata (the old approach) is a louder automation signal
  * than having natural device metadata — no real device produces blank metadata.
  */
-function phoneMetadata(): string[] {
+export function phoneMetadata(): string[] {
   return [
     '-map_metadata', '-1',
     '-metadata:s:v', 'handler_name=Core Media Video',
@@ -102,7 +102,7 @@ function phoneMetadata(): string[] {
  * GOP of 60 = keyframe every 2 seconds at 30fps (Instagram's expected interval).
  * maxrate 8M caps bitrate spikes that trigger heavier Instagram re-compression.
  */
-const INSTAGRAM_VIDEO_OPTS = [
+export const INSTAGRAM_VIDEO_OPTS = [
   '-profile:v', 'main', '-level:v', '4.0', '-r', '30',
   '-g', '60', '-keyint_min', '60',
   '-maxrate', '8M', '-bufsize', '16M',
@@ -113,7 +113,7 @@ const INSTAGRAM_VIDEO_OPTS = [
  * 48kHz sample rate matches CapCut/phone output and avoids Instagram audio re-encoding.
  * Randomized bitrate in the 256-320k range matches consumer editor output.
  */
-function instagramAudioOpts(): string[] {
+export function instagramAudioOpts(): string[] {
   const bitrates = ['256k', '272k', '288k', '304k', '320k'];
   const bitrate = bitrates[Math.floor(Math.random() * bitrates.length)];
   return ['-c:a', 'aac', '-b:a', bitrate, '-ar', '48000'];

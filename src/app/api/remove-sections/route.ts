@@ -5,7 +5,7 @@ import { existsSync, lstatSync } from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
-import { safeFFprobe } from '@/lib/ffmpeg';
+import { safeFFprobe, naturalCrf, phoneMetadata, INSTAGRAM_VIDEO_OPTS, instagramAudioOpts } from '@/lib/ffmpeg';
 
 // Allow up to 3 minutes for removing sections from videos
 export const maxDuration = 180;
@@ -245,9 +245,12 @@ export async function POST(request: NextRequest) {
           '-map', '[outa]',
           '-c:v', 'libx264',
           '-preset', 'fast',
-          '-crf', '23',
-          '-c:a', 'aac',
-          '-b:a', '128k',
+          '-crf', naturalCrf(),
+          ...INSTAGRAM_VIDEO_OPTS,
+          ...instagramAudioOpts(),
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          ...phoneMetadata(),
         ])
         .output(outputPath)
         .on('end', () => {
