@@ -69,12 +69,11 @@ export async function probeVideoColorInfo(inputPath: string): Promise<VideoColor
   const colorSpace = videoStream?.color_space;
   const pixFmt = videoStream?.pix_fmt;
 
-  // HDR indicators: PQ (HDR10/Dolby Vision) or HLG transfer functions, or 10-bit pixel formats
+  // Only flag as HDR when the transfer function is explicitly PQ (HDR10/Dolby Vision) or HLG.
+  // Do NOT use 10-bit pixel format alone — modern iPhones record 10-bit SDR (yuv420p10le)
+  // and applying PQ tone mapping to SDR gamma data destroys colors.
   const hdrTransfers = ['smpte2084', 'arib-std-b67'];
-  const isHdrTransfer = colorTransfer ? hdrTransfers.includes(colorTransfer) : false;
-  const is10Bit = pixFmt ? /10le|10be|p010/.test(pixFmt) : false;
-
-  const isHdr = isHdrTransfer || is10Bit;
+  const isHdr = colorTransfer ? hdrTransfers.includes(colorTransfer) : false;
 
   return { isHdr, colorTransfer, colorSpace, pixFmt };
 }
@@ -853,16 +852,27 @@ export async function removeSilence(
   }
 
   // If HDR, prepend tone mapping to the filter complex so the first encode produces SDR output.
-  // Replace all [0:v] video references with the tone-mapped stream label.
+  // Each [0:v] reference in the filter complex is a separate consumer, so we need split=N
+  // to create N copies of the tone-mapped stream (intermediate filter outputs can only be read once).
   let finalFilterComplex = filterComplex;
   if (colorInfo.isHdr) {
     if (filterComplex) {
-      finalFilterComplex = `[0:v]${HDR_TONEMAP_FILTER}[tonemapped];` + filterComplex.replace(/\[0:v\]/g, '[tonemapped]');
+      const segmentCount = (filterComplex.match(/\[0:v\]/g) || []).length;
+      if (segmentCount <= 1) {
+        // Single segment: no split needed
+        finalFilterComplex = `[0:v]${HDR_TONEMAP_FILTER}[tonemapped];` + filterComplex.replace(/\[0:v\]/g, '[tonemapped]');
+      } else {
+        // Multiple segments: split tone-mapped stream into N copies
+        const splitLabels = Array.from({ length: segmentCount }, (_, i) => `[tm${i}]`);
+        const splitFilter = `[0:v]${HDR_TONEMAP_FILTER},split=${segmentCount}${splitLabels.join('')}`;
+        let idx = 0;
+        finalFilterComplex = splitFilter + ';' + filterComplex.replace(/\[0:v\]/g, () => `[tm${idx++}]`);
+      }
     } else {
       // No silence removal needed, but HDR needs tone mapping — encode full video
       finalFilterComplex = `[0:v]${HDR_TONEMAP_FILTER}[outv];[0:a]anull[outa]`;
     }
-    logger.info('[Silence Removal] HDR tone mapping integrated into filter complex');
+    logger.info(`[Silence Removal] HDR tone mapping integrated into filter complex`);
   }
 
   onProgress?.('Encoding video...', 50);
