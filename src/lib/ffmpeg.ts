@@ -50,6 +50,41 @@ export function safeFFprobe(inputPath: string): Promise<ffmpeg.FfprobeData> {
     });
   });
 }
+/**
+ * Probe video stream for color/HDR information.
+ * Used to detect HDR sources that need tone mapping before encoding to SDR.
+ */
+export interface VideoColorInfo {
+  isHdr: boolean;
+  colorTransfer: string | undefined;
+  colorSpace: string | undefined;
+  pixFmt: string | undefined;
+}
+
+export async function probeVideoColorInfo(inputPath: string): Promise<VideoColorInfo> {
+  const probe = await safeFFprobe(inputPath);
+  const videoStream = probe.streams.find(s => s.codec_type === 'video');
+
+  const colorTransfer = videoStream?.color_transfer;
+  const colorSpace = videoStream?.color_space;
+  const pixFmt = videoStream?.pix_fmt;
+
+  // HDR indicators: PQ (HDR10/Dolby Vision) or HLG transfer functions, or 10-bit pixel formats
+  const hdrTransfers = ['smpte2084', 'arib-std-b67'];
+  const isHdrTransfer = colorTransfer ? hdrTransfers.includes(colorTransfer) : false;
+  const is10Bit = pixFmt ? /10le|10be|p010/.test(pixFmt) : false;
+
+  const isHdr = isHdrTransfer || is10Bit;
+
+  return { isHdr, colorTransfer, colorSpace, pixFmt };
+}
+
+/** HDR-to-SDR tone mapping filter chain using zscale + tonemap (requires libzimg) */
+const HDR_TONEMAP_FILTER = 'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p';
+
+/** Explicit BT.709 colorspace tags for SDR output — prevents player misinterpretation */
+export const BT709_FLAGS = ['-colorspace', 'bt709', '-color_trc', 'bt709', '-color_primaries', 'bt709'];
+
 export interface SilenceInterval {
   start: number;
   end: number;
@@ -74,9 +109,9 @@ export interface RemoveSilenceResult {
   keptSegments: SilenceInterval[];
 }
 
-/** Returns a random CRF between 17–19 for anti-fingerprinting. Visually indistinguishable but produces unique bitrate curves. */
+/** Fixed CRF 18 — high quality H.264 suitable for Instagram upload. */
 export function naturalCrf(): string {
-  return String(17 + Math.floor(Math.random() * 3));
+  return '18';
 }
 
 /**
@@ -665,6 +700,12 @@ export async function removeSilence(
   // Validate input file exists before spawning any ffmpeg processes
   validateFileExists(inputPath, 'silence removal');
 
+  // Detect HDR/color info for tone mapping decisions
+  const colorInfo = await probeVideoColorInfo(inputPath);
+  if (colorInfo.isHdr) {
+    logger.info(`[Silence Removal] HDR source detected (transfer=${colorInfo.colorTransfer}, pix_fmt=${colorInfo.pixFmt})`);
+  }
+
   const duration = await getVideoDuration(inputPath);
   const presetName = validatePresetName(options.silencePreset);
   const preset = SILENCE_PRESETS[presetName];
@@ -758,18 +799,22 @@ export async function removeSilence(
     }
 
     if (silences.length === 0) {
-      logger.debug(`[Silence Removal] No silences found, copying original file`);
-      fs.copyFileSync(inputPath, outputPath);
-      return { outputPath, keptSegments: [{ start: 0, end: duration }] };
+      if (!colorInfo.isHdr) {
+        logger.debug(`[Silence Removal] No silences found, copying original file`);
+        fs.copyFileSync(inputPath, outputPath);
+        return { outputPath, keptSegments: [{ start: 0, end: duration }] };
+      }
+      // HDR: force through encode path for tone mapping
+      segments = [{ start: 0, end: duration }];
+    } else {
+      segments = getNonSilentSegments(silences, duration, {
+        padding: 0,
+        minSegmentDuration: 0.1,
+        mergeGap: 0.05,
+        timebackPadding: preset.prePadMs / 1000,
+        timebackPaddingEnd: preset.postPadMs / 1000,
+      });
     }
-
-    segments = getNonSilentSegments(silences, duration, {
-      padding: 0,
-      minSegmentDuration: 0.1,
-      mergeGap: 0.05,
-      timebackPadding: preset.prePadMs / 1000,
-      timebackPaddingEnd: preset.postPadMs / 1000,
-    });
   }
 
   onProgress?.('Detecting silence...', 30);
@@ -781,11 +826,14 @@ export async function removeSilence(
 
   logger.info(`[Silence Removal] ${segments.length} segments to keep`);
 
-  // If no segments to keep, copy the original file
+  // If no segments to keep, copy the original file (or tone-map if HDR)
   if (segments.length === 0) {
-    logger.debug(`[Silence Removal] No segments to keep, copying original file`);
-    fs.copyFileSync(inputPath, outputPath);
-    return { outputPath, keptSegments: [{ start: 0, end: duration }] };
+    if (!colorInfo.isHdr) {
+      logger.debug(`[Silence Removal] No segments to keep, copying original file`);
+      fs.copyFileSync(inputPath, outputPath);
+      return { outputPath, keptSegments: [{ start: 0, end: duration }] };
+    }
+    segments = [{ start: 0, end: duration }];
   }
 
   const isIntermediate = options.isIntermediate === true;
@@ -797,9 +845,24 @@ export async function removeSilence(
   );
 
   if (!filterComplex) {
-    logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
-    fs.copyFileSync(inputPath, outputPath);
-    return { outputPath, keptSegments: segments };
+    if (!colorInfo.isHdr) {
+      logger.debug(`[Silence Removal] Empty filter complex, copying original file`);
+      fs.copyFileSync(inputPath, outputPath);
+      return { outputPath, keptSegments: segments };
+    }
+  }
+
+  // If HDR, prepend tone mapping to the filter complex so the first encode produces SDR output.
+  // Replace all [0:v] video references with the tone-mapped stream label.
+  let finalFilterComplex = filterComplex;
+  if (colorInfo.isHdr) {
+    if (filterComplex) {
+      finalFilterComplex = `[0:v]${HDR_TONEMAP_FILTER}[tonemapped];` + filterComplex.replace(/\[0:v\]/g, '[tonemapped]');
+    } else {
+      // No silence removal needed, but HDR needs tone mapping — encode full video
+      finalFilterComplex = `[0:v]${HDR_TONEMAP_FILTER}[outv];[0:a]anull[outa]`;
+    }
+    logger.info('[Silence Removal] HDR tone mapping integrated into filter complex');
   }
 
   onProgress?.('Encoding video...', 50);
@@ -825,7 +888,7 @@ export async function removeSilence(
   try {
     await runFFmpegWithRetry(() => {
       const pipeline = ffmpeg(inputPath)
-        .complexFilter(filterComplex)
+        .complexFilter(finalFilterComplex)
         .outputOptions([
           '-map', '[outv]',
           '-map', '[outa]',
@@ -838,7 +901,7 @@ export async function removeSilence(
           ...(isIntermediate ? ['-bufsize', '1M', '-c:a', 'aac', '-b:a', '256k', '-ar', '48000'] : [...INSTAGRAM_VIDEO_OPTS, ...instagramAudioOpts()]),
           // faststart moves moov atom to the front for instant mobile playback/preview.
           // Skip for intermediate files since they'll be re-encoded anyway.
-          ...(isIntermediate ? [] : ['-movflags', '+faststart', '-pix_fmt', 'yuv420p']),
+          ...(isIntermediate ? [] : ['-movflags', '+faststart', '-pix_fmt', 'yuv420p', ...BT709_FLAGS]),
           ...(isIntermediate ? [] : phoneMetadata()),
         ])
         .output(outputPath);
@@ -1214,9 +1277,10 @@ export async function applyCombinedFilters(
         '-crf', naturalCrf(),
         '-pix_fmt', 'yuv420p',
         ...INSTAGRAM_VIDEO_OPTS,
+        ...BT709_FLAGS,
         '-threads', '0',
         '-max_muxing_queue_size', '512',
-        ...instagramAudioOpts(),
+        '-c:a', 'copy',
         '-movflags', '+faststart',
         ...phoneMetadata(),
         '-shortest',
@@ -1237,9 +1301,10 @@ export async function applyCombinedFilters(
             '-crf', naturalCrf(),
             '-pix_fmt', 'yuv420p',
             ...INSTAGRAM_VIDEO_OPTS,
+            ...BT709_FLAGS,
             '-threads', '0',
             '-max_muxing_queue_size', '512',
-            ...instagramAudioOpts(),
+            '-c:a', 'copy',
             '-movflags', '+faststart',
             ...phoneMetadata(),
           ])
@@ -1290,9 +1355,10 @@ export async function trimVideo(
         '-crf', naturalCrf(),
         '-pix_fmt', 'yuv420p',
         ...INSTAGRAM_VIDEO_OPTS,
+        ...BT709_FLAGS,
         '-threads', '0',
         '-max_muxing_queue_size', '512',
-        ...instagramAudioOpts(),
+        '-c:a', 'copy',
         '-avoid_negative_ts', 'make_zero',
         '-movflags', '+faststart',
         ...phoneMetadata(),
@@ -1357,9 +1423,10 @@ export async function splitVideo(
           '-crf', naturalCrf(),
           '-pix_fmt', 'yuv420p',
           ...INSTAGRAM_VIDEO_OPTS,
+          ...BT709_FLAGS,
           '-threads', '0',
           '-max_muxing_queue_size', '512',
-          ...instagramAudioOpts(),
+          '-c:a', 'copy',
           '-avoid_negative_ts', 'make_zero',
           '-movflags', '+faststart',
           ...phoneMetadata(),
